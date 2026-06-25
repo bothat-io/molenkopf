@@ -10,6 +10,7 @@ const signals = ["SIGINT", "SIGTERM"];
 
 export function runLauncher(args = process.argv.slice(2), options = {}) {
   const root = options.sourceRoot ?? sourceRoot;
+  const exit = options.exit ?? process.exit;
   const runtimeRoot = runtimeRootFor(root);
   const entry = join(runtimeRoot, "packages", "proxy", "src", "cli", "main.ts");
   if (!existsSync(entry)) throw new Error(`missing CLI entrypoint: ${entry}`);
@@ -29,7 +30,7 @@ export function runLauncher(args = process.argv.slice(2), options = {}) {
     cleanup();
     const finalSignal = requestedSignal || signal;
     if (finalSignal && !forced && process.platform !== "win32") process.kill(process.pid, finalSignal);
-    process.exit(code ?? (forced ? 1 : 1));
+    exit(code ?? (forced ? 1 : 1));
   };
   const handlers = Object.fromEntries(signals.map((name) => [name, () => {
     if (closeRequested) return;

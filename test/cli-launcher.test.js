@@ -6,25 +6,39 @@ import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/pr
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { runLauncher } from "../bin/launcher.js";
 
 const repo = dirname(dirname(fileURLToPath(import.meta.url)));
 
 test("launcher kills an unresponsive child before cleaning staged runtime", { skip: process.platform === "win32", timeout: 5000 }, async () => {
   const root = await fakeInstall("process.on('SIGTERM', () => {}); await hold();\n");
   const pidFile = join(root.base, "child.pid");
+  const previousPidFile = process.env.CHILD_PID_FILE;
+  const previousGrace = process.env.MOLENKOPF_LAUNCHER_GRACE_MS;
   try {
     const before = await tempRuntimes(root.installed);
-    const wrapper = spawn(process.execPath, [join(root.installed, "bin", "molenkopf.js")], {
-      env: { ...process.env, CHILD_PID_FILE: pidFile, MOLENKOPF_LAUNCHER_GRACE_MS: "100" },
-      stdio: "ignore"
+    process.env.CHILD_PID_FILE = pidFile;
+    process.env.MOLENKOPF_LAUNCHER_GRACE_MS = "100";
+    let exitCode;
+    const exit = new Promise((resolve) => {
+      runLauncher([], {
+        sourceRoot: root.installed,
+        stdio: "ignore",
+        exit: (code) => {
+          exitCode = code;
+          resolve();
+        }
+      });
     });
     const childPid = Number(await waitForFile(pidFile));
-    wrapper.kill("SIGTERM");
-    const result = await waitForClose(wrapper, 3000);
-    assert.equal(result.code, 1);
+    process.emit("SIGTERM");
+    await withTimeout(exit, 3000, "timed out waiting for launcher forced shutdown");
+    assert.equal(exitCode, 1);
     await waitForDead(childPid);
     assert.deepEqual(await tempRuntimes(root.installed), before);
   } finally {
+    restoreEnv("CHILD_PID_FILE", previousPidFile);
+    restoreEnv("MOLENKOPF_LAUNCHER_GRACE_MS", previousGrace);
     await rm(root.base, { recursive: true, force: true });
   }
 });
@@ -84,20 +98,11 @@ async function waitForFile(path) {
 }
 
 function waitForClose(child, timeoutMs) {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      child.kill("SIGKILL");
-      reject(new Error(`timed out waiting for child ${child.pid} to close`));
-    }, timeoutMs);
-    child.on("close", (code, signal) => {
-      clearTimeout(timeout);
-      resolve({ code, signal });
-    });
-    child.on("error", (error) => {
-      clearTimeout(timeout);
-      reject(error);
-    });
+  const closed = new Promise((resolve, reject) => {
+    child.on("close", (code, signal) => resolve({ code, signal }));
+    child.on("error", reject);
   });
+  return withTimeout(closed, timeoutMs, `timed out waiting for child ${child.pid} to close`, () => child.kill("SIGKILL"));
 }
 
 function isAlive(pid) {
@@ -114,4 +119,28 @@ async function waitForDead(pid) {
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function withTimeout(promise, timeoutMs, message, onTimeout = () => {}) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      onTimeout();
+      reject(new Error(message));
+    }, timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      }
+    );
+  });
+}
+
+function restoreEnv(name, value) {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
 }
