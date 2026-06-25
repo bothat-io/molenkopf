@@ -1,0 +1,70 @@
+{
+  "name": "molenkopf",
+  "version": "0.1.0",
+  "description": "Local gateway for API and CLI based coding agents with routing, redaction, compression, memory, audit, and dashboard controls.",
+  "author": "Molenkopf contributors",
+  "license": "MIT",
+  "private": false,
+  "type": "module",
+  "bin": {
+    "molenkopf": "bin/molenkopf.js"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/molenkopf/molenkopf.git"
+  },
+  "bugs": {
+    "url": "https://github.com/molenkopf/molenkopf/issues"
+  },
+  "homepage": "https://github.com/molenkopf/molenkopf#readme",
+  "keywords": [
+    "molenkopf",
+    "local-ai-gateway",
+    "coding-agents",
+    "proxy",
+    "redaction",
+    "audit"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "bin/",
+    "packages/core/src/",
+    "packages/proxy/src/",
+    "packages/plugins/",
+    "packages/dashboard/dist/",
+    "packages/dashboard/public/molenkopf-logo.png",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md"
+  ],
+  "scripts": {
+    "bootstrap": "npm ci && npm --prefix packages/dashboard ci",
+    "typecheck": "npm run typecheck:node && npm --prefix packages/dashboard run typecheck",
+    "typecheck:node": "node packages/dashboard/node_modules/typescript/bin/tsc -p tsconfig.node.json",
+    "test": "npm run test:unit",
+    "test:unit": "npm run check:docs && npm run check:dashboard-install && npm run check:reachability && npm run check:container-contract && npm run typecheck && npm --prefix packages/dashboard run build && npm run vitest && npm run test:node",
+    "check:docs": "node scripts/check-doc-paths.js",
+    "check:dashboard-install": "node scripts/check-dashboard-install.js",
+    "check:reachability": "node scripts/check-reachability.js",
+    "check:container-contract": "node scripts/check-container-contract.js",
+    "test:node": "node --experimental-strip-types --experimental-sqlite --disable-warning=ExperimentalWarning --import ./packages/proxy/test/setup.ts --test --test-concurrency=1 packages/core/test/*.test.ts packages/proxy/test/*.test.ts packages/dashboard/test/*.test.ts",
+    "test:all": "npm run test:unit && npm run e2e",
+    "vitest": "npm --prefix packages/dashboard run test",
+    "e2e": "npm --prefix packages/dashboard run e2e",
+    "pack:dry": "npm --prefix packages/dashboard run build && npm pack --dry-run",
+    "serve:dev": "node --experimental-strip-types --experimental-sqlite --disable-warning=ExperimentalWarning packages/proxy/src/cli/profile-server.ts dev",
+    "serve:test": "node --experimental-strip-types --experimental-sqlite --disable-warning=ExperimentalWarning packages/proxy/src/cli/profile-server.ts test",
+    "serve:prod": "npm --prefix packages/dashboard run build && node --experimental-strip-types --experimental-sqlite --disable-warning=ExperimentalWarning packages/proxy/src/cli/profile-server.ts prod",
+    "dev": "npm run serve:dev",
+    "prod": "npm run serve:prod"
+  },
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  }
+}

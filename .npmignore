@@ -1,0 +1,13 @@
+# Keep accidental npm packs narrow until the public package file list is finalized.
+*
+!package.json
+!package-lock.json
+!README.md
+!LICENSE
+!SECURITY.md
+!packages/
+!packages/dashboard/
+!packages/dashboard/dist/
+!packages/dashboard/dist/**
+!packages/dashboard/public/
+!packages/dashboard/public/molenkopf-logo.png

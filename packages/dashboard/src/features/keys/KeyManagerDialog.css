@@ -1,0 +1,7 @@
+.key-manager{display:flex;flex-direction:column;gap:14px;min-height:0;overflow:auto;padding-right:2px}
+.key-manager-table{min-width:820px}
+.key-manager-form{border-top:1px solid var(--line);padding-top:14px}
+.key-manager-form h3{margin:0;font-size:16px}
+.key-secret{border:1px solid rgba(15,118,104,.25);background:rgba(15,118,104,.07);border-radius:10px;padding:10px 12px;display:grid;gap:7px}
+.key-secret span{color:var(--muted);font-size:13px}
+.key-secret code{display:block;background:#1d1a17;color:#fff;border-radius:8px;padding:10px;overflow-wrap:anywhere}

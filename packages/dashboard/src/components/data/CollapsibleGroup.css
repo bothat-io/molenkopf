@@ -1,0 +1,14 @@
+.collapsible-group{background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:none;overflow:hidden}
+.collapsible-group:last-child{border-bottom:0}
+.collapsible-group summary{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 16px;cursor:pointer;list-style:none}
+.collapsible-group summary::-webkit-details-marker{display:none}
+.collapsible-group summary::before{content:"+";width:22px;height:22px;display:grid;place-items:center;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--muted);font-weight:700;flex:0 0 auto}
+.collapsible-group[open] summary::before{content:"-";color:var(--accent-2);background:var(--soft)}
+.collapsible-group.is-drop-active summary{background:rgba(15,118,104,.07);outline:1px dashed var(--accent);outline-offset:-5px}
+.collapsible-main{display:grid;gap:3px;min-width:0;flex:1}
+.collapsible-main strong{display:block}
+.collapsible-main span{color:var(--muted);font-size:12px}
+.collapsible-side{display:flex;gap:12px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.collapsible-side span{color:var(--muted);font-size:12px}
+.collapsible-actions{display:inline-flex}
+@media(max-width:760px){.collapsible-group summary{align-items:flex-start}.collapsible-side{justify-content:flex-start}}

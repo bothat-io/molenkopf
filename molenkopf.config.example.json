@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "server": {
+    "bindHost": "127.0.0.1",
+    "port": 8787,
+    "dataDir": ".molenkopf"
+  },
+  "providers": [
+    {
+      "id": "openai-main",
+      "name": "OpenAI Main",
+      "kind": "openai-compatible",
+      "baseUrl": "https://api.openai.com/v1",
+      "auth": {
+        "scheme": "bearer",
+        "credentialRef": "env:OPENAI_MAIN_API_KEY"
+      },
+      "enabled": true
+    },
+    {
+      "id": "claude-main",
+      "name": "Claude Main",
+      "kind": "anthropic",
+      "baseUrl": "https://api.anthropic.com/v1",
+      "auth": {
+        "scheme": "x-api-key",
+        "credentialRef": "env:ANTHROPIC_MAIN_API_KEY"
+      },
+      "enabled": true
+    },
+    {
+      "id": "claude-local",
+      "name": "Claude Local CLI",
+      "kind": "cli-claude",
+      "command": "claude",
+      "args": ["--print"],
+      "inputMode": "stdin",
+      "timeoutMs": 120000,
+      "enabled": false
+    }
+  ],
+  "profiles": [
+    {
+      "id": "default-local",
+      "providerId": "openai-main",
+      "allowedModels": ["gpt-4.1-mini"],
+      "defaultModel": "gpt-4.1-mini"
+    }
+  ],
+  "pluginPolicies": [
+    {
+      "id": "standard-policy",
+      "enabledPluginIds": ["context-compressor-plugin"],
+      "remotePlugins": false
+    }
+  ],
+  "agents": [
+    {
+      "id": "local-codex",
+      "ownerId": "local",
+      "kind": "local-agent",
+      "profileId": "default-local",
+      "pluginPolicyId": "standard-policy",
+      "scopes": ["proxy:use"],
+      "enabled": true
+    }
+  ]
+}

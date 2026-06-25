@@ -1,0 +1,8 @@
+# Private dashboard package; avoid accidental tarballs with source, tests, or builds.
+*
+!package.json
+!package-lock.json
+!dist/
+!dist/**
+!public/
+!public/molenkopf-logo.png

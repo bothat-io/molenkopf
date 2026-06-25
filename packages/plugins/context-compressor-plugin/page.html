@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Context compression</title>
+<style>
+  :root{--bg:#f4f1ea;--surface:#fbf9f4;--line:#e3ddd1;--ink:#1c1a17;--muted:#746d63;--accent:#087a68;--soft:#d9f3ed;--warn:#9b4a00;--font-sans:"Segoe UI",Arial,sans-serif;--font-serif:Georgia,"Times New Roman",serif}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-sans);line-height:1.45}
+  .wrap{max-width:1440px;margin:0 auto;padding:34px 28px 48px}
+  header{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:22px}
+  h1{font-family:var(--font-serif);font-weight:650;font-size:30px;margin:0 0 4px}
+  h2{font-size:15px;margin:0 0 14px}.sub,.muted{color:var(--muted);font-size:13px}.state{border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:10px 12px;min-width:260px}
+  .statusbox{display:grid;gap:8px}.actions{display:flex;justify-content:flex-end}button{border:1px solid var(--line);border-radius:8px;background:#fffdf8;color:var(--ink);padding:7px 10px;font-weight:700;cursor:pointer}button:disabled{opacity:.55;cursor:default}
+  .badge{display:inline-flex;align-items:center;border-radius:999px;background:var(--soft);color:#075f54;font-size:11px;font-weight:700;padding:3px 8px;margin-left:6px}
+  .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.two{grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr)}.panel,.metric{min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 22px rgba(28,26,23,.06)}
+  .metric{padding:16px}.metric .k,.label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}.metric .v{font-family:var(--font-serif);font-size:31px;font-weight:650;margin-top:7px}
+  .panel{padding:18px;margin-top:14px}.funnel{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:10px;align-items:center}.step{border:1px solid var(--line);border-radius:8px;padding:13px;background:#fffdf8}.arrow{color:var(--muted);font-weight:700}
+  .bar,.track{height:8px;background:#ebe5d9;border-radius:999px;overflow:hidden;margin-top:8px}.bar span,.track span{display:block;height:100%;background:var(--accent);border-radius:999px;animation:fill .45s ease-out}
+  .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.chart-row{display:grid;grid-template-columns:110px minmax(0,1fr) 88px;gap:10px;align-items:center;margin:10px 0}.chart-row b{font-size:13px}.chart-value{text-align:right;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px}
+  .stackbar{height:18px;border-radius:999px;background:#ebe5d9;overflow:hidden;display:flex}.stackbar span{display:block;height:100%;animation:fill .45s ease-out}.sent{background:#087a68}.saved{background:#e0ad45}.lost{background:#d7cfc1}
+  .break-list{display:grid;gap:9px}.break-card{border:1px solid var(--line);border-radius:8px;background:#fffdf8;padding:11px}.break-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.break-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:9px}.break-stats div{font-size:12px}.break-stats b{display:block;font-size:13px}.mini{height:5px;background:#ebe5d9;border-radius:999px;overflow:hidden;margin-top:9px}.mini span{display:block;height:100%;background:var(--accent);border-radius:999px;animation:fill .45s ease-out}
+  .timeline{width:100%;height:190px}.timeline text{font:11px ui-monospace,SFMono-Regular,Consolas,monospace;fill:var(--muted)}.timeline rect{rx:3;animation:rise .45s ease-out}.timeline .orig{fill:#d7cfc1}.timeline .fwd{fill:#087a68}.timeline .save{fill:#e0ad45}
+  table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px}th,td{text-align:left;border-bottom:1px solid var(--line);padding:9px 8px;vertical-align:top;overflow-wrap:anywhere}th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+  .right{text-align:right}.row-title{font-weight:700}.recent{display:grid;gap:9px}.request{display:grid;grid-template-columns:1.5fr 1fr 1fr auto;gap:10px;border:1px solid var(--line);border-radius:8px;background:#fffdf8;padding:10px}
+  .empty{border:1px dashed var(--line);border-radius:10px;padding:18px;color:var(--muted);background:#fffdf8}.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;overflow-wrap:anywhere}.status-error{color:var(--warn);font-weight:700}
+  @keyframes fill{from{width:0}to{width:var(--w,100%)}}@keyframes rise{from{transform:scaleY(.05);transform-origin:bottom}to{transform:scaleY(1);transform-origin:bottom}}
+  html[data-loaded="1"] .bar span,html[data-loaded="1"] .track span,html[data-loaded="1"] .stackbar span,html[data-loaded="1"] .mini span,html[data-loaded="1"] .timeline rect{animation:none}
+  @media(max-width:900px){.grid,.two,.funnel,.chart-grid,.break-stats{grid-template-columns:1fr}header{display:block}.state{margin-top:12px}.arrow{display:none}.request{grid-template-columns:1fr}.chart-row{grid-template-columns:1fr}
+    table,thead,tbody,tr,th,td{display:block}thead,th{display:none}tr{border:1px solid var(--line);border-radius:8px;background:#fffdf8;padding:8px;margin-bottom:9px}
+    td{border:0;padding:4px 0}.right{text-align:left}td[data-label]::before{content:attr(data-label);display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+  }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <div>
+      <h1>Context compression</h1>
+      <div class="sub">Real compression accounting for transferred payloads. Full prompts and responses stay out of this page.</div>
+    </div>
+    <div class="statusbox"><div class="state" id="state">Loading workspace...</div><div class="actions"><button id="refresh" type="button">Refresh snapshot</button></div></div>
+  </header>
+  <section class="grid" id="metrics"></section>
+  <section class="chart-grid">
+    <div class="panel"><h2>Payload reduction chart</h2><div id="reduction"></div></div>
+    <div class="panel"><h2>Recent activity chart</h2><div id="timeline"></div></div>
+  </section>
+  <section class="panel" id="funnel"></section>
+  <section class="grid two">
+    <div class="panel"><h2>Projects / API keys</h2><div id="accounts"></div></div>
+    <div class="panel"><h2>Provider savings</h2><div id="providers"></div></div>
+  </section>
+  <section class="panel"><h2>Endpoint pressure</h2><div id="endpoints"></div></section>
+  <section class="panel"><h2>Recent grouped activity</h2><div id="recent" class="recent"></div></section>
+</main>
+<script>
+const DATA_URL="/__molenkopf/plugins/context-compressor-plugin/data";
+const METRICS=[
+  ["Requests","requests"],["Observed payload","originalTokens"],["Forwarded payload","compressedTokens"],
+  ["Transform delta","payloadDelta","delta"],["Compression saved","savedTokens"],["Compressed items","compressedItems"],["Compression %","savedPercent","pct"],
+  ["Input tokens","upstreamInputTokens"],["Output tokens","upstreamOutputTokens"],["Redacted secrets","redactedSecrets"]
+];
+const TABLE_COLS=[["Requests","requests"],["Compression saved","savedTokens"],["Compression %","savedPercent","pct"],["Original","originalTokens"],["Forwarded","compressedTokens"]];
+const $=(id)=>document.getElementById(id);
+const n=(v)=>Number(v||0).toLocaleString("en-US");
+const pct=(v)=>`${Number(v||0).toLocaleString("en-US")}%`;
+const esc=(v)=>String(v??"").replace(/[&<>"]/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const delta=(row)=>Math.max(0,(row.originalTokens||0)-(row.compressedTokens||0));
+const value=(row,key,kind)=>kind==="pct"?pct(row[key]):kind==="delta"?n(delta(row)):key==="upstream"?n((row.upstreamInputTokens||0)+(row.upstreamOutputTokens||0)):n(row[key]);
+
+function stateText(plugin,m){
+  const enabled=plugin?.enabled!==false;
+  if(!m.requests) return `No payloads observed yet <span class="badge">${enabled?"enabled":"off"}</span><div class="muted">Send Claude, Codex, or API traffic through Molenkopf to populate this workspace.</div>`;
+  if(!enabled) return `Compression disabled <span class="badge">off</span><div class="muted">Existing rows are historical audit data; new requests pass through unchanged.</div>`;
+  if(m.compressedItems>0&&m.savedTokens>0) return `Compression active <span class="badge">saving</span><div class="muted">${n(m.savedTokens)} tokens saved across ${n(m.compressedItems)} compressed ${m.compressedItems===1?"item":"items"}.</div>`;
+  const d=delta(m);
+  return `Compressor enabled <span class="badge">watching</span><div class="muted">${d?n(d)+" tokens changed by other safe transforms; ":""}No compressible structured block was replaced yet. Prose, code, markdown and diffs stay untouched.</div>`;
+}
+
+function renderMetrics(m){
+  $("metrics").innerHTML=METRICS.map(([label,key,kind])=>`<div class="metric"><div class="k">${label}</div><div class="v">${value(m,key,kind)}</div></div>`).join("");
+}
+
+function renderFunnel(m){
+  const saved=Math.max(0,m.savedTokens||0), original=Math.max(0,m.originalTokens||0), forwarded=Math.max(0,m.compressedTokens||0);
+  const width=original?Math.max(2,Math.min(100,Math.round((saved/original)*100))):0;
+  $("funnel").innerHTML=`<h2>Token funnel</h2><div class="funnel">
+    ${step("Before",original,"Estimated tokens observed before compression")}
+    <div class="arrow">-&gt;</div>${step("Forwarded",forwarded,"Estimated tokens after safe transforms")}
+    <div class="arrow">-&gt;</div>${step("Compression saved",saved,`${pct(m.savedPercent)} compression saved`)}
+  </div><div class="bar"><span style="--w:${width}%;width:${width}%"></span></div>
+  <div class="muted">Compression only targets large structured content such as logs, JSON, shell output and stacktraces.</div>`;
+}
+
+function renderReduction(m){
+  const original=Math.max(0,m.originalTokens||0), forwarded=Math.max(0,m.compressedTokens||0), saved=Math.max(0,m.savedTokens||0);
+  const changed=delta(m), max=Math.max(original,forwarded,changed,saved,1), sentPct=Math.min(100,Math.round((forwarded/max)*100)), changedPct=Math.min(100,Math.round((changed/max)*100)), savePct=Math.min(100,Math.round((saved/max)*100));
+  $("reduction").innerHTML=[
+    chartRow("Observed",original,100,"sent"),
+    chartRow("Forwarded",forwarded,sentPct,"sent"),
+    chartRow("Payload delta",changed,changedPct,"lost"),
+    chartRow("Compression saved",saved,savePct,"saved")
+  ].join("")+`<div class="stackbar" title="Forwarded, transform delta, compression saved"><span class="sent" style="--w:${original?Math.max(1,Math.round((forwarded/original)*100)):0}%;width:${original?Math.max(1,Math.round((forwarded/original)*100)):0}%"></span><span class="lost" style="--w:${original?Math.round((Math.max(0,changed-saved)/original)*100):0}%;width:${original?Math.round((Math.max(0,changed-saved)/original)*100):0}%"></span><span class="saved" style="--w:${original?Math.round((saved/original)*100):0}%;width:${original?Math.round((saved/original)*100):0}%"></span></div><div class="muted">Green is forwarded context. Amber is confirmed context-compression savings; gray is other safe transform delta.</div>`;
+}
+
+function chartRow(label,count,width,cls){
+  return `<div class="chart-row"><b>${label}</b><div class="track"><span class="${cls}" style="--w:${Math.max(0,width)}%;width:${Math.max(0,width)}%"></span></div><div class="chart-value">${n(count)}</div></div>`;
+}
+
+function renderTimeline(items){
+  const rows=(items||[]).slice(-14), max=Math.max(...rows.map((r)=>r.estimatedOriginalTokens??r.originalTokens??0),1);
+  if(!rows.length){$("timeline").innerHTML=`<div class="empty">No request timeline yet.</div>`;return}
+  const w=560,h=170,gap=7,bw=Math.max(14,Math.floor((w-gap*(rows.length-1))/rows.length));
+  const bars=rows.map((r,i)=>{
+    const original=r.estimatedOriginalTokens??r.originalTokens??0, compressed=r.estimatedCompressedTokens??r.compressedTokens??0, saved=r.estimatedSavedTokens??r.savedTokens??0;
+    const x=i*(bw+gap), orig=Math.max(2,Math.round((original/max)*130)), fwd=Math.max(2,Math.round((compressed/max)*130)), save=Math.max(0,Math.round((saved/max)*130));
+    return `<rect class="orig" x="${x}" y="${h-orig}" width="${bw}" height="${orig}"></rect><rect class="fwd" x="${x+3}" y="${h-fwd}" width="${Math.max(3,bw-6)}" height="${fwd}"></rect>${save?`<rect class="save" x="${x+6}" y="${h-fwd-save}" width="${Math.max(2,bw-12)}" height="${save}"></rect>`:""}`;
+  }).join("");
+  $("timeline").innerHTML=`<svg class="timeline" viewBox="0 0 ${w} 190" role="img" aria-label="Recent activity token chart">${bars}<text x="0" y="188">last ${rows.length} activity groups - gray observed - green forwarded - amber saved</text></svg>`;
+}
+
+function step(label,count,caption){return `<div class="step"><div class="label">${label}</div><div class="metric v" style="box-shadow:none;border:0;padding:0;background:transparent">${n(count)}</div><div class="muted">${esc(caption)}</div></div>`}
+
+function renderTable(id,rows,emptyLabel,withSource=false){
+  if(!rows?.length){$(id).innerHTML=`<div class="empty">${emptyLabel}</div>`;return}
+  const head=`<thead><tr><th>Name</th>${withSource?"<th>Source</th>":""}${TABLE_COLS.map(([l])=>`<th class="right">${l}</th>`).join("")}<th>Latest</th></tr></thead>`;
+  const body=rows.slice(0,8).map((row)=>`<tr><td data-label="Name"><div class="row-title">${esc(row.label)}</div><div class="mono">${esc(row.id)}</div></td>${withSource?`<td data-label="Source">${esc(row.source)}</td>`:""}${TABLE_COLS.map(([label,key,kind])=>`<td data-label="${label}" class="right">${value(row,key,kind)}</td>`).join("")}<td data-label="Latest">${esc(shortTime(row.latestAt))}</td></tr>`).join("");
+  $(id).innerHTML=`<table>${head}<tbody>${body}</tbody></table>`;
+}
+
+function renderBreakdown(id,rows,emptyLabel,withSource=false){
+  if(!rows?.length){$(id).innerHTML=`<div class="empty">${emptyLabel}</div>`;return}
+  $(""+id).innerHTML=`<div class="break-list">`+rows.slice(0,8).map((row)=>{
+    const width=Math.max(2,Math.min(100,Math.round(row.savedPercent||0)));
+    const third=row.inputTokens!=null?["Input",n(row.inputTokens)]:["Observed",n(row.originalTokens)];
+    const fourth=row.outputTokens!=null?["Output",n(row.outputTokens)]:[withSource?"Source":"Forwarded",withSource?esc(row.source):n(row.compressedTokens)];
+    return `<div class="break-card"><div class="break-top"><div><div class="row-title">${esc(row.label)}</div><div class="mono">${esc(row.id)}</div></div><div class="muted">${esc(shortTime(row.latestAt))}</div></div>`+
+      `<div class="mini"><span style="--w:${width}%;width:${width}%"></span></div><div class="break-stats">`+
+      `<div><span class="label">Requests</span><b>${n(row.requests)}</b></div><div><span class="label">Compression saved</span><b>${n(row.savedTokens)}</b></div>`+
+      `<div><span class="label">${third[0]}</span><b>${third[1]}</b></div><div><span class="label">${fourth[0]}</span><b>${fourth[1]}</b></div>`+
+      `</div></div>`;
+  }).join("")+`</div>`;
+}
+
+function renderRecent(groups){
+  if(!groups?.length){$("recent").innerHTML=`<div class="empty">No request activity recorded yet.</div>`;return}
+  $("recent").innerHTML=groups.map((item)=>{
+    const tokens=`${n(item.originalTokens)} -> ${n(item.compressedTokens)} compression saved ${n(item.savedTokens)}`;
+    const status=item.errors?`<span class="status-error">${esc(item.status)}</span>`:esc(item.status||"unknown");
+    return `<div class="request"><div><div class="row-title">${esc(item.clientLabel)}</div><div class="mono">${esc(item.endpoint)}</div><div class="muted">${item.project?`project ${esc(item.project)}`:"no project"}${item.keyId?` - key ${esc(item.keyId)}`:""}</div></div><div><div class="label">Provider</div><div class="mono">${esc(item.providerId)}</div></div><div><div class="label">Activity</div><div>${n(item.requests)} requests</div><div class="muted">${tokens}; ${n(item.compressedItems)} items, ${n(item.retrievalRefs)} retrieval refs</div></div><div><div class="label">Status</div><div>${status}</div><div class="muted">${esc(shortTime(item.latestAt))}</div></div></div>`;
+  }).join("");
+}
+
+function shortTime(value){
+  if(!value) return "n/a";
+  const date=new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+async function loadData(url){
+  try{const r=await fetch(url);if(!r.ok)return{loadError:`HTTP ${r.status}`};return await r.json()}catch(error){return{loadError:String(error.message||error||"request failed")}}
+}
+
+async function load(){
+  const button=$("refresh");
+  if(button) button.disabled=true;
+  try{
+    const data=await loadData(DATA_URL);
+    if(data.loadError){$("state").innerHTML=`Data unavailable <span class="badge">error</span><div class="muted">${esc(data.loadError)}</div>`;["metrics","reduction","timeline","funnel","accounts","providers","endpoints","recent"].forEach((id)=>$(id).innerHTML=`<div class="empty status-error">Plugin data unavailable. Refresh after the proxy returns a valid data response.</div>`);return}
+    const m=data.metrics||{}, groups=data.requestGroups||[];
+    $("state").innerHTML=stateText(data.plugin,m);
+    renderMetrics(m);
+    renderReduction(m);
+    renderTimeline(groups);
+    renderFunnel(m);
+    const projectRows=m.projects&&m.projects.length?m.projects:m.buckets;
+    renderBreakdown("accounts",projectRows,"No project or API-key buckets observed yet.",!(m.projects&&m.projects.length));
+    renderBreakdown("providers",m.providers,"No provider traffic observed yet.");
+    renderTable("endpoints",m.endpoints,"No endpoint traffic observed yet.");
+    renderRecent(groups);
+    requestAnimationFrame(()=>{document.documentElement.dataset.loaded="1"});
+  }finally{
+    if(button) button.disabled=false;
+  }
+}
+$("refresh").addEventListener("click",load);
+load();
+</script>
+</body>
+</html>

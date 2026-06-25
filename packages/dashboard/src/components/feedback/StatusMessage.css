@@ -1,0 +1,17 @@
+.status-message{display:flex;align-items:flex-start;gap:10px;border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.35;border:1px solid var(--line);background:#fff}
+.status-message.success{border-color:rgba(15,118,104,.24);background:rgba(15,118,104,.08);color:var(--accent)}
+.status-message.error{border-color:rgba(183,79,24,.28);background:rgba(183,79,24,.07);color:var(--danger)}
+.status-message.warning{border-color:rgba(158,111,34,.28);background:rgba(158,111,34,.08);color:#7b5312}
+.status-message.info,.status-message.pending{border-color:rgba(74,92,111,.22);background:rgba(74,92,111,.06);color:#334155}
+.status-icon{position:relative;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;flex:0 0 20px;border-radius:999px;border:1px solid currentColor;margin-top:1px}
+.status-message.success .status-icon::after{content:"";position:absolute;width:5px;height:9px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);top:3px;left:7px}
+.status-message.error .status-icon::before,.status-message.error .status-icon::after{content:"";position:absolute;width:10px;height:2px;background:currentColor;border-radius:2px;top:8px;left:4px}
+.status-message.error .status-icon::before{transform:rotate(45deg)}
+.status-message.error .status-icon::after{transform:rotate(-45deg)}
+.status-message.warning .status-icon::before{content:"";position:absolute;width:2px;height:8px;background:currentColor;top:4px;left:8px;border-radius:2px}
+.status-message.warning .status-icon::after,.status-message.info .status-icon::after,.status-message.pending .status-icon::after{content:"";position:absolute;width:4px;height:4px;background:currentColor;border-radius:999px;bottom:4px;left:7px}
+.status-message.info .status-icon::before{content:"";position:absolute;width:2px;height:8px;background:currentColor;top:7px;left:8px;border-radius:2px}
+.status-message.pending .status-icon::before{content:"";position:absolute;inset:3px;border:2px solid currentColor;border-right-color:transparent;border-radius:999px}
+.status-copy{display:flex;flex-direction:column;gap:2px;min-width:0}
+.status-copy strong{font-weight:750;color:inherit}
+.status-copy span{color:var(--ink);overflow-wrap:anywhere}

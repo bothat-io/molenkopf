@@ -1,0 +1,119 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run validation only"
+        default: "true"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm run bootstrap
+      - run: npm test
+      - name: Dashboard E2E
+        run: npm run e2e
+      - name: Verify tag matches package version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          expected="v$(node -p "require('./package.json').version")"
+          test "$GITHUB_REF_NAME" = "$expected"
+      - name: Pack and smoke installed tarball
+        run: |
+          npm --prefix packages/dashboard run build
+          npm pack --json > pack.json
+          tarball="$(node -e "const fs=require('fs'); console.log(JSON.parse(fs.readFileSync('pack.json','utf8'))[0].filename)")"
+          tmp="$(mktemp -d)"
+          npm --prefix "$tmp" init -y
+          npm --prefix "$tmp" install "$PWD/$tarball"
+          "$tmp/node_modules/.bin/molenkopf" --help
+          MOLENKOPF_DATA_DIR="$tmp/data" "$tmp/node_modules/.bin/molenkopf" self-test
+      - run: docker build --pull -t molenkopf:ci .
+      - name: Smoke final image
+        run: |
+          docker run -d --name molenkopf-ci molenkopf:ci
+          trap 'docker rm -f molenkopf-ci' EXIT
+          ready=0
+          for i in $(seq 1 30); do
+            if docker exec molenkopf-ci node -e "fetch('http://127.0.0.1:8787/__molenkopf/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" = "1" ]; then
+            docker exec molenkopf-ci node - <<'NODE'
+          const base = 'http://127.0.0.1:8787';
+          const before = await fetch(`${base}/__molenkopf/me`).then((r) => r.json());
+          if (!before.needsSetup) throw new Error('expected first-run setup');
+          const setup = await fetch(`${base}/__molenkopf/setup-admin`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ username: 'admin', password: 'admin-secret' })
+          });
+          if (!setup.ok) throw new Error(`setup failed: ${setup.status}`);
+          const cookie = setup.headers.get('set-cookie')?.split(';')[0];
+          const after = await fetch(`${base}/__molenkopf/me`, { headers: { cookie } }).then((r) => r.json());
+          if (after.user?.id !== 'admin') throw new Error('authenticated setup session missing');
+          NODE
+            exit 0
+          fi
+          docker logs molenkopf-ci
+          exit 1
+
+  publish-npm:
+    needs: validate
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') && github.event.inputs.dry_run != 'true'
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: npm run bootstrap
+        env:
+          CYPRESS_INSTALL_BINARY: "0"
+      - run: npm --prefix packages/dashboard run build
+      - run: npm publish
+
+  publish-docker:
+    needs: validate
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') && github.event.inputs.dry_run != 'true'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

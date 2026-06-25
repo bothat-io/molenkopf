@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "typeRoots": ["./packages/dashboard/node_modules/@types"],
+    "strict": false,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "packages/core/src/**/*.ts",
+    "packages/core/test/**/*.ts",
+    "packages/proxy/src/**/*.ts",
+    "packages/proxy/test/**/*.ts",
+    "packages/plugins/**/*.ts",
+    "packages/dashboard/test/**/*.ts"
+  ]
+}
