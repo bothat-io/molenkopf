@@ -3,6 +3,7 @@
 !package.json
 !package-lock.json
 !Dockerfile
+!LICENSE
 
 !packages/
 !packages/core/
@@ -19,6 +20,8 @@
 !packages/dashboard/vite.config.ts
 !packages/dashboard/src/
 !packages/dashboard/src/**
+!packages/dashboard/public/
+!packages/dashboard/public/**
 
 packages/dashboard/node_modules/
 packages/dashboard/dist/

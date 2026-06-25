@@ -22,7 +22,9 @@ http://127.0.0.1:8787/v1
 
 ## Attribute Traffic
 
-Optional local-only headers let the dashboard group usage:
+Optional local-only headers let the dashboard group usage. They do not grant
+provider access. `x-molenkopf-agent` can select only an agent/provider binding
+that is already allowed by the authenticated key, team, and profile policy.
 
 ```text
 x-molenkopf-user: operator
@@ -36,11 +38,21 @@ Molenkopf strips these before forwarding upstream. If neither is present, it gro
 Send a normal OpenAI-compatible request through the proxy. Then refresh the dashboard.
 
 ```bash
-curl http://127.0.0.1:8787/v1/responses ^
-  -H "authorization: Bearer %OPENAI_API_KEY%" ^
-  -H "content-type: application/json" ^
-  -H "x-molenkopf-user: local-test" ^
-  -d "{\"model\":\"gpt-4.1-mini\",\"input\":\"short local test\"}"
+curl http://127.0.0.1:8787/v1/responses \
+  -H "authorization: Bearer ${OPENAI_API_KEY}" \
+  -H "content-type: application/json" \
+  -H "x-molenkopf-user: local-test" \
+  -d '{"model":"gpt-4.1-mini","input":"short local test"}'
+```
+
+PowerShell:
+
+```powershell
+curl.exe http://127.0.0.1:8787/v1/responses `
+  -H "authorization: Bearer $env:OPENAI_API_KEY" `
+  -H "content-type: application/json" `
+  -H "x-molenkopf-user: local-test" `
+  -d '{ "model": "gpt-4.1-mini", "input": "short local test" }'
 ```
 
 Expected result:
@@ -66,7 +78,7 @@ Start from the example:
 Copy-Item molenkopf.config.example.json molenkopf.config.json
 $env:OPENAI_MAIN_API_KEY = "<your OpenAI API key>"
 $env:ANTHROPIC_MAIN_API_KEY = "<your Anthropic API key>"
-node --experimental-strip-types --experimental-sqlite --disable-warning=ExperimentalWarning packages/proxy/src/cli/main.ts proxy --config molenkopf.config.json
+molenkopf proxy --config molenkopf.config.json
 ```
 
 Then inspect:
@@ -91,7 +103,8 @@ Use `kind: "cli-claude"` or `kind: "cli-codex"` for local CLI accounts, and
 `kind: "ollama"` or `kind: "lmstudio"` for local OpenAI-compatible model
 servers. Runtime-auth imports run CLI providers with isolated local auth/profile
 directories. Provider switching is visible in Admin; explicit agent bindings can
-route `x-molenkopf-agent` values to configured providers.
+route `x-molenkopf-agent` values to configured providers without bypassing
+team/provider allowlists or API-key scopes.
 
 Providers added through the Admin form are runtime state unless represented by
 JSON config, env configuration, or imported runtime-auth metadata.
@@ -142,8 +155,8 @@ user belongs to one team, Molenkopf can use that team automatically.
 - `Admin`: users, teams, provider accounts, routing, plugin controls, imported runtime auth, and workspace links.
 
 Dedicated Providers, Plugins, Requests, Audit, Agents, and Settings views are
-planned in `NEXT.md`. Until then, use the local APIs and plugin pages below for
-request/audit/plugin details.
+planned in `ROADMAP.md`. Until then, use the local APIs and plugin pages below
+for request/audit/plugin details.
 
 ## Plugin Pages And Data
 

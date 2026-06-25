@@ -10,9 +10,7 @@ traffic and local CLI runtimes such as Claude CLI and Codex CLI. It should
 reduce real transferred context, redact secrets, build local derived memory,
 and write audit manifests without full prompts or responses.
 
-Molenkopf includes built-in plugin middleware for secret redaction, content
-classification, safe compression for logs, JSON and stacktraces, local
-retrieval storage, audit manifests, and redacted SSE events.
+Molenkopf has a fixed core safety pipeline for secret redaction, content classification, safe compression for logs, JSON and stacktraces, local retrieval storage, audit manifests, and redacted SSE events. Optional plugins extend this pipeline; core safety behavior is not toggleable.
 
 Product intent and non-negotiable plugin semantics live in
 `docs/PRODUCT_INTENT.md` and `docs/MOLENKOPF_PLUGIN_API.md`.
@@ -36,11 +34,8 @@ Built now:
   are streamed through byte-for-byte where possible (SSE, gzip, headers
   preserved); the agent runs normally and its context stream flows through
   Molenkopf.
-- Transparent by default: the request body is never altered unless a transform plugin is
-  explicitly enabled. Compression is opt-in and only reduces structured/operational content
-  (json/log/stacktrace/shell); prose, markdown, source code, and diffs pass through untouched.
-- Per-agent multi-account routing: each agent (`x-molenkopf-agent`) routes to its bound
-  provider/account; config `profiles`/`agents` resolve to providers.
+- Transparent by default: the request body is never altered unless a transform plugin is explicitly enabled. Compression is opt-in and only reduces structured/operational content (json/log/stacktrace/shell); prose, markdown, source code, and diffs pass through untouched.
+- Per-agent multi-account routing: each agent (`x-molenkopf-agent`) routes to its bound provider/account; config `profiles`/`agents` resolve to providers.
 - Real token accounting: upstream `usage` is read from the provider response and recorded as
   real input/output tokens (not only a chars/4 estimate).
 - Text-derived memory graph: concepts (files, symbols, error types) are extracted from the
@@ -87,16 +82,20 @@ a strong session secret are configured.
 
 ## Control Plane Usage
 
-Open `http://127.0.0.1:8787/__molenkopf/dashboard` after `npm run dev`. Root `/` redirects there, while upstream agent traffic still uses `/v1/...`.
+Open `http://127.0.0.1:8787/__molenkopf/dashboard` after starting Molenkopf.
+Root `/` redirects there, while upstream agent traffic still uses `/v1/...`.
 
-Attribution headers are optional local request metadata:
+Attribution headers are optional local request metadata. They never expand the
+authenticated API-key/team/provider policy. `x-molenkopf-agent` may select an
+explicit agent binding only when that binding is already allowed for the
+authenticated caller; otherwise the request fails closed.
 
 ```text
 x-molenkopf-user: operator
 x-molenkopf-agent: codex-local
 ```
 
-`x-molenkopf-user` wins over `x-molenkopf-agent`. Molenkopf strips both before forwarding upstream. If neither header is present, audit summaries use a short SHA-256 fingerprint of `Authorization` or `x-api-key`, or `anonymous` when no credential header exists.
+`x-molenkopf-user` wins over `x-molenkopf-agent` for accounting labels. Molenkopf strips both before forwarding upstream. If neither header is present, audit summaries use a short SHA-256 fingerprint of `Authorization` or `x-api-key`, or `anonymous` when no credential header exists.
 
 Manual provider switching happens in the Admin provider section or by posting `{ "id": "openai-env" }` to `/__molenkopf/providers/select`. Explicit provider profiles, API-key scopes, team allowlists, and routing mode are enforced before forwarding; manual selection remains the default route when no explicit profile is attached.
 
@@ -123,6 +122,21 @@ Plugin pages open in standalone windows from `/__molenkopf/plugins/context-compr
 
 ## Commands
 
+Installed package:
+
+```bash
+npm install -g molenkopf
+molenkopf proxy --target https://api.openai.com/v1 --port 8787
+molenkopf self-test
+```
+
+Source checkout:
+
+```bash
+npm run bootstrap
+npm run dev
+```
+
 ## Connect A Client
 
 Use Molenkopf as the OpenAI-compatible base URL:
@@ -140,28 +154,28 @@ x-molenkopf-agent: codex-local
 
 These headers are stripped before upstream forwarding. See `docs/MOLENKOPF_USAGE.md` for a concrete `curl` request, provider setup, and dashboard checks.
 
-Start the proxy:
+Start the proxy from an installed package:
 
 ```bash
-node --experimental-strip-types --experimental-sqlite --disable-warning=ExperimentalWarning packages/proxy/src/cli/main.ts proxy --target https://api.openai.com/v1 --port 8787
+molenkopf proxy --target https://api.openai.com/v1 --port 8787
 ```
 
 Compress a local file:
 
 ```bash
-node --experimental-strip-types --disable-warning=ExperimentalWarning packages/proxy/src/cli/main.ts compress-file sample.log
+molenkopf compress-file sample.log
 ```
 
 Retrieve a bounded redacted excerpt:
 
 ```bash
-node --experimental-strip-types --disable-warning=ExperimentalWarning packages/proxy/src/cli/main.ts retrieve molenkopf://sha256/HASH
+molenkopf retrieve molenkopf://sha256/HASH
 ```
 
 Inspect the latest audit summary:
 
 ```bash
-node --experimental-strip-types --disable-warning=ExperimentalWarning packages/proxy/src/cli/main.ts inspect --last
+molenkopf inspect --last
 ```
 
 Run tests:

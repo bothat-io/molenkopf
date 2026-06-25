@@ -9,7 +9,7 @@ Routes, flags, and environment variables use Molenkopf names.
   - Binds `127.0.0.1:8787`
   - Uses `.molenkopf/dev`
   - Starts the Vite dashboard unless `MOLENKOPF_DASHBOARD_DEV=0`
-- Test server: `npm run dev -- test`
+- Test server: `npm run serve:test`
   - Binds `127.0.0.1:8798`
   - Uses `.molenkopf/test`
 - Local prod smoke: `npm run prod`
@@ -31,7 +31,8 @@ docker build --pull -t molenkopf:local .
 
 The Docker image builds dashboard assets in a separate stage and copies only the
 runtime source, plugin pages, root manifests, and built dashboard assets into the
-final image. Core and Proxy keep Node built-ins only.
+final image. The final image also carries the MIT license notice. Core and Proxy
+keep Node built-ins only.
 
 ## Docker Run
 

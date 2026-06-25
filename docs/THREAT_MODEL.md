@@ -44,7 +44,7 @@ safe transferred text
 ## Hardened Release Invariants
 
 These are target invariants for the team gateway. Remaining hardening work is
-tracked in `NEXT.md`.
+tracked in `FIXME.md`; `NEXT.md` is a dated verification record.
 
 - No provider credential values in audit, dashboard, events, docs, or plugin data.
 - No full prompt or full response in audit, dashboard, events, or plugin pages.

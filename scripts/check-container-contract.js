@@ -4,11 +4,13 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const dockerfile = read("Dockerfile");
+const dockerignore = read(".dockerignore");
 const release = read(".github/workflows/release.yml");
 const testWorkflow = read(".github/workflows/test.yml");
 
 const requiredDockerfile = [
   /COPY packages\/core\/src packages\/core\/src/,
+  /COPY LICENSE LICENSE/,
   /COPY packages\/proxy\/src packages\/proxy\/src/,
   /COPY packages\/plugins packages\/plugins/,
   /COPY --from=dashboard-build .*packages\/dashboard\/dist packages\/dashboard\/dist/,
@@ -35,6 +37,7 @@ const requiredTest = [
 
 const failures = [
   ...missing("Dockerfile", dockerfile, requiredDockerfile),
+  ...missing(".dockerignore", dockerignore, [/!LICENSE/, /!packages\/dashboard\/public\//]),
   ...missing("release.yml", release, requiredRelease),
   ...missing("test.yml", testWorkflow, requiredTest)
 ];

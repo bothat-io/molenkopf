@@ -34,7 +34,6 @@ import { handleDashboardRequest, isDashboardRequest } from "./dashboard-assets.t
 import { createPluginHost, type PluginHost } from "./plugin-host.ts";
 import { effectiveRequestPolicy, enforceModelPolicy, pluginAllowedByPolicy } from "./request-policy.ts";
 import type { ProxyOptions, RunningProxy } from "./server-types.ts";
-
 export async function startProxy(options: ProxyOptions): Promise<RunningProxy> {
   const host = options.host ?? "127.0.0.1";
   requirePublicBindFlag(host, options.allowPublicBind);
@@ -60,18 +59,19 @@ export async function startProxy(options: ProxyOptions): Promise<RunningProxy> {
   await listen(server, options.port, host);
   const address = server.address();
   const port = typeof address === "object" && address ? address.port : options.port;
-  state.port = port; await pluginHost.start(port);
+  state.port = port;
+  await pluginHost.start(port);
   return {
     port,
     close: async () => {
       await pluginHost.stop().catch(() => {});
       usageSnapshot.schedule(state);
-      await usageSnapshot.close(); identity.close();
+      await usageSnapshot.close();
+      identity.close();
       await new Promise<void>((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
     }
   };
 }
-
 async function handle(req: IncomingMessage, res: ServerResponse, store: RetrievalStore, audit: AuditStore, events: EventBus, state: RuntimeState, pluginHost: PluginHost) {
   try {
     if (req.url === "/") return writeRedirect(res, "/__molenkopf/dashboard");
@@ -101,11 +101,7 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
   const client = resolved.client;
   if (resolved.keyOk) { inbound.delete("authorization"); inbound.delete("x-api-key"); }
   const budget = checkBudgets(state, client);
-  if (budget.ok === false) {
-    events.emit("request_failed", { requestId, data: { error: budget.error } });
-    res.writeHead(budget.status, { "content-type": "application/json", "retry-after": "60" });
-    return res.end(JSON.stringify({ error: budget.error, tier: budget.tier, scope: budget.scopeId, metric: budget.metric }));
-  }
+  if (budget.ok === false) return rejectBudget(res, events, requestId, budget);
   for (const warning of budget.warnings) events.emit("request_warning", { requestId, data: { warning } });
   const routing = resolveRouting(state, inbound, client);
   if (routing.ok === false) {
@@ -120,14 +116,9 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
   const pluginActive = (id: string) => isPluginEnabled(state, id) && pluginAllowedByPolicy(policy, id);
   if (jsonRequest && originalBody) {
     const modelPolicy = enforceModelPolicy(policy, originalBody);
-    if (modelPolicy.ok === false) {
-      events.emit("request_failed", { requestId, data: { error: modelPolicy.error } });
-      return writeJson(res, modelPolicy.status, { error: modelPolicy.error });
-    }
+    if (modelPolicy.ok === false) { events.emit("request_failed", { requestId, data: { error: modelPolicy.error } }); return writeJson(res, modelPolicy.status, { error: modelPolicy.error }); }
   }
-  if (pluginActive("obsidian-graph-plugin") && originalBody) {
-    recordConcepts(state.memoryGraph, extractConcepts(redactSecrets(originalBody).text), new Date().toISOString());
-  }
+  if (pluginActive("obsidian-graph-plugin") && originalBody) recordConcepts(state.memoryGraph, extractConcepts(redactSecrets(originalBody).text), new Date().toISOString());
   let body = originalBody;
   let audit: RewriteAudit | undefined;
   if (jsonRequest && originalBody) {
@@ -139,17 +130,11 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
     };
     const ordered = [...builtinMiddlewares].sort((a, b) => orderIndex(state, a.id) - orderIndex(state, b.id));
     await runRequestPipeline(ctx, pluginActive, { store }, ordered);
-    if (ctx.block) {
-      events.emit("request_failed", { requestId, data: { error: ctx.block.error } });
-      return writeJson(res, ctx.block.status, { error: ctx.block.error });
-    }
+    if (ctx.block) { events.emit("request_failed", { requestId, data: { error: ctx.block.error } }); return writeJson(res, ctx.block.status, { error: ctx.block.error }); }
     if (ctx.providerId !== provider.id) {
       const next = state.providers.find((item) => item.id === ctx.providerId && item.enabled !== false);
       if (next) {
-        if (!providerAllowedForClient(client, next.id)) {
-          events.emit("request_failed", { requestId, data: { error: "provider_forbidden" } });
-          return writeJson(res, 403, { error: "provider_forbidden" });
-        }
+        if (!providerAllowedForClient(client, next.id)) { events.emit("request_failed", { requestId, data: { error: "provider_forbidden" } }); return writeJson(res, 403, { error: "provider_forbidden" }); }
         provider = next;
       }
     }
@@ -206,7 +191,8 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
     if (!res.headersSent) return writeJson(res, 502, { error: "proxy_error", requestId });
     return res.end();
   }
-  const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, statusCode, Date.now() - started, client, audit, await scanner.finish());
+const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, statusCode, Date.now() - started, client, audit, await scanner.finish());
   await finishRequest(manifest, auditStore, events, state, pluginHost);
 }
+function rejectBudget(res: ServerResponse, events: EventBus, requestId: string, budget: Exclude<ReturnType<typeof checkBudgets>, { ok: true }>) { events.emit("request_failed", { requestId, data: { error: budget.error } }); res.writeHead(budget.status, { "content-type": "application/json", "retry-after": "60" }); return res.end(JSON.stringify({ error: budget.error, tier: budget.tier, scope: budget.scopeId, metric: budget.metric })); }
 const proxyKeyRequired = () => process.env.MOLENKOPF_REQUIRE_KEY === "1", headerValue = (value: number | string | string[] | undefined) => Array.isArray(value) ? value[0] : typeof value === "string" ? value : undefined;

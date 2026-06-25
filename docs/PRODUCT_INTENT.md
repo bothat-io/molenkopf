@@ -22,7 +22,7 @@ rights are explicit plugin descriptor fields and are enforced by the proxy.
 - Context compression plugin: owns token reduction, before/after accounting, saved-token totals, skip reasons, and retrieval IDs for real context chunks.
 - Memory/Obsidian plugin: owns the derived text memory graph, semantic nodes, links, and local store updates from real agent text.
 - Provider/runtime plugins: adapt OpenAI API, Anthropic API, Codex CLI, Claude CLI, and later MCP into the same run/event contract.
-- Safety plugins: redact secrets and prevent raw credentials, full prompts, and full responses from leaking into UI/logs.
+- Core safety pipeline: redacts secrets and prevents raw credentials, full prompts, and full responses from leaking into UI/logs. This is not optional plugin behavior.
 
 ## UI Rules
 

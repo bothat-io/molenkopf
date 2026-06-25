@@ -16,6 +16,7 @@ LABEL org.opencontainers.image.title="Molenkopf" \
       org.opencontainers.image.licenses="MIT"
 
 COPY package.json package-lock.json ./
+COPY LICENSE LICENSE
 COPY packages/core/src packages/core/src
 COPY packages/proxy/src packages/proxy/src
 COPY packages/plugins packages/plugins

@@ -66,7 +66,8 @@ const $=(id)=>document.getElementById(id);
 const n=(v)=>Number(v||0).toLocaleString("en-US");
 const pct=(v)=>`${Number(v||0).toLocaleString("en-US")}%`;
 const esc=(v)=>String(v??"").replace(/[&<>"]/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const delta=(row)=>Math.max(0,(row.originalTokens||0)-(row.compressedTokens||0));
+const forwarded=(row)=>row.forwardedTokens??row.compressedTokens??0;
+const delta=(row)=>Math.max(0,(row.originalTokens||0)-forwarded(row));
 const value=(row,key,kind)=>kind==="pct"?pct(row[key]):kind==="delta"?n(delta(row)):key==="upstream"?n((row.upstreamInputTokens||0)+(row.upstreamOutputTokens||0)):n(row[key]);
 
 function stateText(plugin,m){
@@ -83,25 +84,25 @@ function renderMetrics(m){
 }
 
 function renderFunnel(m){
-  const saved=Math.max(0,m.savedTokens||0), original=Math.max(0,m.originalTokens||0), forwarded=Math.max(0,m.compressedTokens||0);
+  const saved=Math.max(0,m.savedTokens||0), original=Math.max(0,m.originalTokens||0), sent=Math.max(0,forwarded(m));
   const width=original?Math.max(2,Math.min(100,Math.round((saved/original)*100))):0;
   $("funnel").innerHTML=`<h2>Token funnel</h2><div class="funnel">
     ${step("Before",original,"Estimated tokens observed before compression")}
-    <div class="arrow">-&gt;</div>${step("Forwarded",forwarded,"Estimated tokens after safe transforms")}
+    <div class="arrow">-&gt;</div>${step("Forwarded",sent,"Estimated tokens after safe transforms")}
     <div class="arrow">-&gt;</div>${step("Compression saved",saved,`${pct(m.savedPercent)} compression saved`)}
   </div><div class="bar"><span style="--w:${width}%;width:${width}%"></span></div>
   <div class="muted">Compression only targets large structured content such as logs, JSON, shell output and stacktraces.</div>`;
 }
 
 function renderReduction(m){
-  const original=Math.max(0,m.originalTokens||0), forwarded=Math.max(0,m.compressedTokens||0), saved=Math.max(0,m.savedTokens||0);
-  const changed=delta(m), max=Math.max(original,forwarded,changed,saved,1), sentPct=Math.min(100,Math.round((forwarded/max)*100)), changedPct=Math.min(100,Math.round((changed/max)*100)), savePct=Math.min(100,Math.round((saved/max)*100));
+  const original=Math.max(0,m.originalTokens||0), sent=Math.max(0,forwarded(m)), saved=Math.max(0,m.savedTokens||0);
+  const changed=delta(m), max=Math.max(original,sent,changed,saved,1), sentPct=Math.min(100,Math.round((sent/max)*100)), changedPct=Math.min(100,Math.round((changed/max)*100)), savePct=Math.min(100,Math.round((saved/max)*100));
   $("reduction").innerHTML=[
     chartRow("Observed",original,100,"sent"),
-    chartRow("Forwarded",forwarded,sentPct,"sent"),
+    chartRow("Forwarded",sent,sentPct,"sent"),
     chartRow("Payload delta",changed,changedPct,"lost"),
     chartRow("Compression saved",saved,savePct,"saved")
-  ].join("")+`<div class="stackbar" title="Forwarded, transform delta, compression saved"><span class="sent" style="--w:${original?Math.max(1,Math.round((forwarded/original)*100)):0}%;width:${original?Math.max(1,Math.round((forwarded/original)*100)):0}%"></span><span class="lost" style="--w:${original?Math.round((Math.max(0,changed-saved)/original)*100):0}%;width:${original?Math.round((Math.max(0,changed-saved)/original)*100):0}%"></span><span class="saved" style="--w:${original?Math.round((saved/original)*100):0}%;width:${original?Math.round((saved/original)*100):0}%"></span></div><div class="muted">Green is forwarded context. Amber is confirmed context-compression savings; gray is other safe transform delta.</div>`;
+  ].join("")+`<div class="stackbar" title="Forwarded, transform delta, compression saved"><span class="sent" style="--w:${original?Math.max(1,Math.round((sent/original)*100)):0}%;width:${original?Math.max(1,Math.round((sent/original)*100)):0}%"></span><span class="lost" style="--w:${original?Math.round((Math.max(0,changed-saved)/original)*100):0}%;width:${original?Math.round((Math.max(0,changed-saved)/original)*100):0}%"></span><span class="saved" style="--w:${original?Math.round((saved/original)*100):0}%;width:${original?Math.round((saved/original)*100):0}%"></span></div><div class="muted">Green is forwarded context. Amber is confirmed context-compression savings; gray is other safe transform delta.</div>`;
 }
 
 function chartRow(label,count,width,cls){
@@ -113,7 +114,7 @@ function renderTimeline(items){
   if(!rows.length){$("timeline").innerHTML=`<div class="empty">No request timeline yet.</div>`;return}
   const w=560,h=170,gap=7,bw=Math.max(14,Math.floor((w-gap*(rows.length-1))/rows.length));
   const bars=rows.map((r,i)=>{
-    const original=r.estimatedOriginalTokens??r.originalTokens??0, compressed=r.estimatedCompressedTokens??r.compressedTokens??0, saved=r.estimatedSavedTokens??r.savedTokens??0;
+    const original=r.estimatedOriginalTokens??r.originalTokens??0, compressed=r.estimatedCompressedTokens??forwarded(r), saved=r.estimatedSavedTokens??r.savedTokens??0;
     const x=i*(bw+gap), orig=Math.max(2,Math.round((original/max)*130)), fwd=Math.max(2,Math.round((compressed/max)*130)), save=Math.max(0,Math.round((saved/max)*130));
     return `<rect class="orig" x="${x}" y="${h-orig}" width="${bw}" height="${orig}"></rect><rect class="fwd" x="${x+3}" y="${h-fwd}" width="${Math.max(3,bw-6)}" height="${fwd}"></rect>${save?`<rect class="save" x="${x+6}" y="${h-fwd-save}" width="${Math.max(2,bw-12)}" height="${save}"></rect>`:""}`;
   }).join("");
@@ -134,7 +135,7 @@ function renderBreakdown(id,rows,emptyLabel,withSource=false){
   $(""+id).innerHTML=`<div class="break-list">`+rows.slice(0,8).map((row)=>{
     const width=Math.max(2,Math.min(100,Math.round(row.savedPercent||0)));
     const third=row.inputTokens!=null?["Input",n(row.inputTokens)]:["Observed",n(row.originalTokens)];
-    const fourth=row.outputTokens!=null?["Output",n(row.outputTokens)]:[withSource?"Source":"Forwarded",withSource?esc(row.source):n(row.compressedTokens)];
+    const fourth=row.outputTokens!=null?["Output",n(row.outputTokens)]:[withSource?"Source":"Forwarded",withSource?esc(row.source):n(forwarded(row))];
     return `<div class="break-card"><div class="break-top"><div><div class="row-title">${esc(row.label)}</div><div class="mono">${esc(row.id)}</div></div><div class="muted">${esc(shortTime(row.latestAt))}</div></div>`+
       `<div class="mini"><span style="--w:${width}%;width:${width}%"></span></div><div class="break-stats">`+
       `<div><span class="label">Requests</span><b>${n(row.requests)}</b></div><div><span class="label">Compression saved</span><b>${n(row.savedTokens)}</b></div>`+
@@ -146,7 +147,7 @@ function renderBreakdown(id,rows,emptyLabel,withSource=false){
 function renderRecent(groups){
   if(!groups?.length){$("recent").innerHTML=`<div class="empty">No request activity recorded yet.</div>`;return}
   $("recent").innerHTML=groups.map((item)=>{
-    const tokens=`${n(item.originalTokens)} -> ${n(item.compressedTokens)} compression saved ${n(item.savedTokens)}`;
+    const tokens=`${n(item.originalTokens)} -> ${n(forwarded(item))} compression saved ${n(item.savedTokens)}`;
     const status=item.errors?`<span class="status-error">${esc(item.status)}</span>`:esc(item.status||"unknown");
     return `<div class="request"><div><div class="row-title">${esc(item.clientLabel)}</div><div class="mono">${esc(item.endpoint)}</div><div class="muted">${item.project?`project ${esc(item.project)}`:"no project"}${item.keyId?` - key ${esc(item.keyId)}`:""}</div></div><div><div class="label">Provider</div><div class="mono">${esc(item.providerId)}</div></div><div><div class="label">Activity</div><div>${n(item.requests)} requests</div><div class="muted">${tokens}; ${n(item.compressedItems)} items, ${n(item.retrievalRefs)} retrieval refs</div></div><div><div class="label">Status</div><div>${status}</div><div class="muted">${esc(shortTime(item.latestAt))}</div></div></div>`;
   }).join("");

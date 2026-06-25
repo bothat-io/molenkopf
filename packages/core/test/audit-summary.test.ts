@@ -13,16 +13,17 @@ test("audit summary aggregates token savings by safe client bucket", () => {
   assert.equal(summary.requests, 3);
   assert.equal(summary.originalTokens, 230);
   assert.equal(summary.compressedTokens, 120);
-  assert.equal(summary.savedTokens, 110);
-  assert.equal(summary.savedPercent, 47.83);
+  assert.equal(summary.forwardedTokens, 120);
+  assert.equal(summary.savedTokens, 60);
+  assert.equal(summary.savedPercent, 26.09);
   assert.equal(summary.errors, 1);
   assert.equal(summary.unknown, 0);
   assert.deepEqual(summary.statusTotals.byClass.map((item) => [item.id, item.count]), [["2xx", 2], ["5xx", 1]]);
   assert.deepEqual(summary.statusTotals.byCode.map((item) => [item.id, item.count]), [["200", 2], ["500", 1]]);
   assert.deepEqual(summary.warningTotals, { requests: 1, warnings: 1 });
   assert.deepEqual(summary.buckets.map((item) => item.id), ["user:operator", "api-key:abc"]);
-  assert.equal(summary.buckets[0].savedTokens, 110);
-  assert.equal(summary.buckets[0].savedPercent, 61.11);
+  assert.equal(summary.buckets[0].savedTokens, 60);
+  assert.equal(summary.buckets[0].savedPercent, 33.33);
   assert.deepEqual(summary.providers.map((item) => item.id), ["provider:openai", "provider:backup"]);
   assert.deepEqual(summary.endpoints.map((item) => item.label), ["POST /v1/responses", "POST /v1/chat/completions"]);
   assert.doesNotMatch(JSON.stringify(summary.endpoints), /secret/);
@@ -41,6 +42,15 @@ test("audit summary derives savings for historical compressed manifests", () => 
   ]);
   assert.equal(summary.savedTokens, 750);
   assert.equal(summary.buckets[0].savedTokens, 750);
+});
+
+test("audit summary exposes forwarded tokens without crediting non-compression deltas", () => {
+  const summary = summarizeAudit([
+    manifest({ requestId: "redacted-only", original: 100, compressed: 80, saved: 20, compressedItems: 0 })
+  ]);
+  assert.equal(summary.forwardedTokens, 80);
+  assert.equal(summary.compressedTokens, 80);
+  assert.equal(summary.savedTokens, 0);
 });
 
 test("audit summary groups providers by provider id and API keys by key id", () => {

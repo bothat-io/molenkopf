@@ -2,7 +2,8 @@
 
 Current status: Molenkopf is a local proxy/control-plane with admin auth, scoped
 API keys, project-attributed usage, imported Claude/Codex runtime profiles, and
-audit-backed plugin workspaces. The current execution plan is `NEXT.md`.
+audit-backed plugin workspaces. Product direction lives here; active execution
+work is tracked in `FIXME.md`, and `NEXT.md` is a dated verification record.
 Older target-design notes
 remain in these historical docs:
 
@@ -51,8 +52,8 @@ remain in these historical docs:
   retention policy.
 - Durable provider policy and provider settings persistence.
 - Claude/Codex runtime permission envelope and safe UI diagnostics.
-- Manual audit/retrieval purge endpoint; retention policies, quotas,
-  project scope, and paginated request APIs remain.
+- Retention policies, quotas, project scope, and paginated request APIs remain.
+  Manual audit/retrieval purge exists.
 - Explicit skip-reason counters for non-compressed payloads.
 - Obsidian export with dry-run/apply guards.
 - Release hygiene for tracked files, docs, and generated local state before PR handoff.
@@ -70,5 +71,5 @@ Run:
 npm test
 ```
 
-Keep project files below repo line limits. The detailed forward plan is now in
-`NEXT.md` plus the platform documents listed above.
+Keep project files below repo line limits. Active release work is tracked in
+`FIXME.md`.

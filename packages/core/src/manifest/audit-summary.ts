@@ -8,6 +8,7 @@ export type AuditSummaryTotals = {
   unknown: number;
   originalTokens: number;
   compressedTokens: number;
+  forwardedTokens: number;
   savedTokens: number;
   savedPercent: number;
   upstreamInputTokens: number;
@@ -86,7 +87,7 @@ export function summarizeAudit(manifests: AuditManifest[]): AuditSummary {
 }
 
 function empty(): MutableTotals {
-  return { requests: 0, ok: 0, errors: 0, unknown: 0, originalTokens: 0, compressedTokens: 0, savedTokens: 0, upstreamInputTokens: 0, upstreamOutputTokens: 0, compressedItems: 0, redactedSecrets: 0, warnings: 0 };
+  return { requests: 0, ok: 0, errors: 0, unknown: 0, originalTokens: 0, compressedTokens: 0, forwardedTokens: 0, savedTokens: 0, upstreamInputTokens: 0, upstreamOutputTokens: 0, compressedItems: 0, redactedSecrets: 0, warnings: 0 };
 }
 
 function emptyStatus(): StatusAccumulator { return { unknown: 0, byClass: new Map(), byCode: new Map() }; }
@@ -99,6 +100,7 @@ function add(target: MutableTotals, manifest: AuditManifest) {
   else target.unknown++;
   target.originalTokens += manifest.estimatedOriginalTokens;
   target.compressedTokens += manifest.estimatedCompressedTokens;
+  target.forwardedTokens += manifest.estimatedCompressedTokens;
   target.savedTokens += confirmedSavedTokens(manifest);
   target.upstreamInputTokens += manifest.upstreamInputTokens ?? 0;
   target.upstreamOutputTokens += manifest.upstreamOutputTokens ?? 0;

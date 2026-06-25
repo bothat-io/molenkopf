@@ -7,10 +7,6 @@ import { readJson, writeJson } from "./local-api-io.ts";
 import { isValidSlugId, isValidUserId } from "./identity-id.ts";
 import { isWeakPassword } from "./password-policy.ts";
 
-// Admin-managed identity CRUD: users, teams, pricing, org budget. Gated by
-// MANAGE_PATHS in local-api.ts (admin/open only). Provider credentials are
-// never touched here; key secrets live only in api-keys (hash-only).
-
 export function listIdentity(_req: IncomingMessage, res: ServerResponse, state: RuntimeState) {
   const id = state.identity;
   if (!id) return writeJson(res, 200, { users: [], teams: [], pricing: {}, orgBudget: undefined });
@@ -21,7 +17,6 @@ export function listIdentity(_req: IncomingMessage, res: ServerResponse, state: 
     orgBudget: id.data.orgBudget
   });
 }
-
 export async function putIdentityUser(req: IncomingMessage, res: ServerResponse, state: RuntimeState) {
   const id = state.identity;
   if (!id) return writeJson(res, 400, { error: "identity_unavailable" });
@@ -59,7 +54,6 @@ export async function putIdentityUser(req: IncomingMessage, res: ServerResponse,
   const saved = await id.putUser(user);
   writeJson(res, 200, { ok: true, user: viewUser(saved) });
 }
-
 export async function removeIdentityUser(req: IncomingMessage, res: ServerResponse, state: RuntimeState) {
   const id = state.identity;
   if (!id) return writeJson(res, 400, { error: "identity_unavailable" });
@@ -70,7 +64,6 @@ export async function removeIdentityUser(req: IncomingMessage, res: ServerRespon
   const ok = await id.removeUser(userId);
   writeJson(res, ok ? 200 : 404, ok ? { ok: true } : { error: "unknown_user" });
 }
-
 export async function putIdentityTeam(req: IncomingMessage, res: ServerResponse, state: RuntimeState) {
   const id = state.identity;
   if (!id) return writeJson(res, 400, { error: "identity_unavailable" });
@@ -109,7 +102,6 @@ export async function putIdentityTeam(req: IncomingMessage, res: ServerResponse,
   }
   writeJson(res, 200, { ok: true, team });
 }
-
 export async function removeIdentityTeam(req: IncomingMessage, res: ServerResponse, state: RuntimeState) {
   const id = state.identity;
   if (!id) return writeJson(res, 400, { error: "identity_unavailable" });
@@ -119,30 +111,24 @@ export async function removeIdentityTeam(req: IncomingMessage, res: ServerRespon
   const ok = await id.removeTeam(teamId);
   writeJson(res, ok ? 200 : 404, ok ? { ok: true } : { error: "unknown_team" });
 }
-
 function parseRole(value: unknown): Role { return value === "admin" ? "admin" : value === "manager" ? "manager" : "member"; }
-
 function nextSessionVersion(existing: User | undefined, next: { passwordChanged: boolean; role: Role; disabled?: boolean; loginDisabled?: boolean }): number {
   if (!existing) return 0;
   const changed = next.passwordChanged || existing.role !== next.role || existing.disabled !== next.disabled || existing.loginDisabled !== next.loginDisabled;
   return (existing.sessionVersion ?? 0) + (changed ? 1 : 0);
 }
-
 function isLastEnabledAdminWithPassword(store: { listUsers(): User[] }, user: User): boolean {
   if (!enabledAdminWithPassword(user)) return false;
   return !store.listUsers().some((item) => item.id !== user.id && enabledAdminWithPassword(item));
 }
-
 function enabledAdminWithPassword(user: User): boolean {
   return user.role === "admin" && user.disabled !== true && Boolean(user.password);
 }
-
 function nextBudget(body: Record<string, unknown>, existing: Budget | undefined): Budget | undefined | false {
   if (!Object.hasOwn(body, "budget")) return existing;
   const parsed = normalizeBudget(body.budget);
   return parsed.ok ? parsed.budget : false;
 }
-
 function userTeamIds(body: Record<string, unknown>, existing: string[], store: { getTeam(id: string): Team | undefined }): string[] | false {
   if (!Array.isArray(body.teamIds)) return existing;
   const out: string[] = [];
@@ -152,7 +138,6 @@ function userTeamIds(body: Record<string, unknown>, existing: string[], store: {
   }
   return out;
 }
-
 function managerList(value: unknown, existing: string[], store: { getUser(id: string): User | undefined }): string[] | false {
   if (!Array.isArray(value)) return existing;
   const out: string[] = [];
@@ -162,7 +147,6 @@ function managerList(value: unknown, existing: string[], store: { getUser(id: st
   }
   return out;
 }
-
 function memberList(value: unknown[], store: { getUser(id: string): User | undefined }): Set<string> | false {
   const out = new Set<string>();
   for (const id of value) {
@@ -171,7 +155,6 @@ function memberList(value: unknown[], store: { getUser(id: string): User | undef
   }
   return out;
 }
-
 function providerList(value: unknown, existing: Team["allowedProviders"], state: RuntimeState): Team["allowedProviders"] | false {
   if (value === undefined) return existing;
   if (value === "*") return "*";
@@ -183,13 +166,11 @@ function providerList(value: unknown, existing: Team["allowedProviders"], state:
   }
   return out;
 }
-
 function parseKeyPermissions(value: unknown, existing: KeyPermissions | undefined): KeyPermissions | undefined {
   if (!value || typeof value !== "object") return existing;
   const permissions = value as Record<string, unknown>;
   return { create: permissions.create !== false, revoke: permissions.revoke !== false };
 }
-
 function generatedTeamId(store: { getTeam(id: string): Team | undefined }, name: string): string {
   const base = slugFromName(name || "team");
   if (!store.getTeam(base)) return base;
@@ -199,7 +180,6 @@ function generatedTeamId(store: { getTeam(id: string): Team | undefined }, name:
   }
   return `${base}-${Date.now().toString(36)}`;
 }
-
 function slugFromName(value: string): string {
   const slug = value.toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
   if (isValidSlugId(slug)) return slug;
