@@ -29,7 +29,7 @@ export async function putIdentityUser(req: IncomingMessage, res: ServerResponse,
   if (rawPassword && passwordTooLong(rawPassword)) return writeJson(res, 400, { error: "password_too_long" });
   const password = rawPassword ? await hashPasswordAsync(rawPassword) : existing?.password;
   const disabled = typeof body.disabled === "boolean" ? body.disabled : existing?.disabled;
-  const loginDisabled = password ? false : typeof body.loginDisabled === "boolean" ? body.loginDisabled : (existing?.loginDisabled ?? true);
+  const loginDisabled = typeof body.loginDisabled === "boolean" ? body.loginDisabled : (rawPassword ? false : (password ? (existing?.loginDisabled ?? false) : true));
   if (!password && loginDisabled === false) return writeJson(res, 400, { error: "password_required" });
   const teamIds = userTeamIds(body, existing?.teamIds ?? [], id);
   if (teamIds === false) return writeJson(res, 400, { error: "invalid_team_id" });

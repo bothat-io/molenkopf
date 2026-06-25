@@ -47,6 +47,12 @@ test("admin/open identity API: teams, users, keys, usage, revoke", async () => {
     assert.ok(identity.users.every((u: any) => u.password === undefined), "no password leaked");
     assert.ok(identity.teams.some((t: any) => t.id === "alpha"));
 
+    await postAuth(base, "/__molenkopf/identity/users", { id: "carol", displayName: "Carol", password: "carol-secret", role: "member" }, admin);
+    const disabledLogin = await postAuth(base, "/__molenkopf/identity/users", { id: "carol", displayName: "Carol", role: "member", loginDisabled: true }, admin).then((r) => r.json());
+    assert.equal(disabledLogin.user.loginDisabled, true);
+    assert.equal(disabledLogin.user.hasPassword, true);
+    assert.equal((await post(base, "/__molenkopf/login", { username: "carol", password: "carol-secret" })).status, 401);
+
     const missingProject = await postAuth(base, "/__molenkopf/keys", { owner: "bob", agentLabel: "ci-bot" }, admin).then((r) => r.json());
     assert.equal(missingProject.error, "project_required");
 

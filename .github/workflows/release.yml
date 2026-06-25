@@ -55,7 +55,7 @@ jobs:
             sleep 1
           done
           if [ "$ready" = "1" ]; then
-            docker exec molenkopf-ci node - <<'NODE'
+            docker exec -i molenkopf-ci node - <<'NODE'
           const base = 'http://127.0.0.1:8787';
           const before = await fetch(`${base}/__molenkopf/me`).then((r) => r.json());
           if (!before.needsSetup) throw new Error('expected first-run setup');
