@@ -33,9 +33,8 @@ jobs:
           test "$GITHUB_REF_NAME" = "$expected"
       - name: Pack and smoke installed tarball
         run: |
-          npm --prefix packages/dashboard run build
-          npm pack --json > pack.json
-          tarball="$(node -e "const fs=require('fs'); console.log(JSON.parse(fs.readFileSync('pack.json','utf8'))[0].filename)")"
+          npm run prepack
+          tarball="$(node scripts/release-pack.js)"
           tmp="$(mktemp -d)"
           npm --prefix "$tmp" init -y
           npm --prefix "$tmp" install "$PWD/$tarball"

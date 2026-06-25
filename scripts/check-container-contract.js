@@ -20,7 +20,8 @@ const requiredDockerfile = [
 
 const requiredRelease = [
   /npm run e2e/,
-  /npm pack --json/,
+  /npm run prepack/,
+  /scripts\/release-pack\.js/,
   /molenkopf" --help/,
   /molenkopf" self-test/,
   /docker build --pull -t molenkopf:ci \./,
