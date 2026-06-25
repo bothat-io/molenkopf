@@ -11,7 +11,7 @@ import { runLauncher } from "../bin/launcher.js";
 const repo = dirname(dirname(fileURLToPath(import.meta.url)));
 
 test("launcher kills an unresponsive child before cleaning staged runtime", { skip: process.platform === "win32", timeout: 5000 }, async () => {
-  const root = await fakeInstall("process.on('SIGTERM', () => {}); await hold();\n");
+  const root = await fakeInstall("process.on('SIGTERM', () => {}); setInterval(() => {}, 1000); await hold();\n");
   const pidFile = join(root.base, "child.pid");
   const previousPidFile = process.env.CHILD_PID_FILE;
   const previousGrace = process.env.MOLENKOPF_LAUNCHER_GRACE_MS;
