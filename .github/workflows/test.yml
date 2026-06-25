@@ -36,10 +36,17 @@ jobs:
         with:
           node-version: 24
 
+      - name: Cache Cypress binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/Cypress
+          key: cypress-${{ runner.os }}-${{ hashFiles('packages/dashboard/package-lock.json') }}
+
       - name: Bootstrap dependencies
-        env:
-          CYPRESS_INSTALL_BINARY: "0"
         run: npm run bootstrap
+
+      - name: Verify Cypress runner
+        run: npm --prefix packages/dashboard exec cypress verify
 
       - name: E2E
         run: npm run e2e
