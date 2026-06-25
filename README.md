@@ -196,4 +196,4 @@ local artifacts.
 
 ## License
 
-MIT License. Copyright (c) 2026 Molenkopf contributors.
+MIT License. Copyright (c) 2026 bothat.io and Molenkopf contributors.
