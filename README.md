@@ -125,7 +125,7 @@ Plugin pages open in standalone windows from `/__molenkopf/plugins/context-compr
 Installed package:
 
 ```bash
-npm install -g molenkopf
+npm install -g @bothat-io/molenkopf
 molenkopf proxy --target https://api.openai.com/v1 --port 8787
 molenkopf self-test
 ```
@@ -196,4 +196,4 @@ local artifacts.
 
 ## License
 
-MIT License. Copyright (c) 2026 Molenkopf contributors.
+MIT License. Copyright (c) 2026 bothat.io and Molenkopf contributors.

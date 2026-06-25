@@ -1,5 +1,5 @@
 {
-  "name": "molenkopf",
+  "name": "@bothat-io/molenkopf",
   "version": "0.1.0",
   "description": "Local gateway for API and CLI based coding agents with routing, redaction, compression, memory, audit, and dashboard controls.",
   "author": "Molenkopf contributors",

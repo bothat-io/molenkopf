@@ -1,4 +1,5 @@
 import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,7 +16,8 @@ try {
   runNpm(["init", "-y"], dir, "ignore");
   await rm(consumer, { recursive: true, force: true });
   runNpm(["install", join(root, tarball)], dir, "ignore");
-  const bin = join(dir, "node_modules", "molenkopf", "bin", "molenkopf.js");
+  const packageDir = join(dir, "node_modules", ...packageName().split("/"));
+  const bin = join(packageDir, "bin", "molenkopf.js");
   const before = await tempRuntimeDirs();
   execFileSync(process.execPath, [bin, "--help"], { cwd: dir, stdio: "pipe" });
   execFileSync(process.execPath, [bin, "self-test"], { cwd: dir, stdio: "pipe" });
@@ -33,4 +35,8 @@ async function tempRuntimeDirs() {
 function runNpm(args, cwd, stdio) {
   if (npmCli) return execFileSync(process.execPath, [npmCli, ...args], { cwd, stdio });
   return execFileSync(process.platform === "win32" ? "npm.cmd" : "npm", args, { cwd, stdio, shell: process.platform === "win32" });
+}
+
+function packageName() {
+  return JSON.parse(readFileSync(join(root, "package.json"), "utf8")).name;
 }

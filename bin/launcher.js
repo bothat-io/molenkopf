@@ -10,6 +10,8 @@ const signals = ["SIGINT", "SIGTERM"];
 
 export function runLauncher(args = process.argv.slice(2), options = {}) {
   const root = options.sourceRoot ?? sourceRoot;
+  const exit = options.exit ?? process.exit;
+  const signalSelf = options.signalSelf ?? ((name) => process.kill(process.pid, name));
   const runtimeRoot = runtimeRootFor(root);
   const entry = join(runtimeRoot, "packages", "proxy", "src", "cli", "main.ts");
   if (!existsSync(entry)) throw new Error(`missing CLI entrypoint: ${entry}`);
@@ -28,8 +30,8 @@ export function runLauncher(args = process.argv.slice(2), options = {}) {
     for (const name of signals) process.removeListener(name, handlers[name]);
     cleanup();
     const finalSignal = requestedSignal || signal;
-    if (finalSignal && process.platform !== "win32") process.kill(process.pid, finalSignal);
-    process.exit(code ?? (forced ? 1 : 1));
+    if (finalSignal && process.platform !== "win32") signalSelf(finalSignal);
+    exit(code ?? (forced ? 1 : 1));
   };
   const handlers = Object.fromEntries(signals.map((name) => [name, () => {
     if (closeRequested) return;
