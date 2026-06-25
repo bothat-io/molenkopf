@@ -20,10 +20,14 @@ test("launcher kills an unresponsive child before cleaning staged runtime", { sk
     process.env.CHILD_PID_FILE = pidFile;
     process.env.MOLENKOPF_LAUNCHER_GRACE_MS = "100";
     let exitCode;
+    let raisedSignal;
     const exit = new Promise((resolve) => {
       runLauncher([], {
         sourceRoot: root.installed,
         stdio: "ignore",
+        signalSelf: (name) => {
+          raisedSignal = name;
+        },
         exit: (code) => {
           exitCode = code;
           resolve();
@@ -33,6 +37,7 @@ test("launcher kills an unresponsive child before cleaning staged runtime", { sk
     const childPid = Number(await waitForFile(pidFile));
     process.emit("SIGTERM");
     await withTimeout(exit, 3000, "timed out waiting for launcher forced shutdown");
+    assert.equal(raisedSignal, "SIGTERM");
     assert.equal(exitCode, 1);
     await waitForDead(childPid);
     assert.deepEqual(await tempRuntimes(root.installed), before);
