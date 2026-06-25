@@ -80,6 +80,17 @@ jobs:
           fi
           docker logs molenkopf-ci
           exit 1
+      - name: Save smoked Docker image
+        run: |
+          mkdir -p docker-artifacts
+          docker image inspect molenkopf:ci --format '{{.Id}}' > docker-artifacts/image-id.txt
+          docker save molenkopf:ci | gzip > docker-artifacts/molenkopf-image.tar.gz
+          (cd docker-artifacts && sha256sum image-id.txt molenkopf-image.tar.gz > molenkopf-image.sha256)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: molenkopf-docker-image
+          path: docker-artifacts/
+          if-no-files-found: error
 
   publish-npm:
     needs: validate
@@ -112,19 +123,31 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: molenkopf-docker-image
+          path: docker-artifacts
+      - name: Load validated Docker image
+        run: |
+          cd docker-artifacts
+          sha256sum -c molenkopf-image.sha256
+          gunzip -c molenkopf-image.tar.gz | docker load
+          test "$(cat image-id.txt)" = "$(docker image inspect molenkopf:ci --format '{{.Id}}')"
       - uses: docker/metadata-action@v5
         id: meta
         with:
           images: ghcr.io/${{ github.repository }}
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+      - name: Push validated Docker image
+        run: |
+          while IFS= read -r tag; do
+            test -n "$tag" || continue
+            docker tag molenkopf:ci "$tag"
+            docker push "$tag"
+          done <<'TAGS'
+          ${{ steps.meta.outputs.tags }}
+          TAGS
