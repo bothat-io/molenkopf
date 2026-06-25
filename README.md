@@ -122,15 +122,7 @@ Plugin pages open in standalone windows from `/__molenkopf/plugins/context-compr
 
 ## Commands
 
-Installed package:
-
-```bash
-npm install -g @bothat-io/molenkopf
-molenkopf proxy --target https://api.openai.com/v1 --port 8787
-molenkopf self-test
-```
-
-Source checkout:
+npm package publication follows. Until then, use a source checkout:
 
 ```bash
 npm run bootstrap
@@ -154,29 +146,13 @@ x-molenkopf-agent: codex-local
 
 These headers are stripped before upstream forwarding. See `docs/MOLENKOPF_USAGE.md` for a concrete `curl` request, provider setup, and dashboard checks.
 
-Start the proxy from an installed package:
+Start the local proxy from source:
 
 ```bash
-molenkopf proxy --target https://api.openai.com/v1 --port 8787
+npm run dev
 ```
 
-Compress a local file:
-
-```bash
-molenkopf compress-file sample.log
-```
-
-Retrieve a bounded redacted excerpt:
-
-```bash
-molenkopf retrieve molenkopf://sha256/HASH
-```
-
-Inspect the latest audit summary:
-
-```bash
-molenkopf inspect --last
-```
+Installed CLI utility usage will be documented with npm publication.
 
 Run tests:
 
