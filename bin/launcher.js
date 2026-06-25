@@ -39,6 +39,7 @@ export function runLauncher(args = process.argv.slice(2), options = {}) {
     graceTimer = setTimeout(() => {
       forced = true;
       child.kill("SIGKILL");
+      finish(1, null);
     }, Number(process.env.MOLENKOPF_LAUNCHER_GRACE_MS ?? 5000)).unref();
   }]));
 

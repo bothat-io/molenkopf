@@ -22,7 +22,7 @@ test("launcher kills an unresponsive child before cleaning staged runtime", { sk
     wrapper.kill("SIGTERM");
     const result = await waitForClose(wrapper, 3000);
     assert.equal(result.code, 1);
-    assert.equal(isAlive(childPid), false);
+    await waitForDead(childPid);
     assert.deepEqual(await tempRuntimes(root.installed), before);
   } finally {
     await rm(root.base, { recursive: true, force: true });
@@ -102,6 +102,14 @@ function waitForClose(child, timeoutMs) {
 
 function isAlive(pid) {
   try { process.kill(pid, 0); return true; } catch { return false; }
+}
+
+async function waitForDead(pid) {
+  for (let i = 0; i < 50; i++) {
+    if (!isAlive(pid)) return;
+    await delay(20);
+  }
+  assert.equal(isAlive(pid), false);
 }
 
 function delay(ms) {
