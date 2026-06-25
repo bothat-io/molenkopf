@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { connectionStatus, shouldPollDashboard } from "./refresh";
+import { beginRefresh, connectionStatus, shouldPollDashboard } from "./refresh";
 
 describe("refresh helpers", () => {
   it("derives truthful connection state", () => {
@@ -12,5 +12,11 @@ describe("refresh helpers", () => {
   it("pauses refresh polling while the tab is hidden", () => {
     expect(shouldPollDashboard("visible")).toBe(true);
     expect(shouldPollDashboard("hidden")).toBe(false);
+  });
+
+  it("keeps background refreshes visually quiet", () => {
+    const current = { loading: false, lastSuccessAt: "2026-06-25T00:00:00.000Z" };
+    expect(connectionStatus(beginRefresh(current, true))).toBe("connected");
+    expect(connectionStatus(beginRefresh(current))).toBe("syncing");
   });
 });

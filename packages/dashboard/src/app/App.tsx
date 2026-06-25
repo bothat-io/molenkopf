@@ -8,7 +8,7 @@ import { tabFromPath, tabPath, useDevRevisionReload, type DashboardTab } from ".
 import { OverviewTab } from "../features/overview/Overview";
 import { Shell } from "./Shell";
 import { noticeTone, providerTestFailure } from "./messages";
-import { connectionStatus, shouldPollDashboard, type RefreshState } from "./refresh";
+import { beginRefresh, connectionStatus, shouldPollDashboard, type RefreshState } from "./refresh";
 import { confirmDestructive } from "./destructiveActions";
 import type { DashboardData, TeamView, UserView } from "./types";
 
@@ -35,13 +35,13 @@ export function DashboardApp() {
   }, []);
 
   const canManage = Boolean(user?.canManage || needsSetup);
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (options?: { quiet?: boolean }) => {
     const seq = loadSeq.current + 1;
     loadSeq.current = seq;
     loadAbort.current?.abort();
     const controller = new AbortController();
     loadAbort.current = controller;
-    setRefresh((prev) => ({ ...prev, loading: true }));
+    setRefresh((prev) => beginRefresh(prev, options?.quiet));
     try {
       const options = { signal: controller.signal, timeoutMs: 10000 };
       const session = await loadSession(options);
@@ -68,7 +68,7 @@ export function DashboardApp() {
   useEffect(() => { reload(); }, [reload]);
   useEffect(() => () => loadAbort.current?.abort(), []);
   useEffect(() => {
-    const tick = () => { if ((user || needsSetup) && shouldPollDashboard(document.visibilityState)) reload(); };
+    const tick = () => { if ((user || needsSetup) && shouldPollDashboard(document.visibilityState)) reload({ quiet: true }); };
     const timer = window.setInterval(tick, 5000);
     const visible = () => { if (document.visibilityState === "visible") tick(); };
     document.addEventListener("visibilitychange", visible);
