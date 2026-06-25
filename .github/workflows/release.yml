@@ -95,7 +95,7 @@ jobs:
   publish-npm:
     needs: validate
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/') && github.event.inputs.dry_run != 'true'
+    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/') && github.event.inputs.dry_run == 'false'
     permissions:
       contents: read
       id-token: write
@@ -118,7 +118,7 @@ jobs:
   publish-docker:
     needs: validate
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/') && github.event.inputs.dry_run != 'true'
+    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/') && github.event.inputs.dry_run == 'false'
     permissions:
       contents: read
       packages: write

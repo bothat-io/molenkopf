@@ -36,7 +36,7 @@ const requiredRelease = [
   /docker push "\$tag"/,
   /__molenkopf\/health/,
   /__molenkopf\/setup-admin/,
-  /github\.event\.inputs\.dry_run != 'true'/,
+  /github\.event_name == 'workflow_dispatch'[\s\S]*github\.event\.inputs\.dry_run == 'false'/,
   /GITHUB_REF_NAME.*expected/
 ];
 

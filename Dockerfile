@@ -12,7 +12,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 LABEL org.opencontainers.image.title="Molenkopf" \
       org.opencontainers.image.description="Local gateway for coding agents" \
-      org.opencontainers.image.source="https://github.com/molenkopf/molenkopf" \
+      org.opencontainers.image.source="https://github.com/bothat-io/molenkopf" \
       org.opencontainers.image.licenses="MIT"
 
 COPY package.json package-lock.json ./

@@ -14,12 +14,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/molenkopf/molenkopf.git"
+    "url": "git+https://github.com/bothat-io/molenkopf.git"
   },
   "bugs": {
-    "url": "https://github.com/molenkopf/molenkopf/issues"
+    "url": "https://github.com/bothat-io/molenkopf/issues"
   },
-  "homepage": "https://github.com/molenkopf/molenkopf#readme",
+  "homepage": "https://github.com/bothat-io/molenkopf#readme",
   "keywords": [
     "molenkopf",
     "local-ai-gateway",
