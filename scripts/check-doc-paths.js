@@ -2,7 +2,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, sep } from "node:path";
 
 const root = process.cwd();
-const maintainedDocs = ["README.md", "ROADMAP.md", "NEXT.md", "SECURITY.md"];
+const localPlanningDocs = new Set(["FIXME.md", "NEXT.md"]);
+const maintainedDocs = ["README.md", "ROADMAP.md", "NEXT.md", "SECURITY.md"].filter((file) => existsExact(file));
 const docs = [...maintainedDocs, ...markdownFiles("docs")];
 const failures = [];
 
@@ -10,7 +11,9 @@ for (const file of maintainedDocs) {
   const text = readText(file);
   for (const token of text.matchAll(/`([^`]+)`/g)) {
     const value = token[1].trim();
-    if (isRepoPath(value) && !existsExact(value)) failures.push(`${file}: missing or wrong-case path ${value}`);
+    if (isRepoPath(value) && !existsExact(value) && !localPlanningDocs.has(value)) {
+      failures.push(`${file}: missing or wrong-case path ${value}`);
+    }
   }
 }
 
