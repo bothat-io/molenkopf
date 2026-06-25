@@ -50,3 +50,25 @@ jobs:
 
       - name: E2E
         run: npm run e2e
+
+  windows-launcher:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Bootstrap dependencies
+        env:
+          CYPRESS_INSTALL_BINARY: "0"
+        run: npm run bootstrap
+
+      - name: Launcher regressions
+        run: npm run test:launcher
+
+      - name: Installed package smoke
+        run: npm run smoke:installed
