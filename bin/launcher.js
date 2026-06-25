@@ -28,7 +28,7 @@ export function runLauncher(args = process.argv.slice(2), options = {}) {
     for (const name of signals) process.removeListener(name, handlers[name]);
     cleanup();
     const finalSignal = requestedSignal || signal;
-    if (finalSignal && process.platform !== "win32") process.kill(process.pid, finalSignal);
+    if (finalSignal && !forced && process.platform !== "win32") process.kill(process.pid, finalSignal);
     process.exit(code ?? (forced ? 1 : 1));
   };
   const handlers = Object.fromEntries(signals.map((name) => [name, () => {

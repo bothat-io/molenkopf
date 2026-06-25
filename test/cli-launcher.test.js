@@ -20,7 +20,8 @@ test("launcher kills an unresponsive child before cleaning staged runtime", { sk
     });
     const childPid = Number(await waitForFile(pidFile));
     wrapper.kill("SIGTERM");
-    await waitForClose(wrapper, 3000);
+    const result = await waitForClose(wrapper, 3000);
+    assert.equal(result.code, 1);
     assert.equal(isAlive(childPid), false);
     assert.deepEqual(await tempRuntimes(root.installed), before);
   } finally {
