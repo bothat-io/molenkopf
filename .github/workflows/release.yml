@@ -40,6 +40,14 @@ jobs:
           npm --prefix "$tmp" install "$PWD/$tarball"
           "$tmp/node_modules/.bin/molenkopf" --help
           MOLENKOPF_DATA_DIR="$tmp/data" "$tmp/node_modules/.bin/molenkopf" self-test
+          mkdir -p release-artifacts
+          cp "$tarball" release-artifacts/
+          (cd release-artifacts && sha256sum "$tarball" > molenkopf.tgz.sha256 && sha256sum -c molenkopf.tgz.sha256)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: molenkopf-npm-package
+          path: release-artifacts/
+          if-no-files-found: error
       - run: docker build --pull -t molenkopf:ci .
       - name: Smoke final image
         run: |
@@ -81,16 +89,20 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
-      - run: npm run bootstrap
-        env:
-          CYPRESS_INSTALL_BINARY: "0"
-      - run: npm --prefix packages/dashboard run build
-      - run: npm publish
+      - uses: actions/download-artifact@v4
+        with:
+          name: molenkopf-npm-package
+          path: release-artifacts
+      - name: Publish validated npm tarball
+        run: |
+          cd release-artifacts
+          sha256sum -c molenkopf.tgz.sha256
+          tarball="$(awk '{print $2}' molenkopf.tgz.sha256)"
+          npm publish "$tarball"
 
   publish-docker:
     needs: validate
