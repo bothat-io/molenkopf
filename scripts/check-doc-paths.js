@@ -4,10 +4,11 @@ import { join, sep } from "node:path";
 const root = process.cwd();
 const localPlanningDocs = new Set(["FIXME.md", "NEXT.md"]);
 const maintainedDocs = ["README.md", "ROADMAP.md", "SECURITY.md"];
-const docs = [...maintainedDocs, ...markdownFiles("docs")];
+const optionalDocs = ["NEXT.md"].filter((file) => existsExact(file));
+const docs = [...maintainedDocs, ...optionalDocs, ...markdownFiles("docs")];
 const failures = [];
 
-for (const file of maintainedDocs) {
+for (const file of [...maintainedDocs, ...optionalDocs]) {
   const text = readText(file);
   for (const token of text.matchAll(/`([^`]+)`/g)) {
     const value = token[1].trim();
