@@ -34,6 +34,22 @@ test("writes audit manifest without secret-bearing fields", async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
+test("redacts and bounds free-form audit manifest fields at write time", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "audit-safe-"));
+  const store = new AuditStore(dir);
+  await store.write({
+    ...manifest("req_safe", "2026-01-01T00:00:00.000Z"),
+    targetHost: "api.example.test Authorization: Bearer raw-token",
+    client: { id: "user:admin", label: "Authorization: Bearer raw-client-token", source: "user", userId: "admin" },
+    warnings: ["password=hunter2", "plain-warning"]
+  });
+  const latest = await store.latest();
+  const encoded = JSON.stringify(latest);
+  assert.doesNotMatch(encoded, /raw-token|raw-client-token|hunter2/);
+  assert.match(encoded, /REDACTED_SECRET|plain-warning/);
+  await rm(dir, { recursive: true, force: true });
+});
+
 test("lists audit manifests by bounded pages", async () => {
   const dir = await mkdtemp(join(tmpdir(), "audit-page-"));
   const store = new AuditStore(dir);
@@ -74,6 +90,17 @@ test("skips and quarantines corrupt audit records without breaking reads", async
   assert.equal(page.skippedCorrupt, 1);
   assert.ok((await readdir(join(dir, "audit"))).some((file) => file.endsWith(".corrupt")));
   await rm(dir, { recursive: true, force: true });
+});
+
+test("surfaces audit storage outages instead of reporting an empty audit log", async () => {
+  const root = await mkdtemp(join(tmpdir(), "audit-outage-"));
+  await writeFile(join(root, "audit"), "file blocks audit directory", "utf8");
+  const store = new AuditStore(root);
+
+  await assert.rejects(store.listPage({ limit: 10 }));
+  await assert.rejects(store.list());
+
+  await rm(root, { recursive: true, force: true });
 });
 
 test("rejects invalid audit cursors instead of restarting from the first page", async () => {

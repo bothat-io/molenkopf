@@ -4,11 +4,10 @@ import { compressContext } from "../../../core/src/compression/context-compresso
 import { AuditStore } from "../../../core/src/manifest/audit-store.ts";
 import { RetrievalStore } from "../../../core/src/store/retrieval-store.ts";
 import { startProxy } from "../http/server.ts";
+import { parseArgs, type CliArgs } from "./args.ts";
 import { loadProxyConfig } from "./config-loader.ts";
 import { loadEnvFile } from "./env-file.ts";
 import { resolveCliTarget } from "./target.ts";
-
-type Args = { command?: string; values: string[]; flags: Map<string, string | boolean> };
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -21,7 +20,7 @@ async function main() {
   usage(1);
 }
 
-async function proxy(args: Args) {
+async function proxy(args: CliArgs) {
   const envFile = args.flags.get("env-file");
   if (typeof envFile === "string") await loadEnvFile(envFile);
   const loaded = await loadProxyConfig(args.flags);
@@ -59,7 +58,7 @@ async function proxy(args: Args) {
   console.log(`Molenkopf proxy listening on http://${host}:${running.port}`);
 }
 
-async function compressFile(args: Args) {
+async function compressFile(args: CliArgs) {
   const file = args.values[0];
   if (!file) throw new Error("compress-file requires a file path");
   const text = await readFile(file, "utf8");
@@ -69,13 +68,13 @@ async function compressFile(args: Args) {
   if (result.retrievalId) console.log(`\nretrieve: ${result.retrievalId}`);
 }
 
-async function retrieve(args: Args) {
+async function retrieve(args: CliArgs) {
   const id = args.values[0];
   if (!id) throw new Error("retrieve requires a retrieval id");
   console.log(await new RetrievalStore().retrieve(id));
 }
 
-async function inspect(args: Args) {
+async function inspect(args: CliArgs) {
   if (!args.flags.has("last")) throw new Error("inspect currently supports --last");
   const latest = await new AuditStore().latest();
   console.log(JSON.stringify(latest ?? {}, null, 2));
@@ -89,28 +88,6 @@ async function selfTest() {
   if (!original.includes("Context excerpt only") || !original.includes("TRUNCATED_CONTEXT")) throw new Error("retrieval self-test failed");
   if (original.includes("ERROR sample")) throw new Error("retrieval self-test persisted a raw tail");
   console.log("self-test ok");
-}
-
-function parseArgs(input: string[]): Args {
-  const [command, ...rest] = input;
-  const flags = new Map<string, string | boolean>();
-  const values: string[] = [];
-  for (let i = 0; i < rest.length; i++) {
-    const item = rest[i];
-    if (!item.startsWith("--")) {
-      values.push(item);
-      continue;
-    }
-    const key = item.slice(2);
-    const next = rest[i + 1];
-    if (next && !next.startsWith("--")) {
-      flags.set(key, next);
-      i++;
-    } else {
-      flags.set(key, true);
-    }
-  }
-  return { command, values, flags };
 }
 
 function usage(code: number): never {

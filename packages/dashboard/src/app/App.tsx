@@ -9,6 +9,7 @@ import { OverviewTab } from "../features/overview/Overview";
 import { Shell } from "./Shell";
 import { noticeTone, providerTestFailure } from "./messages";
 import { connectionStatus, shouldPollDashboard, type RefreshState } from "./refresh";
+import { confirmDestructive } from "./destructiveActions";
 import type { DashboardData, TeamView, UserView } from "./types";
 
 const emptyData: DashboardData = { usage: {}, keys: { items: [] }, config: {}, providers: {}, summary: {}, plugins: {} };
@@ -94,11 +95,11 @@ export function DashboardApp() {
     onEditTeam: (team: TeamView) => setModal({ kind: "team", payload: team }),
     onUserKey: (owner: UserView) => setModal({ kind: "keys", payload: { owner } }),
     onTeamKey: (team: TeamView) => setModal({ kind: "keys", payload: { team } }),
-    onRemoveUser: (id: string) => mutate("/__molenkopf/identity/users/remove", { id }),
-    onRemoveTeam: (id: string) => mutate("/__molenkopf/identity/teams/remove", { id }),
+    onRemoveUser: (id: string) => { if (confirmDestructive("remove-user", id)) mutate("/__molenkopf/identity/users/remove", { id }); },
+    onRemoveTeam: (id: string) => { if (confirmDestructive("remove-team", id)) mutate("/__molenkopf/identity/teams/remove", { id }); },
     onAssignUserToTeam: assignUserToTeam,
     onRemoveUserFromTeam: removeUserFromTeam,
-    onProviderRemove: (id: string) => mutate("/__molenkopf/providers/remove", { id }),
+    onProviderRemove: (id: string) => { if (confirmDestructive("remove-provider", id)) mutate("/__molenkopf/providers/remove", { id }); },
     onProviderOptions: (id: string) => setModal({ kind: "provider-options", payload: id }),
     providerMessages,
     onProviderTest: testProvider,
@@ -187,7 +188,7 @@ export function DashboardApp() {
   if (!user) return <LoginView onDone={(next) => { setUser(next); openOverview(); reload(); }} />;
   return <Shell user={user} canManage={canManage} activeTab={tab} connection={connectionStatus(refresh)} onTab={setTab} onLogout={async () => { await postJson("/__molenkopf/logout", {}); clearSessionState(); setUser(undefined); }}>
     {message ? <DashboardNotice tone={noticeTone(message)} onDismiss={() => setMessage("")}>{message}</DashboardNotice> : null}
-    {tab === "overview" ? <OverviewTab usage={data.usage} currentUser={user} keys={data.keys.items || []} config={data.config} selectedSecret={selectedSecret} onNewKey={() => setModal({ kind: "key" })} onRevoke={(id) => mutate("/__molenkopf/keys/revoke", { id })} /> : null}
+    {tab === "overview" ? <OverviewTab usage={data.usage} currentUser={user} keys={data.keys.items || []} config={data.config} selectedSecret={selectedSecret} onNewKey={() => setModal({ kind: "key" })} onRevoke={(id) => { if (confirmDestructive("revoke-key", id)) mutate("/__molenkopf/keys/revoke", { id }); }} /> : null}
     {tab === "admin" && canManage ? <AdminTab {...adminProps} /> : null}
     <Dialogs modal={modal} close={() => setModal({ kind: null })} reload={reload} providers={providers} users={data.identity?.users || data.usage.users || []} teams={data.identity?.teams || data.usage.teams || []} apiKeys={data.keys.items || data.usage.keys || []} currentUser={user} onKeyCreated={setSelectedSecret} onAddProvider={(body) => mutate("/__molenkopf/providers/add", body, "", { rethrow: true })} onImportAuth={(body) => mutate("/__molenkopf/providers/import-auth", body, "Runtime account imported", { rethrow: true })} onRuntimeTest={testRuntimeProvider} />
   </Shell>;

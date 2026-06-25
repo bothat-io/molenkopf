@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync } from "node:fs";
+import { chmodSync, cpSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,13 +29,11 @@ child.on("error", (error) => {
 
 function runtimeRootFor(sourceRoot) {
   if (!sourceRoot.split(/[\\/]/).includes("node_modules")) return sourceRoot;
-  const cacheRoot = join(tmpdir(), "molenkopf-cli", createHash("sha256").update(sourceRoot).digest("hex").slice(0, 16));
-  const cachedEntry = join(cacheRoot, "packages", "proxy", "src", "cli", "main.ts");
-  if (!existsSync(cachedEntry)) {
-    mkdirSync(cacheRoot, { recursive: true });
-    for (const name of ["package.json", "packages", "bin"]) {
-      cpSync(join(sourceRoot, name), join(cacheRoot, name), { recursive: true });
-    }
+  const prefix = `molenkopf-cli-${createHash("sha256").update(sourceRoot).digest("hex").slice(0, 12)}-`;
+  const runtimeRoot = mkdtempSync(join(tmpdir(), prefix));
+  try { chmodSync(runtimeRoot, 0o700); } catch { /* Windows ACLs are inherited. */ }
+  for (const name of ["package.json", "packages", "bin"]) {
+    cpSync(join(sourceRoot, name), join(runtimeRoot, name), { recursive: true });
   }
-  return cacheRoot;
+  return runtimeRoot;
 }

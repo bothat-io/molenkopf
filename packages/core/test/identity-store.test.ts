@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile, mkdir, readdir } from "node:fs/promises";
+import { mkdtemp, writeFile, mkdir, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { IdentityStore } from "../src/identity/identity-store.ts";
@@ -47,6 +47,21 @@ test("removing a user removes their keys; removing a team detaches members", asy
   assert.equal(await s.removeTeam("alpha"), true);
   assert.deepEqual(s.getUser("carol")?.teamIds, [], "team membership detached");
   assert.equal(s.data.keys["key_2"].disabled, true, "team-bound key disabled with team removal");
+});
+
+test("identity mutations roll back when persistence fails and closed stores reject writes", async () => {
+  const root = await tempRoot();
+  const s = new IdentityStore(root);
+  await s.load();
+  await s.putTeam(team("alpha"));
+  const originalSave = s.save.bind(s);
+  s.save = async () => { throw new Error("disk full"); };
+  await assert.rejects(s.putUser(user("bob", { teamIds: ["alpha"] })), /disk full/);
+  assert.equal(s.getUser("bob"), undefined);
+  s.save = originalSave;
+  s.close();
+  await assert.rejects(s.putTeam(team("beta")), /identity_store_closed/);
+  await rm(root, { recursive: true, force: true });
 });
 
 test("corrupt database file is quarantined and fails closed", async () => {

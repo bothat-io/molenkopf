@@ -18,17 +18,22 @@ export function openDb(root = defaultDataDir()): Db {
   let db: DatabaseSync | undefined;
   try {
     db = new DatabaseSync(path);
-    db.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 4000;");
+    db.exec("PRAGMA busy_timeout = 4000; PRAGMA journal_mode = WAL;");
     ensureSchema(db);
     repairSqlitePermissions(root);
     return db;
   } catch (error) {
-    // Corrupt/unreadable DB: close and quarantine, then fail closed.
     try { db?.close(); } catch { /* ignore */ }
+    if (isOperationalSqliteError(error)) throw new Error("identity database unavailable: busy");
     try { if (existsSync(path)) renameSync(path, `${path}.corrupt.${Date.now()}`); } catch { /* best effort */ }
     try { writeFileSync(marker, `${new Date().toISOString()} ${error instanceof Error ? error.message : String(error)}\n`, privateWriteOptions()); chmodPrivateSync(marker, PRIVATE_FILE_MODE); } catch { /* best effort */ }
     throw new Error("identity database unavailable");
   }
+}
+
+function isOperationalSqliteError(error: unknown): boolean {
+  const item = error as { code?: unknown; message?: unknown };
+  return /SQLITE_(BUSY|LOCKED)/.test(String(item.code ?? "")) || /database is (locked|busy)/i.test(String(item.message ?? ""));
 }
 
 export function markIdentityDbUnavailable(root = defaultDataDir(), reason: string): void {

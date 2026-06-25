@@ -13,12 +13,12 @@ export function connectLines(tool: ConnectTool, shell: ConnectShell, base: strin
   const urlValue = base + (isCodex ? "/v1" : "");
   const command = isCodex ? codexCommand("codex", urlValue) : "claude";
   const psCommand = isCodex ? codexCommand("codex.cmd", urlValue) : "claude.cmd";
-  if (isCodex && shell === "cmd") return [`set "${keyVar}=${key}"`, command];
-  if (isCodex && shell === "bash") return [`export ${keyVar}="${key}"`, command];
-  if (isCodex) return [`$env:${keyVar} = "${key}"`, psCommand];
-  if (shell === "cmd") return [`set "${urlVar}=${urlValue}"`, `set "${keyVar}=${key}"`, command];
-  if (shell === "bash") return [`export ${urlVar}="${urlValue}"`, `export ${keyVar}="${key}"`, command];
-  return [`$env:${urlVar} = "${urlValue}"`, `$env:${keyVar} = "${key}"`, psCommand];
+  if (isCodex && shell === "cmd") return [cmdSet(keyVar, key), command];
+  if (isCodex && shell === "bash") return [bashExport(keyVar, key), command];
+  if (isCodex) return [psSet(keyVar, key), psCommand];
+  if (shell === "cmd") return [cmdSet(urlVar, urlValue), cmdSet(keyVar, key), command];
+  if (shell === "bash") return [bashExport(urlVar, urlValue), bashExport(keyVar, key), command];
+  return [psSet(urlVar, urlValue), psSet(keyVar, key), psCommand];
 }
 
 function codexCommand(binary: string, baseUrl: string): string {
@@ -26,7 +26,7 @@ function codexCommand(binary: string, baseUrl: string): string {
     binary,
     "-c model_provider=molenkopf",
     "-c model_providers.molenkopf.name=Molenkopf",
-    `-c model_providers.molenkopf.base_url=${baseUrl}`,
+    quoteArg(`-c model_providers.molenkopf.base_url=${baseUrl}`),
     "-c model_providers.molenkopf.env_key=OPENAI_API_KEY",
     "-c model_providers.molenkopf.wire_api=responses"
   ].join(" ");
@@ -34,7 +34,23 @@ function codexCommand(binary: string, baseUrl: string): string {
 
 function openAiCompatibleLines(shell: ConnectShell, base: string, key: string): string[] {
   const urlValue = `${base}/v1`;
-  if (shell === "cmd") return [`set "OPENAI_BASE_URL=${urlValue}"`, `set "OPENAI_API_KEY=${key}"`, "rem Start your OpenAI-compatible tool in this shell."];
-  if (shell === "bash") return [`export OPENAI_BASE_URL="${urlValue}"`, `export OPENAI_API_KEY="${key}"`, "# Start your OpenAI-compatible tool in this shell."];
-  return [`$env:OPENAI_BASE_URL = "${urlValue}"`, `$env:OPENAI_API_KEY = "${key}"`, "# Start your OpenAI-compatible tool in this shell."];
+  if (shell === "cmd") return [cmdSet("OPENAI_BASE_URL", urlValue), cmdSet("OPENAI_API_KEY", key), "rem Start your OpenAI-compatible tool in this shell."];
+  if (shell === "bash") return [bashExport("OPENAI_BASE_URL", urlValue), bashExport("OPENAI_API_KEY", key), "# Start your OpenAI-compatible tool in this shell."];
+  return [psSet("OPENAI_BASE_URL", urlValue), psSet("OPENAI_API_KEY", key), "# Start your OpenAI-compatible tool in this shell."];
+}
+
+function psSet(name: string, value: string): string {
+  return `$env:${name} = '${value.replaceAll("'", "''")}'`;
+}
+
+function bashExport(name: string, value: string): string {
+  return `export ${name}='${value.replaceAll("'", "'\"'\"'")}'`;
+}
+
+function cmdSet(name: string, value: string): string {
+  return `set "${name}=${value.replaceAll("%", "%%").replaceAll("\r", "").replaceAll("\n", "")}"`;
+}
+
+function quoteArg(value: string): string {
+  return `"${value.replaceAll('"', '\\"')}"`;
 }

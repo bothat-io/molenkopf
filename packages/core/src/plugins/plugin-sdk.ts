@@ -23,7 +23,7 @@ export function createLocalPluginRegistry() {
       if (plugin.permissions.length === 0) throw new Error("plugin permissions required");
       if (!hasRuntimeHook(plugin.module)) throw new Error("plugin runtime hook required");
       if (plugins.has(plugin.name)) throw new Error(`duplicate plugin: ${plugin.name}`);
-      plugins.set(plugin.name, Object.freeze({ ...plugin, permissions: [...plugin.permissions] }));
+      plugins.set(plugin.name, deepFreeze({ ...plugin, permissions: [...plugin.permissions], module: { ...plugin.module } }));
     },
     registerRemote(_url: string): never {
       throw new Error("remote plugins are disabled");
@@ -35,6 +35,11 @@ export function createLocalPluginRegistry() {
       return [...plugins.keys()];
     }
   };
+}
+
+function deepFreeze<T extends object>(value: T): T {
+  for (const item of Object.values(value)) if (item && typeof item === "object") deepFreeze(item as object);
+  return Object.freeze(value);
 }
 
 function hasRuntimeHook(module: MolenkopfPluginModule): boolean {

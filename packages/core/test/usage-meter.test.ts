@@ -36,6 +36,12 @@ test("reads OpenAI streamed usage objects only from SSE data JSON", () => {
   assert.deepEqual(meter.result(), { inputTokens: 9, outputTokens: 4 });
 });
 
+test("reads CRLF-delimited OpenAI Responses completed usage", () => {
+  const meter = createUsageMeter();
+  meter.feed('event: response.completed\r\ndata: {"response":{"usage":{"input_tokens":17,"output_tokens":5}}}\r\n\r\n');
+  assert.deepEqual(meter.result(), { inputTokens: 17, outputTokens: 5 });
+});
+
 test("ignores token-looking text outside recognized usage objects", () => {
   const meter = createUsageMeter();
   meter.feed('The model said: "prompt_tokens": 999, "completion_tokens": 888');

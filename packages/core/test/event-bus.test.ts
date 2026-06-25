@@ -32,3 +32,18 @@ test("EventBus bounds replay history", () => {
   assert.equal(replayed[0], "5");
   assert.equal(replayed.at(-1), "104");
 });
+
+test("EventBus stores immutable redacted event snapshots", () => {
+  const bus = new EventBus();
+  const data = { message: "Authorization: Bearer raw-token", nested: { value: "password=hunter2" } };
+  const event = bus.emit("plugin_event", { requestId: "req", data });
+  data.message = "changed";
+  data.nested.value = "changed";
+  assert.equal(Object.isFrozen(event), true);
+  assert.equal(Object.isFrozen(event.data), true);
+  assert.equal(Object.isFrozen(event.data?.nested), true);
+  assert.doesNotMatch(JSON.stringify(event), /raw-token|hunter2|changed/);
+  const replayed: unknown[] = [];
+  bus.subscribe((item) => replayed.push(item));
+  assert.deepEqual(replayed, [event]);
+});

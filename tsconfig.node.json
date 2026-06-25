@@ -8,7 +8,6 @@
     "noEmit": true,
     "skipLibCheck": true,
     "types": ["node"],
-    "typeRoots": ["./packages/dashboard/node_modules/@types"],
     "strict": false,
     "forceConsistentCasingInFileNames": true
   },

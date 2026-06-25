@@ -11,19 +11,17 @@ export function packPrContext(input: PrContextInput, limitsInput: PrContextLimit
   if (input.files.length > limits.maxFiles) throw new Error("too_many_pr_files");
   const lines = ["# PR Context", `title: ${safeField(input.title, limits.maxFieldChars)}`];
   if (input.description) lines.push(`description: ${safeField(input.description, limits.maxFieldChars)}`);
-  let total = lines.join("\n").length;
   let omittedFiles = 0;
   for (const file of input.files) {
     const block = fileBlock(file, limits.maxPatchChars);
-    if (total + block.length > limits.maxTotalChars) {
+    if (joinedLength(lines, block) > limits.maxTotalChars) {
       omittedFiles++;
       continue;
     }
     lines.push(block);
-    total += block.length;
   }
-  if (omittedFiles) lines.push(`[molenkopf omitted: ${omittedFiles} files after total context limit]`);
-  return lines.join("\n");
+  if (omittedFiles && joinedLength(lines, omittedMarker(omittedFiles)) <= limits.maxTotalChars) lines.push(omittedMarker(omittedFiles));
+  return truncate(lines.join("\n"), limits.maxTotalChars, "context");
 }
 
 export function createCiAuditArtifact(input: { requestId: string; savedTokens: number; retrievalIds: string[] }) {
@@ -59,5 +57,15 @@ function safePatch(value: string, maxChars: number): string {
 
 function truncate(value: string, maxChars: number, label: string): string {
   if (value.length <= maxChars) return value;
-  return `${value.slice(0, maxChars)}\n[molenkopf omitted: ${value.length - maxChars} ${label} chars]`;
+  const marker = `\n[molenkopf omitted: ${value.length - maxChars} ${label} chars]`;
+  if (marker.length >= maxChars) return value.slice(0, Math.max(0, maxChars));
+  return `${value.slice(0, maxChars - marker.length)}${marker}`;
+}
+
+function joinedLength(lines: string[], next: string): number {
+  return lines.concat(next).join("\n").length;
+}
+
+function omittedMarker(count: number): string {
+  return `[molenkopf omitted: ${count} files after total context limit]`;
 }

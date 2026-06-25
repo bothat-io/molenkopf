@@ -45,7 +45,7 @@ export class IdentityStore {
   }
 
   async save(): Promise<void> {
-    if (this.closed) return;
+    if (this.closed) throw new Error("identity_store_closed");
     const db = this.handle();
     db.exec("BEGIN");
     try {
@@ -70,28 +70,65 @@ export class IdentityStore {
   listUsers(): User[] { return Object.values(this.data.users); }
   getUser(id: string): User | undefined { return this.data.users[id]; }
   markEphemeralUser(id: string): void { this.ephemeralUserIds.add(id); }
-  async putUser(user: User): Promise<User> { this.data.users[user.id] = normalizeUser(user, this.data); await this.save(); return this.data.users[user.id]; }
+  async putUser(user: User): Promise<User> {
+    const previous = this.data;
+    this.data = cloneIdentity(previous);
+    try {
+      this.data.users[user.id] = normalizeUser({ ...user, teamIds: [...(user.teamIds ?? [])] }, this.data);
+      await this.save();
+      return this.data.users[user.id];
+    } catch (error) {
+      this.data = previous;
+      throw error;
+    }
+  }
   async removeUser(id: string): Promise<boolean> {
     if (!this.data.users[id]) return false;
-    delete this.data.users[id];
-    for (const key of Object.values(this.data.keys)) if (key.ownerUserId === id) delete this.data.keys[key.id];
-    for (const team of Object.values(this.data.teams)) team.managerIds = team.managerIds.filter((managerId) => managerId !== id);
-    await this.save();
-    return true;
+    const previous = this.data;
+    this.data = cloneIdentity(previous);
+    try {
+      delete this.data.users[id];
+      for (const key of Object.values(this.data.keys)) if (key.ownerUserId === id) delete this.data.keys[key.id];
+      for (const team of Object.values(this.data.teams)) team.managerIds = team.managerIds.filter((managerId) => managerId !== id);
+      await this.save();
+      return true;
+    } catch (error) {
+      this.data = previous;
+      throw error;
+    }
   }
 
   // ---- teams ----
   listTeams(): Team[] { return Object.values(this.data.teams); }
   getTeam(id: string): Team | undefined { return this.data.teams[id]; }
-  async putTeam(team: Team): Promise<Team> { this.data.teams[team.id] = team; if (team.id === "everyone") normalizeDefaultTeam(this.data); await this.save(); return team; }
+  async putTeam(team: Team): Promise<Team> {
+    const previous = this.data;
+    this.data = cloneIdentity(previous);
+    try {
+      this.data.teams[team.id] = { ...team, managerIds: [...team.managerIds] };
+      if (team.id === "everyone") normalizeDefaultTeam(this.data);
+      await this.save();
+      return this.data.teams[team.id];
+    } catch (error) {
+      this.data = previous;
+      throw error;
+    }
+  }
   async removeTeam(id: string): Promise<boolean> {
     if (id === "everyone") return false;
     if (!this.data.teams[id]) return false;
-    delete this.data.teams[id];
-    for (const user of Object.values(this.data.users)) user.teamIds = user.teamIds.filter((t) => t !== id);
-    for (const key of Object.values(this.data.keys)) if (key.teamId === id) key.disabled = true;
-    await this.save();
-    return true;
+    const previous = this.data;
+    this.data = cloneIdentity(previous);
+    try {
+      delete this.data.teams[id];
+      for (const user of Object.values(this.data.users)) user.teamIds = user.teamIds.filter((t) => t !== id);
+      for (const key of Object.values(this.data.keys)) if (key.teamId === id) key.disabled = true;
+      await this.save();
+      return true;
+    } catch (error) {
+      this.data = previous;
+      throw error;
+    }
   }
 
   usersInTeam(teamId: string): User[] { return teamId === "everyone" && this.data.teams.everyone ? this.listUsers() : this.listUsers().filter((u) => u.teamIds.includes(teamId)); }
@@ -116,6 +153,10 @@ function normalizeUser(user: User, data: IdentityData): User {
 
 function persistedTeam(team: Team, ephemeralUserIds: Set<string>): Team {
   return { ...team, managerIds: team.managerIds.filter((id) => !ephemeralUserIds.has(id)) };
+}
+
+function cloneIdentity(data: IdentityData): IdentityData {
+  return JSON.parse(JSON.stringify(data)) as IdentityData;
 }
 
 export type { ApiKey };

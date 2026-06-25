@@ -59,6 +59,30 @@ test("redacts sensitive JSON keys with ordinary string values", () => {
   assert.doesNotMatch(result.text, /plain-password|plain-refresh|plain-auth|plain-access|plain-credential|plain-api|plain-client-secret/);
 });
 
+test("redacts sensitive JSON keys with non-string values", () => {
+  const result = redactSecrets(JSON.stringify({
+    password: { value: "object-secret" },
+    token: ["array-secret"],
+    authorization: true,
+    apiKey: 12345,
+    public: { value: "visible" }
+  }));
+  const parsed = JSON.parse(result.text);
+  assert.match(parsed.password, /^\[REDACTED_SECRET:json_password:sha256:[a-f0-9]{12}\]$/);
+  assert.match(parsed.token, /^\[REDACTED_SECRET:json_token:sha256:[a-f0-9]{12}\]$/);
+  assert.match(parsed.authorization, /^\[REDACTED_SECRET:json_authorization:sha256:[a-f0-9]{12}\]$/);
+  assert.match(parsed.apiKey, /^\[REDACTED_SECRET:json_apikey:sha256:[a-f0-9]{12}\]$/);
+  assert.equal(parsed.public.value, "visible");
+  assert.doesNotMatch(result.text, /object-secret|array-secret|12345/);
+});
+
+test("fails closed for sensitive JSON beyond safe scan depth", () => {
+  const deep = `${'{"nested":'.repeat(1005)}{"password":"deep-secret"}${"}".repeat(1005)}`;
+  const result = redactSecrets(deep);
+  assert.match(result.text, /^\[REDACTED_SECRET:json_too_deep:sha256:[a-f0-9]{12}\]$/);
+  assert.doesNotMatch(result.text, /deep-secret/);
+});
+
 test("redacts JSON string spans without rewriting unrelated JSON syntax", () => {
   const input = '{\n  "unsafe": 9007199254740993,\n  "negativeZero": -0,\n  "dup": "first",\n  "dup": "second",\n  "secret": "plain-secret",\n  "escaped": "\\u003c"\n}';
   const result = redactSecrets(input);

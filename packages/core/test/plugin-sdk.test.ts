@@ -8,6 +8,7 @@ test("registers local plugins with explicit permissions and rejects remote plugi
   registry.register({ name: "local-compressor", permissions: [...permissions], module: { onRequest: () => ({}) } });
   assert.deepEqual(registry.names(), ["local-compressor"]);
   assert.deepEqual(registry.get("local-compressor")?.permissions, ["body:write"]);
+  assert.throws(() => registry.get("local-compressor")?.permissions.push("audit:read"), /object is not extensible|read only/);
   assert.throws(() => registry.register({ name: "empty", permissions: [], module: { onRequest: () => ({}) } }), /permissions required/);
   assert.throws(() => registry.register({ name: "no-hook", permissions: ["body:write"], module: {} }), /runtime hook required/);
   assert.throws(() => registry.register({ name: "local-compressor", permissions: ["body:write"], module: { onRequest: () => ({}) } }), /duplicate plugin/);

@@ -1,19 +1,15 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ApiError } from "../../app/api";
 import { FilePicker, FormActionBar, FormField, FormGrid, FormNote, RadioButtonChoice, SelectControl } from "../../components/forms/FormControls";
 import { StatusMessage } from "../../components/feedback/StatusMessage";
+import { runtimeImportFingerprint, runtimeImportReady, type RuntimeImportBody } from "./runtimeImportState";
 
 type Mode = "manual" | "import";
 type RuntimeKind = "codex" | "claude";
-type RuntimeImportBody = Record<string, unknown>;
 type RuntimeDraft = { runtime: RuntimeKind; name: string; authJson: string; profileText: string; authFileName: string; profileFileName: string; importProof: string };
 type TestState = "idle" | "testing" | "passed";
 
 const DEFAULT_DRAFT: RuntimeDraft = { runtime: "codex", name: "", authJson: "", profileText: "", authFileName: "", profileFileName: "", importProof: "" };
-
-export function runtimeImportReady(tested: boolean, testing: boolean): boolean {
-  return tested && !testing;
-}
 
 export function ProviderAddContent({ onAdd, onImport, onTest, onAbort }: { onAdd: (body: Record<string, unknown>) => void | Promise<void>; onImport: (body: RuntimeImportBody) => void | Promise<void>; onTest: (body?: RuntimeImportBody) => RuntimeImportBody | void | Promise<RuntimeImportBody | void>; onAbort?: () => void }) {
   const [mode, setMode] = useState<Mode>("manual");
@@ -52,34 +48,45 @@ function ManualProviderForm({ onAdd, onAbort }: { onAdd: (body: Record<string, u
 
 function RuntimeImportForm({ onImport, onTest, onAbort }: { onImport: (body: RuntimeImportBody) => void | Promise<void>; onTest: (body?: RuntimeImportBody) => RuntimeImportBody | void | Promise<RuntimeImportBody | void>; onAbort?: () => void }) {
   const [draft, setDraft] = useState<RuntimeDraft>(DEFAULT_DRAFT);
+  const draftRef = useRef(draft);
   const [testState, setTestState] = useState<TestState>("idle");
   const [error, setError] = useState("");
   const testing = testState === "testing";
   const tested = testState === "passed";
   const canImport = runtimeImportReady(tested, testing);
+  function setDraftState(next: RuntimeDraft | ((current: RuntimeDraft) => RuntimeDraft)) {
+    setDraft((current) => {
+      const value = typeof next === "function" ? next(current) : next;
+      draftRef.current = value;
+      return value;
+    });
+  }
   function update(field: keyof RuntimeDraft, value: string) {
-    setDraft((current) => ({ ...current, [field]: value, importProof: "" }));
+    setDraftState((current) => ({ ...current, [field]: value, importProof: "" }));
     setTestState("idle");
     setError("");
   }
   function updateFile(textField: "authJson" | "profileText", nameField: "authFileName" | "profileFileName", text: string, fileName: string) {
-    setDraft((current) => ({ ...current, [textField]: text, [nameField]: fileName, importProof: "" }));
+    setDraftState((current) => ({ ...current, [textField]: text, [nameField]: fileName, importProof: "" }));
     setTestState("idle");
     setError("");
   }
   function updateText(textField: "authJson" | "profileText", nameField: "authFileName" | "profileFileName", text: string) {
-    setDraft((current) => ({ ...current, [textField]: text, [nameField]: "", importProof: "" }));
+    setDraftState((current) => ({ ...current, [textField]: text, [nameField]: "", importProof: "" }));
     setTestState("idle");
     setError("");
   }
   async function testActive() {
     setTestState("testing");
     setError("");
+    const testedBody = runtimeImportBody(draftRef.current);
+    const testedFingerprint = runtimeImportFingerprint(testedBody);
     try {
-      const result = await onTest(runtimeImportBody(draft));
+      const result = await onTest(testedBody);
       const importProof = typeof result?.importProof === "string" ? result.importProof : "";
       if (!importProof) throw new Error("runtime_test_proof_missing");
-      setDraft((current) => ({ ...current, importProof }));
+      if (runtimeImportFingerprint(runtimeImportBody(draftRef.current)) !== testedFingerprint) return setTestState("idle");
+      setDraftState((current) => ({ ...current, importProof }));
       setTestState("passed");
     } catch (err) {
       setTestState("idle");
@@ -129,7 +136,7 @@ function configPlaceholder(runtime: RuntimeKind): string {
 
 function messageFromError(err: unknown): string {
   if (err instanceof ApiError) return runtimeErrorMessage(err) || err.message;
-  return err instanceof Error ? err.message : String(err || "request_failed");
+  return err instanceof Error && knownLocalError(err.message) ? err.message : "request_failed";
 }
 
 function runtimeErrorMessage(error: ApiError): string {
@@ -151,7 +158,7 @@ function runtimeErrorMessage(error: ApiError): string {
 export function friendlyCheckMessage(message: string): string {
   if (/output_class:auth_failure|local cli provider exited|authentication failed/i.test(message)) return "Local CLI authentication failed. Re-import a current auth.json or run the runtime login command, then test again.";
   if (/permission prompt/i.test(message)) return "Local CLI reported a permission prompt.";
-  return message;
+  return knownLocalError(message) ? message : "runtime_check_failed";
 }
 
 export function readableRuntimeError(code: string): string {
@@ -185,4 +192,8 @@ function hint(kind: string) {
   if (kind === "ollama") return "Ollama uses the local loopback default and no API token.";
   if (kind === "local") return "Local OpenAI-compatible backends need no token.";
   return "Paste API tokens only on a trusted local machine. They stay local and are never shown again.";
+}
+
+function knownLocalError(message: string): boolean {
+  return /^[a-z][a-z0-9_:-]{0,80}$/i.test(message);
 }

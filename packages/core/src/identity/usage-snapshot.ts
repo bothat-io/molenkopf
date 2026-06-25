@@ -28,6 +28,7 @@ export class UsageSnapshotStore {
   private flushing = false;
   private pending?: UsageMaps;
   private flushPromise?: Promise<void>;
+  private lastError?: unknown;
   private closed = false;
 
   constructor(root = defaultDataDir()) {
@@ -57,7 +58,7 @@ export class UsageSnapshotStore {
   }
 
   async save(maps: UsageMaps): Promise<void> {
-    if (this.closed) return;
+    if (this.closed) throw new UsageSnapshotError("usage snapshot store closed");
     const db = this.handle();
     db.exec("BEGIN");
     try {
@@ -71,13 +72,15 @@ export class UsageSnapshotStore {
   }
 
   async flush(): Promise<void> {
-    if (this.closed) return;
+    if (this.lastError) { const error = this.lastError; this.lastError = undefined; throw error; }
+    if (this.closed) throw new UsageSnapshotError("usage snapshot store closed");
     if (!this.flushPromise && this.pending) this.flushPromise = this.runFlush();
     await this.flushPromise;
+    if (this.lastError) { const error = this.lastError; this.lastError = undefined; throw error; }
   }
 
   async close(): Promise<void> {
-    await this.flush().catch(() => {});
+    if (!this.closed) await this.flush();
     this.closed = true;
     try { this.db?.close(); } catch { /* ignore */ }
     this.db = undefined;
@@ -87,7 +90,9 @@ export class UsageSnapshotStore {
   schedule(maps: UsageMaps): void {
     if (this.closed) return;
     this.pending = maps;
-    if (!this.flushing) queueMicrotask(() => { this.flushPromise ??= this.runFlush().catch(() => {}); });
+    if (!this.flushing) queueMicrotask(() => {
+      this.flushPromise ??= this.runFlush().catch((error) => { this.lastError = error; });
+    });
   }
 
   private async runFlush(): Promise<void> {
@@ -96,7 +101,12 @@ export class UsageSnapshotStore {
       while (this.pending && !this.closed) {
         const next = this.pending;
         this.pending = undefined;
-        await this.save(next);
+        try {
+          await this.save(next);
+        } catch (error) {
+          this.pending = next;
+          throw error;
+        }
       }
     } finally {
       this.flushing = false;

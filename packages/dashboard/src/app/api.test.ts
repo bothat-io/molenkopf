@@ -39,6 +39,22 @@ describe("api helpers", () => {
     vi.useRealTimers();
   });
 
+  it("keeps timeout active while reading the JSON body", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn(async (_path, init) => ({
+      ok: true,
+      status: 200,
+      json: () => new Promise((_resolve, reject) => {
+        (init as RequestInit).signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+      })
+    })));
+    const promise = getJson("/slow-body", { timeoutMs: 10 });
+    const assertion = expect(promise).rejects.toMatchObject({ name: "AbortError" });
+    await vi.advanceTimersByTimeAsync(11);
+    await assertion;
+    vi.useRealTimers();
+  });
+
   it("treats unauthorized session load as anonymous", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 })));
     await expect(loadSession()).resolves.toEqual({});

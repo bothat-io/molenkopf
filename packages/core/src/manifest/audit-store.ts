@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { defaultDataDir } from "../storage/local-paths.ts";
 import { chmodPrivateSync, ensurePrivateDirSync, PRIVATE_FILE_MODE } from "../storage/private-state.ts";
 import { purgeChildDir } from "../storage/purge-dir.ts";
+import { isAuditManifest, normalizedManifest } from "./audit-safety.ts";
 
 export type AuditManifest = {
   requestId: string;
@@ -69,8 +70,7 @@ export class AuditStore {
   async listPage(options: { limit?: number; cursor?: string; newestFirst?: boolean; filter?: (item: AuditManifest) => boolean } = {}): Promise<AuditPage> {
     const dir = join(this.root, "audit");
     const limit = Math.max(1, Math.min(1000, Math.floor(options.limit ?? 100)));
-    let files: string[];
-    try { files = await auditFiles(dir); } catch { return { items: [], skippedCorrupt: 0 }; }
+    let files = await auditFiles(dir);
     if (options.newestFirst) files = files.reverse();
     const start = options.cursor ? cursorIndex(files, options.cursor) + 1 : 0;
     const items: AuditManifest[] = [];
@@ -85,17 +85,13 @@ export class AuditStore {
 
   async list(): Promise<AuditManifest[]> {
     const dir = join(this.root, "audit");
-    try {
-      const files = await auditFiles(dir);
-      const out: AuditManifest[] = [];
-      for (const file of files) {
-        const item = await readManifest(dir, file);
-        if (item) out.push(item); else await quarantine(dir, file);
-      }
-      return out;
-    } catch {
-      return [];
+    const files = await auditFiles(dir);
+    const out: AuditManifest[] = [];
+    for (const file of files) {
+      const item = await readManifest(dir, file);
+      if (item) out.push(item); else await quarantine(dir, file);
     }
+    return out;
   }
 
   async purgeAll(): Promise<void> {
@@ -122,16 +118,33 @@ export class AuditStore {
 }
 
 async function auditFiles(dir: string): Promise<string[]> {
-  return (await readdir(dir)).filter((file) => file.endsWith(".json") && !file.endsWith(".corrupt.json")).sort();
+  try {
+    return (await readdir(dir)).filter((file) => file.endsWith(".json") && !file.endsWith(".corrupt.json")).sort();
+  } catch (err) {
+    if (isFsCode(err, "ENOENT")) return [];
+    throw err;
+  }
 }
 
 async function readManifest(dir: string, file: string): Promise<AuditManifest | undefined> {
+  let raw: string;
   try {
-    const value = JSON.parse(await readFile(join(dir, file), "utf8")) as unknown;
-    return isAuditManifest(value) ? value : undefined;
-  } catch {
-    return undefined;
+    raw = await readFile(join(dir, file), "utf8");
+  } catch (err) {
+    if (isFsCode(err, "ENOENT")) return undefined;
+    throw err;
   }
+  try {
+    const value = JSON.parse(raw) as unknown;
+    return isAuditManifest(value) ? value : undefined;
+  } catch (err) {
+    if (err instanceof SyntaxError) return undefined;
+    throw err;
+  }
+}
+
+function isFsCode(err: unknown, code: string): boolean {
+  return Boolean(err && typeof err === "object" && "code" in err && (err as { code?: unknown }).code === code);
 }
 
 async function quarantine(dir: string, file: string): Promise<void> {
@@ -148,24 +161,6 @@ function safePath(path: string): string {
 
 function safeName(value: string): string {
   return value.replace(/[^a-z0-9._:-]/gi, "_").slice(0, 96) || "request";
-}
-
-function normalizedManifest(manifest: AuditManifest): AuditManifest {
-  const safe = JSON.parse(JSON.stringify(manifest)) as AuditManifest;
-  if (!isAuditManifest(safe)) throw new Error("invalid audit manifest");
-  safe.requestId = safeName(safe.requestId);
-  if (Number.isNaN(Date.parse(safe.timestamp))) safe.timestamp = new Date().toISOString();
-  return safe;
-}
-
-function isAuditManifest(value: unknown): value is AuditManifest {
-  const item = value as AuditManifest;
-  return Boolean(item && typeof item === "object" && typeof item.requestId === "string" && typeof item.timestamp === "string"
-    && typeof item.method === "string" && typeof item.path === "string" && typeof item.targetHost === "string"
-    && typeof item.compressedItems === "number" && typeof item.estimatedOriginalTokens === "number"
-    && typeof item.estimatedCompressedTokens === "number" && typeof item.estimatedSavedTokens === "number"
-    && typeof item.redactedSecrets === "number" && Array.isArray(item.retrievalIds) && Array.isArray(item.compressorsUsed)
-    && Array.isArray(item.warnings));
 }
 
 function encodeCursor(file: string): string {

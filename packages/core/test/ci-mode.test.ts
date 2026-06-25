@@ -18,17 +18,40 @@ test("packs PR context without remote issue calls and creates redacted audit art
 
 test("bounds PR context fields, patches, and total output with omission markers", () => {
   const context = packPrContext({
-    title: "t".repeat(20),
-    description: "d".repeat(20),
+    title: "t".repeat(80),
+    description: "d".repeat(80),
     files: [
-      { path: "../src/a.ts", patch: "+".repeat(30) },
-      { path: "src/b.ts", patch: "+".repeat(30) }
+      { path: "../src/a.ts", patch: "+".repeat(80) },
+      { path: "src/b.ts", patch: "+".repeat(80) }
     ]
-  }, { maxFieldChars: 8, maxPatchChars: 10, maxTotalChars: 200 });
-  assert.match(context, /molenkopf omitted: 12 field chars/);
-  assert.match(context, /molenkopf omitted: 20 patch chars/);
-  assert.match(context, /molenkopf omitted: 1 files after total context limit/);
+  }, { maxFieldChars: 50, maxPatchChars: 40, maxTotalChars: 250 });
+  assert.match(context, /molenkopf omitted: 30 field chars/);
+  assert.match(context, /molenkopf omitted: 40 patch chars/);
   assert.doesNotMatch(context, /\.\./);
+});
+
+test("marks files omitted by the total context limit when the marker fits", () => {
+  const context = packPrContext({
+    title: "short",
+    files: [
+      { path: "src/a.ts", patch: "+" },
+      { path: "src/b.ts", patch: "+".repeat(200) }
+    ]
+  }, { maxPatchChars: 200, maxTotalChars: 100 });
+
+  assert.match(context, /molenkopf omitted: 1 files after total context limit/);
+});
+
+test("keeps packed PR context within the exact total limit", () => {
+  const context = packPrContext({
+    title: "short",
+    files: [
+      { path: "src/a.ts", patch: "+".repeat(200) },
+      { path: "src/b.ts", patch: "+".repeat(200) }
+    ]
+  }, { maxPatchChars: 120, maxTotalChars: 120 });
+
+  assert.ok(context.length <= 120);
 });
 
 test("rejects pathological PR file counts", () => {

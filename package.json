@@ -45,7 +45,7 @@
   "scripts": {
     "bootstrap": "npm ci && npm --prefix packages/dashboard ci",
     "typecheck": "npm run typecheck:node && npm --prefix packages/dashboard run typecheck",
-    "typecheck:node": "node packages/dashboard/node_modules/typescript/bin/tsc -p tsconfig.node.json",
+    "typecheck:node": "tsc -p tsconfig.node.json",
     "test": "npm run test:unit",
     "test:unit": "npm run check:docs && npm run check:dashboard-install && npm run check:reachability && npm run check:container-contract && npm run typecheck && npm --prefix packages/dashboard run build && npm run vitest && npm run test:node",
     "check:docs": "node scripts/check-doc-paths.js",
@@ -63,8 +63,11 @@
     "dev": "npm run serve:dev",
     "prod": "npm run serve:prod"
   },
-  "main": "index.js",
   "directories": {
     "doc": "docs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
   }
 }

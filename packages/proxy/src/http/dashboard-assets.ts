@@ -56,7 +56,8 @@ async function proxyDevDashboard(req: IncomingMessage, res: ServerResponse, orig
     const target = new URL(`${incoming.pathname}${incoming.search}`, origin);
     if (target.pathname === routePrefix) target.pathname = `${routePrefix}/`;
     const upstream = await fetch(target, { method: req.method });
-    const headers = Object.fromEntries(upstream.headers.entries());
+    const headers: Record<string, string> = {};
+    upstream.headers.forEach((value, key) => { headers[key] = value; });
     res.writeHead(upstream.status, headers);
     if (req.method === "HEAD") return res.end();
     res.end(Buffer.from(await upstream.arrayBuffer()));

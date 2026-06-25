@@ -40,6 +40,29 @@ test("close flushes the final pending snapshot before closing storage", async ()
   }
 });
 
+test("failed scheduled snapshot writes are retained and surfaced", async () => {
+  const store = new UsageSnapshotStore();
+  let fail = true;
+  const saved: string[] = [];
+  store.save = async (value: UsageMaps) => {
+    const id = Object.keys(value.usageByUser)[0];
+    if (fail) throw new Error("disk full");
+    saved.push(id);
+  };
+  store.schedule(maps("pending"));
+  await Promise.resolve();
+  await assert.rejects(store.flush(), /disk full/);
+  fail = false;
+  await store.flush();
+  assert.deepEqual(saved, ["pending"]);
+});
+
+test("closed usage snapshot stores reject direct writes", async () => {
+  const store = new UsageSnapshotStore();
+  await store.close();
+  await assert.rejects(store.save(maps("late")), UsageSnapshotError);
+});
+
 test("corrupt snapshot rows fail closed instead of looking absent", async () => {
   const root = await mkdtemp(join(tmpdir(), "molenkopf-usage-corrupt-"));
   try {

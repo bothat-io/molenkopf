@@ -67,6 +67,7 @@ test("issue and revoke roll back in-memory mutations when persistence fails", as
 test("issued key scopes must be valid provider identifiers", async () => {
   const s = await storeWithUser();
   assert.equal(await issueApiKey(s, "bob", { project: "project-alpha", teamId: "alpha", scopes: ["valid", "bad scope"] }), undefined);
+  assert.equal(await issueApiKey(s, "bob", { project: "project-alpha", teamId: "alpha", scopes: [] }), undefined);
   const issued = (await issueApiKey(s, "bob", { project: "project-alpha", teamId: "alpha", scopes: ["default", "default", "openai-env"] }))!;
   assert.deepEqual(s.data.keys[issued.view.id].scopes, ["default", "openai-env"]);
 });

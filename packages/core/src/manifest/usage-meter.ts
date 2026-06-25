@@ -30,12 +30,14 @@ export function createUsageMeter() {
 function consumeSseEvents(text: string, onEvent: (event: SseEvent) => void): string {
   let start = 0;
   for (;;) {
-    const end = text.indexOf("\n\n", start);
+    const lf = text.indexOf("\n\n", start);
+    const crlf = text.indexOf("\r\n\r\n", start);
+    const end = lf === -1 ? crlf : crlf === -1 ? lf : Math.min(lf, crlf);
     if (end === -1) break;
     const raw = text.slice(start, end);
     const event = parseSseEvent(raw);
     if (event) onEvent(event);
-    start = end + 2;
+    start = end + (text.startsWith("\r\n\r\n", end) ? 4 : 2);
   }
   return trimBuffer(text.slice(start));
 }
@@ -62,6 +64,7 @@ function eventUsage(event: SseEvent): UsageTotals | undefined {
   if (!isRecord(event.data)) return undefined;
   if (event.type === "message_start" && isRecord(event.data.message)) return usageObject(event.data.message.usage);
   if (event.type === "message_delta") return usageObject(event.data.usage);
+  if (isRecord(event.data.response)) return usageObject(event.data.response.usage);
   return usageObject(event.data.usage);
 }
 

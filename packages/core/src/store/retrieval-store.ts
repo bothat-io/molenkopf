@@ -1,7 +1,7 @@
-import { readFile } from "node:fs/promises";
+import { readFile, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { defaultDataDir } from "../storage/local-paths.ts";
-import { ensurePrivateDir, writePrivateFile } from "../storage/private-state.ts";
+import { chmodPrivate, ensurePrivateDir, PRIVATE_FILE_MODE, writePrivateFile } from "../storage/private-state.ts";
 import { purgeChildDir } from "../storage/purge-dir.ts";
 import { sha256 } from "../utils/hash.ts";
 import { byteLength } from "../utils/text.ts";
@@ -32,8 +32,7 @@ export class RetrievalStore {
     const full: RetrievalMeta = { hash, createdAt: new Date().toISOString(), originalBytes: byteLength(text), ...meta };
     const dir = this.dirFor(hash);
     await ensurePrivateDir(dir);
-    await writePrivateFile(join(dir, `${hash}.txt`), boundedExcerpt(text));
-    await writePrivateFile(join(dir, `${hash}.json`), JSON.stringify(full, null, 2));
+    await atomicPairWrite(dir, hash, boundedExcerpt(text), JSON.stringify(full, null, 2));
     return { id: `${RETRIEVAL_PREFIX}${hash}`, meta: full };
   }
 
@@ -43,12 +42,13 @@ export class RetrievalStore {
 
   async retrieve(id: string): Promise<string> {
     const hash = this.hashFromId(id);
+    await this.checkedMetadata(hash);
     return readFile(join(this.dirFor(hash), `${hash}.txt`), "utf8");
   }
 
   async metadata(id: string): Promise<RetrievalMeta> {
     const hash = this.hashFromId(id);
-    return JSON.parse(await readFile(join(this.dirFor(hash), `${hash}.json`), "utf8")) as RetrievalMeta;
+    return this.checkedMetadata(hash);
   }
 
   async purgeAll(): Promise<void> {
@@ -65,6 +65,41 @@ export class RetrievalStore {
   private dirFor(hash: string): string {
     return join(this.root, "store", "sha256", hash.slice(0, 2), hash.slice(2, 4));
   }
+
+  private async checkedMetadata(hash: string): Promise<RetrievalMeta> {
+    const meta = JSON.parse(await readFile(join(this.dirFor(hash), `${hash}.json`), "utf8")) as RetrievalMeta;
+    if (!isRetrievalMeta(meta) || meta.hash !== hash) throw new Error("invalid retrieval metadata");
+    return meta;
+  }
+}
+
+async function atomicPairWrite(dir: string, hash: string, text: string, json: string): Promise<void> {
+  const suffix = `${process.pid}-${Date.now()}`;
+  const textTmp = join(dir, `${hash}.${suffix}.txt.tmp`);
+  const jsonTmp = join(dir, `${hash}.${suffix}.json.tmp`);
+  const textPath = join(dir, `${hash}.txt`);
+  const jsonPath = join(dir, `${hash}.json`);
+  try {
+    await writePrivateFile(textTmp, text);
+    await writePrivateFile(jsonTmp, json);
+    await rename(textTmp, textPath);
+    await chmodPrivate(textPath, PRIVATE_FILE_MODE);
+    await rename(jsonTmp, jsonPath);
+    await chmodPrivate(jsonPath, PRIVATE_FILE_MODE);
+  } catch (err) {
+    await rm(textTmp, { force: true }).catch(() => {});
+    await rm(jsonTmp, { force: true }).catch(() => {});
+    throw err;
+  }
+}
+
+function isRetrievalMeta(value: unknown): value is RetrievalMeta {
+  if (!value || typeof value !== "object") return false;
+  const item = value as RetrievalMeta;
+  return /^[a-f0-9]{64}$/.test(item.hash) && typeof item.createdAt === "string" && typeof item.contentKind === "string"
+    && typeof item.originalBytes === "number" && typeof item.compressedBytes === "number"
+    && typeof item.compressorName === "string" && typeof item.redacted === "boolean"
+    && (item.requestId === undefined || typeof item.requestId === "string");
 }
 
 function boundedExcerpt(text: string): string {

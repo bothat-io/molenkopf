@@ -110,7 +110,7 @@ function cleanScopes(scopes: string[] | undefined): string[] | undefined | false
     if (typeof scope !== "string" || !/^[a-z0-9][a-z0-9._:-]{0,63}$/i.test(scope)) return false;
     if (!out.includes(scope)) out.push(scope);
   }
-  return out.length ? out : undefined;
+  return out.length ? out : false;
 }
 
 function resolveIssueTeam(store: IdentityStore, owner: { teamIds: string[] }, value: string | undefined): string | undefined | false {

@@ -19,11 +19,17 @@ export async function postJson<T>(path: string, body: unknown, options?: ApiOpti
 async function requestJson<T>(path: string, init?: RequestInit, options: ApiOptions = {}): Promise<T> {
   const timed = withTimeout(init, options);
   let response!: Response;
-  try { response = await fetch(path, timed.init); }
-  finally { timed.clear(); }
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new ApiError(response.status, String((payload as { error?: string }).error || response.status), payload);
-  return payload as T;
+  try {
+    response = await fetch(path, timed.init);
+    const payload = await response.json().catch((error) => {
+      if (error instanceof DOMException && error.name === "AbortError") throw error;
+      return {};
+    });
+    if (!response.ok) throw new ApiError(response.status, String((payload as { error?: string }).error || response.status), payload);
+    return payload as T;
+  } finally {
+    timed.clear();
+  }
 }
 
 export async function loadSession(options?: ApiOptions): Promise<Session> {

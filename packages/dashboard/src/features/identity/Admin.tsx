@@ -72,6 +72,7 @@ function keyPolicy(user: UserView) {
 }
 
 function loginStatus(user: UserView) {
-  if (user.disabled) return <span className="pill off">login off</span>;
+  if (user.disabled) return <span className="pill off">account off</span>;
+  if (user.loginDisabled) return <span className="pill off">login off</span>;
   return user.hasPassword ? <span className="pill">login on</span> : <span className="pill off">no password</span>;
 }
