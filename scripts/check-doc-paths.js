@@ -3,7 +3,7 @@ import { join, sep } from "node:path";
 
 const root = process.cwd();
 const localPlanningDocs = new Set(["FIXME.md", "NEXT.md"]);
-const maintainedDocs = ["README.md", "ROADMAP.md", "NEXT.md", "SECURITY.md"].filter((file) => existsExact(file));
+const maintainedDocs = ["README.md", "ROADMAP.md", "SECURITY.md"];
 const docs = [...maintainedDocs, ...markdownFiles("docs")];
 const failures = [];
 
