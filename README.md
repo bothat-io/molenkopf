@@ -122,11 +122,22 @@ Plugin pages open in standalone windows from `/__molenkopf/plugins/context-compr
 
 ## Commands
 
-Pull the published Docker image:
+Quick Docker start on the Docker host:
 
 ```bash
 docker pull ghcr.io/bothat-io/molenkopf:latest
+docker run --rm --network host -v molenkopf-data:/data ghcr.io/bothat-io/molenkopf:latest
 ```
+
+Open `http://127.0.0.1:8787/` and create the first admin user. This quickstart
+keeps Molenkopf bound to loopback on the Docker host. If Docker runs on another
+machine or host networking is unavailable, use `docs/DEPLOYMENT.md` or an SSH
+tunnel.
+
+Use `docs/DEPLOYMENT.md` when you need a different port, Docker port
+publishing, env-seeded admin auth, or non-loopback access. Treat those as
+deployment settings: public binds require admin auth, proxy key enforcement, and
+a strong session secret.
 
 For local development, use a source checkout:
 
