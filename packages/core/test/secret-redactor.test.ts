@@ -130,3 +130,10 @@ test("redacts extended service tokens and secret-bearing URLs", () => {
     assert.match(result.text, new RegExp(`REDACTED_SECRET:${kind}:sha256:[a-f0-9]{12}`));
   }
 });
+
+test("redacts standalone Molenkopf API keys", () => {
+  const key = `mk_${"a".repeat(32)}`;
+  const result = redactSecrets(`Use ${key} in OPENAI_API_KEY or JSON {"note":"${key}"}`);
+  assert.doesNotMatch(result.text, new RegExp(key));
+  assert.match(result.text, /\[REDACTED_SECRET:molenkopf_api_key:sha256:[a-f0-9]{12}\]/);
+});

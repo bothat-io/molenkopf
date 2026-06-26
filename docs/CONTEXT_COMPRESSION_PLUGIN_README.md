@@ -44,8 +44,7 @@ If neither header is present, the gateway falls back to a short SHA-256 fingerpr
 - `Compression saved`: estimated tokens saved by confirmed context-compression replacements only.
 - `Original tokens`: estimated tokens before safe transforms.
 - `Forwarded tokens`: estimated tokens after all safe transforms. The API
-  exposes this as `forwardedTokens`; `compressedTokens` remains a compatibility
-  alias for the same value.
+  exposes this as `forwardedTokens`.
 - `Token funnel`: original, forwarded, and confirmed compression-saved token estimates.
 - `Optimization state`: whether the compressor is disabled, idle, threshold-limited, or actively saving tokens.
 - `Consumers / API keys`: buckets grouped by `x-molenkopf-user`, `x-molenkopf-agent`, API-key fingerprint, or anonymous traffic.
@@ -77,10 +76,9 @@ Returns aggregate totals and per-bucket rows:
 {
   "originalTokens": 960,
   "forwardedTokens": 540,
-  "compressedTokens": 540,
   "savedTokens": 420,
   "buckets": [
-    { "label": "user:operator", "originalTokens": 960, "forwardedTokens": 540, "compressedTokens": 540, "savedTokens": 420 }
+    { "label": "user:operator", "originalTokens": 960, "forwardedTokens": 540, "savedTokens": 420 }
   ]
 }
 ```

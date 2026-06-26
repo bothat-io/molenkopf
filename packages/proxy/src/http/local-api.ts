@@ -13,7 +13,7 @@ import { setConsumerBudget } from "./local-api-consumer-actions.ts";
 import { addProvider, removeProvider, selectProvider, setProviderWeight, setProviderWeights, setRoutingMode, updateProvider } from "./local-api-provider-actions.ts";
 import { togglePlugin } from "./local-api-plugin-actions.ts";
 import { authRequired, canManage, currentUser, type AuthUser } from "./auth-state.ts";
-import { createUser, listUsers, login, logout, me, setupAdmin } from "./local-api-auth.ts";
+import { login, logout, me, setupAdmin } from "./local-api-auth.ts";
 import { reorderPlugin } from "./local-api-pipeline.ts";
 import { issueKeyHandler, listKeysHandler, revokeKeyHandler, updateKeyHandler, usageHandler } from "./local-api-keys.ts";
 import { listIdentity, putIdentityTeam, putIdentityUser, removeIdentityTeam, removeIdentityUser } from "./local-api-identity.ts";
@@ -31,7 +31,7 @@ const ADMIN_READ_PATHS = new Set(["/__molenkopf/status", "/__molenkopf/plugins",
 const MANAGE_PATHS = new Set([
   "/__molenkopf/plugins/toggle", "/__molenkopf/plugins/reorder", "/__molenkopf/providers/select", "/__molenkopf/providers/weight", "/__molenkopf/providers/weights",
   "/__molenkopf/providers/add", "/__molenkopf/providers/import-auth", "/__molenkopf/providers/test", "/__molenkopf/providers/test-runtime", "/__molenkopf/providers/update", "/__molenkopf/providers/remove",
-  "/__molenkopf/routing/mode", "/__molenkopf/consumers/budget", "/__molenkopf/agents/draft", "/__molenkopf/users",
+  "/__molenkopf/routing/mode", "/__molenkopf/consumers/budget", "/__molenkopf/agents/draft",
   "/__molenkopf/identity/users", "/__molenkopf/identity/users/remove",
   "/__molenkopf/identity/teams", "/__molenkopf/identity/teams/remove", "/__molenkopf/retention/purge"
 ]);
@@ -54,10 +54,6 @@ export async function handleLocalRequest(req: IncomingMessage, res: ServerRespon
     if (path === "/__molenkopf/plugins/reorder") return reorderPlugin(req, res, state);
     if (path === "/__molenkopf/logout") return logout(req, res);
     if (path === "/__molenkopf/me") return me(req, res, state);
-    if (path === "/__molenkopf/users") {
-      markDeprecated(res, "/__molenkopf/identity");
-      return req.method === "POST" ? createUser(req, res, state) : listUsers(req, res, state);
-    }
     if (path === "/__molenkopf/health") return writeJson(res, 200, { ok: true });
     if (path === DEV_REVISION_PATH) return writeDevRevision(res);
     if (path === "/__molenkopf/status") return writeJson(res, 200, buildStatus(state));
@@ -135,7 +131,7 @@ const POST_ONLY = new Set([
 
 function methodAllowed(method: string, path: string): boolean {
   const upper = method.toUpperCase();
-  if (path === "/__molenkopf/users" || path === "/__molenkopf/keys") return upper === "GET" || upper === "POST";
+  if (path === "/__molenkopf/keys") return upper === "GET" || upper === "POST";
   if (GET_ONLY.has(path)) return upper === "GET";
   if (POST_ONLY.has(path)) return upper === "POST";
   if (/^\/__molenkopf\/plugins\/[^/]+\/(?:data|page)$/.test(path)) return upper === "GET";
@@ -145,11 +141,6 @@ function methodAllowed(method: string, path: string): boolean {
 function writeDevRevision(res: ServerResponse) {
   if (process.env.MOLENKOPF_PROFILE !== "dev") return writeJson(res, 404, { error: "not_found" });
   return writeJson(res, 200, { revision: process.env.MOLENKOPF_DEV_REVISION || "dev" });
-}
-
-function markDeprecated(res: ServerResponse, successor: string) {
-  res.setHeader("Deprecation", "true");
-  res.setHeader("Link", `<${successor}>; rel="successor-version"`);
 }
 
 function writePluginPage(res: ServerResponse, id: string) {

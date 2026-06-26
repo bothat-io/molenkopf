@@ -4,8 +4,9 @@ import type { AuditManifest } from "./audit-store.ts";
 export function normalizedManifest(manifest: AuditManifest): AuditManifest {
   const safe = JSON.parse(JSON.stringify(manifest)) as AuditManifest;
   if (!isAuditManifest(safe)) throw new Error("invalid audit manifest");
-  safe.requestId = safeName(safe.requestId);
+  safe.requestId = safeName(redactSecrets(safe.requestId).text);
   if (Number.isNaN(Date.parse(safe.timestamp))) safe.timestamp = new Date().toISOString();
+  safe.path = safePath(safe.path);
   safe.targetHost = safeToken(redactSecrets(safe.targetHost).text, "target");
   safe.method = safe.method.replace(/[^A-Z]/gi, "").toUpperCase().slice(0, 12) || "GET";
   safe.warnings = safe.warnings.map((item) => safeWarning(redactSecrets(String(item)).text)).slice(0, 20);
@@ -24,12 +25,13 @@ export function isAuditManifest(value: unknown): value is AuditManifest {
 }
 
 function safeClient(client: NonNullable<AuditManifest["client"]>): NonNullable<AuditManifest["client"]> {
-  const safe = { ...client, id: safeToken(client.id, "client"), label: safeToken(redactSecrets(client.label).text, client.source) };
-  if (client.userId) safe.userId = safeToken(client.userId, "user");
-  if (client.agentId) safe.agentId = safeToken(client.agentId, "agent");
-  if (client.teamIds) safe.teamIds = client.teamIds.map((id) => safeToken(id, "team")).slice(0, 50);
-  if (client.keyId) safe.keyId = safeToken(client.keyId, "key");
-  if (client.project) safe.project = safeToken(client.project, "project");
+  const source = safeSource(client.source);
+  const safe = { ...client, source, id: redactedToken(client.id, "client"), label: redactedToken(client.label, source) };
+  if (client.userId) safe.userId = redactedToken(client.userId, "user");
+  if (client.agentId) safe.agentId = redactedToken(client.agentId, "agent");
+  if (client.teamIds) safe.teamIds = client.teamIds.map((id) => redactedToken(id, "team")).slice(0, 50);
+  if (client.keyId) safe.keyId = redactedToken(client.keyId, "key");
+  if (client.project) safe.project = redactedToken(client.project, "project");
   return safe;
 }
 
@@ -40,6 +42,22 @@ function safeName(value: string): string {
 function safeToken(value: string, fallback: string): string {
   const cleaned = value.replace(/[^a-z0-9._:@/-]/gi, "_").slice(0, 96);
   return cleaned || fallback;
+}
+
+function redactedToken(value: string, fallback: string): string {
+  return safeToken(redactSecrets(value).text, fallback);
+}
+
+function safeSource(value: string): NonNullable<AuditManifest["client"]>["source"] {
+  return value === "user" || value === "agent" || value === "api_key" || value === "anonymous" ? value : "anonymous";
+}
+
+function safePath(path: string): string {
+  try {
+    return new URL(path, "http://local").pathname || "/";
+  } catch {
+    return path.split("?")[0] || "/";
+  }
 }
 
 function safeWarning(value: string): string {

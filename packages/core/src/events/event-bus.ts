@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { redactSecrets } from "../security/secret-redactor.ts";
+import { shortHash } from "../utils/hash.ts";
 
 export type MolenkopfEvent = {
   id: string;
@@ -43,7 +44,8 @@ function safeData(value: unknown, seen = new WeakSet<object>()): Record<string, 
   return sanitize(value, seen) as Record<string, unknown>;
 }
 
-function sanitize(value: unknown, seen: WeakSet<object>): unknown {
+function sanitize(value: unknown, seen: WeakSet<object>, key?: string): unknown {
+  if (key && isSensitiveKey(key)) return sensitiveMarker(key, value);
   if (typeof value === "string") return safeString(value);
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
   if (typeof value === "boolean" || value === null) return value;
@@ -51,7 +53,7 @@ function sanitize(value: unknown, seen: WeakSet<object>): unknown {
   if (seen.has(value)) return "[circular]";
   seen.add(value);
   if (Array.isArray(value)) return value.slice(0, 50).map((item) => sanitize(item, seen));
-  return Object.fromEntries(Object.entries(value).slice(0, 50).map(([key, item]) => [safeString(key), sanitize(item, seen)]));
+  return Object.fromEntries(Object.entries(value).slice(0, 50).map(([itemKey, item]) => [safeString(itemKey), sanitize(item, seen, itemKey)]));
 }
 
 function safeString(value: unknown): string | undefined {
@@ -65,4 +67,15 @@ function deepFreeze<T>(value: T): T {
     for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
   }
   return value;
+}
+
+function isSensitiveKey(key: string): boolean {
+  const normalized = key.replace(/([a-z0-9])([A-Z])/g, "$1_$2");
+  return /(?:^|[_-])(?:password|passwd|pwd|token|authorization|auth|cookie|secret|api[_-]?key|credential|private[_-]?key)(?:$|[_-])/i.test(normalized);
+}
+
+function sensitiveMarker(key: string, value: unknown): string {
+  const kind = key.toLowerCase().replace(/[^a-z0-9]+/g, "_") || "secret";
+  const text = typeof value === "string" ? value : JSON.stringify(value);
+  return `[REDACTED_SECRET:event_${kind}:sha256:${shortHash(text ?? "")}]`;
 }

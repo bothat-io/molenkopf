@@ -21,7 +21,9 @@ export function verifySession(token: string | undefined, secret: string, now = D
 
 export function verifySessionPayload(token: string | undefined, secret: string, now = Date.now()): SessionPayload | undefined {
   if (!token || !token.includes(".")) return undefined;
-  const [body, sig] = token.split(".");
+  const parts = token.split(".");
+  if (parts.length !== 2) return undefined;
+  const [body, sig] = parts;
   if (!body || !sig || !equals(sig, hmac(body, secret))) return undefined;
   const decoded = Buffer.from(body, "base64url").toString("utf8");
   const payload = parsePayload(decoded);

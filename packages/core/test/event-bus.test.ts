@@ -47,3 +47,22 @@ test("EventBus stores immutable redacted event snapshots", () => {
   bus.subscribe((item) => replayed.push(item));
   assert.deepEqual(replayed, [event]);
 });
+
+test("EventBus redacts values under sensitive keys", () => {
+  const bus = new EventBus();
+  const event = bus.emit("plugin_event", {
+    data: {
+      apiKey: "plain-api-secret",
+      nested: { password: "plain-password" },
+      list: [{ credential: { token: "object-token" } }]
+    }
+  });
+  const encoded = JSON.stringify(event);
+  assert.doesNotMatch(encoded, /plain-api-secret|plain-password|object-token/);
+  assert.match(encoded, /REDACTED_SECRET:event_apikey/);
+  assert.match(encoded, /REDACTED_SECRET:event_password/);
+  assert.match(encoded, /REDACTED_SECRET:event_credential/);
+  const replayed: unknown[] = [];
+  bus.subscribe((item) => replayed.push(item));
+  assert.doesNotMatch(JSON.stringify(replayed), /plain-api-secret|plain-password|object-token/);
+});

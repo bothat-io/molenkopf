@@ -54,9 +54,8 @@ test("login gates control APIs; roles gate management", async () => {
     assert.equal(meRes.user.canManage, true);
 
     // admin creates a normal member; member can read but not manage
-    const legacyCreate = await fetch(`${base}/__molenkopf/users`, { method: "POST", headers: { "content-type": "application/json", cookie: admin }, body: JSON.stringify({ id: "bob", password: "bob-secret", role: "member", teamIds: ["everyone"] }) });
-    assert.equal(legacyCreate.headers.get("deprecation"), "true");
-    assert.match(legacyCreate.headers.get("link") ?? "", /\/__molenkopf\/identity/);
+    const createMember = await fetch(`${base}/__molenkopf/identity/users`, { method: "POST", headers: { "content-type": "application/json", cookie: admin }, body: JSON.stringify({ id: "bob", password: "bob-secret", role: "member", teamIds: ["everyone"] }) });
+    assert.equal(createMember.status, 200);
     const bobLogin = await fetch(`${base}/__molenkopf/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "bob", password: "bob-secret" }) });
     const bob = cookieFrom(bobLogin);
     const memberConfig = await fetch(`${base}/__molenkopf/config`, { headers: { cookie: bob } }).then((r) => r.json());

@@ -12,7 +12,6 @@ test("audit summary aggregates token savings by safe client bucket", () => {
   const summary = summarizeAudit(manifests);
   assert.equal(summary.requests, 3);
   assert.equal(summary.originalTokens, 230);
-  assert.equal(summary.compressedTokens, 120);
   assert.equal(summary.forwardedTokens, 120);
   assert.equal(summary.savedTokens, 60);
   assert.equal(summary.savedPercent, 26.09);
@@ -49,7 +48,6 @@ test("audit summary exposes forwarded tokens without crediting non-compression d
     manifest({ requestId: "redacted-only", original: 100, compressed: 80, saved: 20, compressedItems: 0 })
   ]);
   assert.equal(summary.forwardedTokens, 80);
-  assert.equal(summary.compressedTokens, 80);
   assert.equal(summary.savedTokens, 0);
 });
 

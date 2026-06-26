@@ -46,7 +46,6 @@ export class AuditStore {
 
   async write(manifest: AuditManifest): Promise<void> {
     const safe = normalizedManifest(manifest);
-    safe.path = safePath(safe.path);
     const dir = join(this.root, "audit");
     ensurePrivateDirSync(dir);
     const name = `${safe.timestamp.replace(/[:.]/g, "-")}-${safeName(safe.requestId)}.json`;
@@ -149,14 +148,6 @@ function isFsCode(err: unknown, code: string): boolean {
 
 async function quarantine(dir: string, file: string): Promise<void> {
   await rename(join(dir, file), join(dir, `${file}.corrupt`)).catch(() => {});
-}
-
-function safePath(path: string): string {
-  try {
-    return new URL(path, "http://local").pathname || "/";
-  } catch {
-    return path.split("?")[0] || "/";
-  }
 }
 
 function safeName(value: string): string {

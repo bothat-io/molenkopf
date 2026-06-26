@@ -14,6 +14,7 @@ const rules: Rule[] = [
   { kind: "anthropic_api_key", pattern: /\bsk-ant-[A-Za-z0-9_-]{32,}\b/g },
   { kind: "openai_api_key", pattern: /\bsk-(?:proj-|)[A-Za-z0-9_-]{32,}\b/g },
   { kind: "github_token", pattern: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{30,}\b/g },
+  { kind: "molenkopf_api_key", pattern: /(?<![A-Za-z0-9_-])mk_[A-Za-z0-9_-]{24,}(?![A-Za-z0-9_-])/g },
   { kind: "gitlab_token", pattern: /\bglpat-[A-Za-z0-9_-]{20,}\b/g },
   { kind: "npm_token", pattern: /\bnpm_[A-Za-z0-9]{32,}\b/g },
   { kind: "slack_token", pattern: /\bxox[baprs]-[A-Za-z0-9-]{20,}\b/g },
