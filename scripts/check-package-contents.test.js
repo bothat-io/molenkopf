@@ -42,11 +42,36 @@ test("package checker accepts the reviewed runtime inventory shape", async () =>
 });
 
 function manifest() {
-  return { files: [".env.example", "bin/", "packages/core/src/", "packages/proxy/src/", "packages/plugins/context-compressor-plugin/plugin.ts", "packages/plugins/context-compressor-plugin/page.html", "packages/plugins/obsidian-graph-plugin/plugin.ts", "packages/plugins/obsidian-graph-plugin/page.html", "packages/plugins/shared/audit-projects.ts", "packages/dashboard/dist/", "packages/dashboard/public/molenkopf-logo.png", "docs/DEPLOYMENT.md", "docs/MOLENKOPF_USAGE.md", "docs/MOLENKOPF_PLUGIN_API.md", "docs/PRODUCT_INTENT.md", "docs/THREAT_MODEL.md", "molenkopf.config.example.json", "README.md", "LICENSE", "SECURITY.md"] };
+  return { files: [
+    ".env.example", "bin/", "packages/core/src/", "packages/proxy/src/",
+    "packages/plugins/context-compressor-plugin/descriptor.ts",
+    "packages/plugins/context-compressor-plugin/plugin.ts",
+    "packages/plugins/context-compressor-plugin/page.html",
+    "packages/plugins/obsidian-graph-plugin/descriptor.ts",
+    "packages/plugins/obsidian-graph-plugin/plugin.ts",
+    "packages/plugins/obsidian-graph-plugin/page.html",
+    "packages/plugins/shared/audit-projects.ts", "packages/dashboard/dist/",
+    "packages/dashboard/public/molenkopf-logo.png", "docs/DEPLOYMENT.md",
+    "docs/MOLENKOPF_USAGE.md", "docs/MOLENKOPF_PLUGIN_API.md",
+    "docs/PRODUCT_INTENT.md", "docs/THREAT_MODEL.md",
+    "molenkopf.config.example.json", "README.md", "LICENSE", "SECURITY.md"
+  ] };
 }
 
 function requiredPaths() {
-  return [".env.example", "bin/molenkopf.js", "packages/core/src/security/secret-redactor.ts", "packages/proxy/src/cli/main.ts", "packages/plugins/context-compressor-plugin/plugin.ts", "packages/dashboard/dist/index.html", "packages/dashboard/public/molenkopf-logo.png", "docs/DEPLOYMENT.md", "docs/MOLENKOPF_USAGE.md", "docs/MOLENKOPF_PLUGIN_API.md", "docs/PRODUCT_INTENT.md", "docs/THREAT_MODEL.md", "molenkopf.config.example.json", "README.md", "LICENSE", "SECURITY.md"];
+  return [
+    ".env.example", "bin/molenkopf.js",
+    "packages/core/src/security/secret-redactor.ts",
+    "packages/proxy/src/cli/main.ts",
+    "packages/plugins/context-compressor-plugin/descriptor.ts",
+    "packages/plugins/context-compressor-plugin/plugin.ts",
+    "packages/plugins/obsidian-graph-plugin/descriptor.ts",
+    "packages/dashboard/dist/index.html",
+    "packages/dashboard/public/molenkopf-logo.png", "docs/DEPLOYMENT.md",
+    "docs/MOLENKOPF_USAGE.md", "docs/MOLENKOPF_PLUGIN_API.md",
+    "docs/PRODUCT_INTENT.md", "docs/THREAT_MODEL.md",
+    "molenkopf.config.example.json", "README.md", "LICENSE", "SECURITY.md"
+  ];
 }
 
 async function fixtureRoot() {

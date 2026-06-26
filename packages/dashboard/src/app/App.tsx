@@ -104,8 +104,7 @@ export function DashboardApp() {
     providerMessages,
     onProviderTest: testProvider,
     onProviderWeight: setProviderShare,
-    onPluginToggle: (id: string, enabled: boolean) => mutate("/__molenkopf/plugins/toggle", { id, enabled }),
-    onPluginMove: (id: string, direction: "up" | "down") => mutate("/__molenkopf/plugins/reorder", { id, direction })
+    onPluginToggle: (id: string, enabled: boolean) => mutate("/__molenkopf/plugins/toggle", { id, enabled })
   };
 
   async function mutate(path: string, body: unknown, okMessage = "", options?: { rethrow?: boolean }) {

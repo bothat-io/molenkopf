@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { builtinPluginDescriptors } from "../src/plugins/plugin-descriptor.ts";
 import { pluginCatalog } from "../src/plugins/plugin-catalog.ts";
@@ -14,6 +14,13 @@ test("builtin plugin descriptors are unique and expose explicit runtime contract
   assert.equal(pluginCatalog.every((plugin) => plugin.hooks.length > 0), true);
   assert.equal(pluginCatalog.every((plugin) => plugin.type && plugin.traffic.reads.length > 0 && plugin.traffic.mutates.length > 0), true);
   assert.deepEqual(pluginCatalog.map((plugin) => plugin.id).sort(), ["context-compressor-plugin", "obsidian-graph-plugin"]);
+});
+
+test("descriptor registry does not import executable plugin modules", () => {
+  const descriptorRegistry = readFileSync("packages/core/src/plugins/builtin-plugin-descriptors.ts", "utf8");
+  const pluginDescriptor = readFileSync("packages/core/src/plugins/plugin-descriptor.ts", "utf8");
+  assert.doesNotMatch(descriptorRegistry, /\/plugin\.ts/);
+  assert.doesNotMatch(pluginDescriptor, /builtin-plugin-modules/);
 });
 
 test("plugin modules live in plugin folders", () => {

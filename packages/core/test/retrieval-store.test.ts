@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { RetrievalStore } from "../src/store/retrieval-store.ts";
@@ -65,6 +65,25 @@ test("requires retrieval metadata to match the requested content hash", async ()
 
   await assert.rejects(store.retrieve(saved.id), /invalid retrieval metadata/);
   await assert.rejects(store.metadata(saved.id), /invalid retrieval metadata/);
+
+  await rm(dir, { recursive: true, force: true });
+});
+
+test("rolls back finalized text when metadata finalization fails", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "molenkopf-retrieval-rollback-"));
+  const store = new RetrievalStore(dir);
+  const text = "rollback text";
+  const hash = store.idFor(text).slice("molenkopf://sha256/".length);
+  const shard = join(dir, "store", "sha256", hash.slice(0, 2), hash.slice(2, 4));
+  await mkdir(join(shard, `${hash}.json`), { recursive: true });
+
+  await assert.rejects(store.save(text, {
+    contentKind: "log",
+    compressedBytes: 5,
+    compressorName: "test",
+    redacted: true
+  }));
+  await assert.rejects(access(join(shard, `${hash}.txt`)));
 
   await rm(dir, { recursive: true, force: true });
 });

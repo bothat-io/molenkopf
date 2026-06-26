@@ -1,5 +1,5 @@
 import type { PluginPermission } from "./plugin-sdk.ts";
-import { builtinPluginDescriptors as descriptors } from "./builtin-plugin-modules.ts";
+import { builtinPluginDescriptors as descriptors } from "./builtin-plugin-descriptors.ts";
 import { staticPluginPipeline } from "./static-pipeline.ts";
 
 export type PluginCategory = "safety" | "compression" | "storage" | "events" | "routing" | "visualization";

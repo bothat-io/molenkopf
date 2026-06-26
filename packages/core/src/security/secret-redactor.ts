@@ -56,9 +56,9 @@ function redactJsonKeys(input: string, redactions: Redaction[]): string | undefi
   if (!/^\s*[\[{]/.test(input)) return undefined;
   if (exceedsSafeJsonDepth(input)) return containsSensitiveJsonKey(input) ? redactionMarker("json_too_deep", input, redactions) : undefined;
   const structural = redactSensitiveJsonValues(input, redactions);
-  if (structural) return structural;
-  const spans = scanJsonStringValues(input);
-  if (!spans) return undefined;
+  const base = structural ?? input;
+  const spans = scanJsonStringValues(base);
+  if (!spans) return structural;
   const replacements: JsonStringReplacement[] = [];
   for (const span of spans) {
     if (span.key && isSensitiveJsonKey(span.key)) {
@@ -69,7 +69,7 @@ function redactJsonKeys(input: string, redactions: Redaction[]): string | undefi
     const nested = redactJsonKeys(span.value, redactions);
     if (nested && nested !== span.value) replacements.push({ start: span.start, end: span.end, value: nested });
   }
-  return replacements.length ? replaceJsonStrings(input, replacements) : undefined;
+  return replacements.length ? replaceJsonStrings(base, replacements) : structural;
 }
 
 function redactSensitiveJsonValues(input: string, redactions: Redaction[]): string | undefined {

@@ -1,5 +1,5 @@
 import { isBudget } from "./budget.ts";
-import type { ApiKey, IdentityData, Team, User } from "./types.ts";
+import { IDENTITY_SCHEMA_VERSION, type ApiKey, type IdentityData, type Team, type User } from "./types.ts";
 import type { PriceTable } from "./pricing.ts";
 
 export type IdentityRow = { id: string; json: string };
@@ -26,6 +26,16 @@ export function validateIdentityReferences(data: IdentityData): void {
     if (!data.users[key.ownerUserId]) throw new Error(`key ${key.id} references missing owner`);
     if (key.teamId && !data.teams[key.teamId]) throw new Error(`key ${key.id} references missing team`);
   }
+}
+
+export function validateIdentityData(data: IdentityData): void {
+  if (data.schemaVersion !== IDENTITY_SCHEMA_VERSION) throw new Error("invalid identity schema version");
+  validateRows(data.users, isIdentityUser, "user");
+  validateRows(data.teams, isIdentityTeam, "team");
+  validateRows(data.keys, isIdentityApiKey, "api_key");
+  if (data.orgBudget !== undefined && !isBudget(data.orgBudget)) throw new Error("invalid orgBudget row");
+  if (data.pricing !== undefined && !isPriceTable(data.pricing)) throw new Error("invalid pricing row");
+  validateIdentityReferences(data);
 }
 
 export function isIdentityUser(value: unknown): value is User {
@@ -65,6 +75,13 @@ function isPassword(value: unknown): boolean {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function validateRows<T extends { id: string }>(rows: Record<string, T>, check: (value: unknown) => value is T, label: string): void {
+  for (const [id, value] of Object.entries(rows)) {
+    if (!check(value)) throw new Error(`invalid ${label} row`);
+    if (value.id !== id) throw new Error(`${label} id mismatch`);
+  }
 }
 
 function isUserId(value: unknown): value is string {

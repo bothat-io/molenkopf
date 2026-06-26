@@ -79,16 +79,22 @@ async function atomicPairWrite(dir: string, hash: string, text: string, json: st
   const jsonTmp = join(dir, `${hash}.${suffix}.json.tmp`);
   const textPath = join(dir, `${hash}.txt`);
   const jsonPath = join(dir, `${hash}.json`);
+  let textFinalized = false;
+  let jsonFinalized = false;
   try {
     await writePrivateFile(textTmp, text);
     await writePrivateFile(jsonTmp, json);
     await rename(textTmp, textPath);
+    textFinalized = true;
     await chmodPrivate(textPath, PRIVATE_FILE_MODE);
     await rename(jsonTmp, jsonPath);
+    jsonFinalized = true;
     await chmodPrivate(jsonPath, PRIVATE_FILE_MODE);
   } catch (err) {
     await rm(textTmp, { force: true }).catch(() => {});
     await rm(jsonTmp, { force: true }).catch(() => {});
+    if (textFinalized && !jsonFinalized) await rm(textPath, { force: true }).catch(() => {});
+    if (jsonFinalized && !textFinalized) await rm(jsonPath, { force: true }).catch(() => {});
     throw err;
   }
 }

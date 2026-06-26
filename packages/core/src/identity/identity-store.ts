@@ -1,6 +1,6 @@
 import { IDENTITY_SCHEMA_VERSION, emptyIdentity, type ApiKey, type IdentityData, type Team, type User } from "./types.ts";
 import { markIdentityDbUnavailable, openDb, type Db } from "./db.ts";
-import { isIdentityApiKey, isIdentityTeam, isIdentityUser, loadIdentityMeta, parseIdentityRow, validateIdentityReferences, type IdentityMetaRow, type IdentityRow } from "./identity-validation.ts";
+import { isIdentityApiKey, isIdentityTeam, isIdentityUser, loadIdentityMeta, parseIdentityRow, validateIdentityData, type IdentityMetaRow, type IdentityRow } from "./identity-validation.ts";
 import { defaultDataDir } from "../storage/local-paths.ts";
 
 // Identity store backed by real SQLite (node:sqlite, a built-in — no dependency).
@@ -31,9 +31,9 @@ export class IdentityStore {
       for (const row of db.prepare("SELECT id, json FROM teams").all() as IdentityRow[]) data.teams[row.id] = parseIdentityRow(row, isIdentityTeam, "team");
       for (const row of db.prepare("SELECT id, json FROM api_keys").all() as IdentityRow[]) data.keys[row.id] = parseIdentityRow(row, isIdentityApiKey, "api_key");
       for (const row of db.prepare("SELECT k, json FROM meta").all() as IdentityMetaRow[]) loadIdentityMeta(data, row);
-      validateIdentityReferences(data);
       normalizeDefaultTeam(data);
       data.schemaVersion = IDENTITY_SCHEMA_VERSION;
+      validateIdentityData(data);
       this.data = data;
       return this.data;
     } catch (error) {
@@ -46,19 +46,21 @@ export class IdentityStore {
 
   async save(): Promise<void> {
     if (this.closed) throw new Error("identity_store_closed");
+    const persisted = persistedIdentity(this.data, this.ephemeralUserIds);
+    validateIdentityData(persisted);
     const db = this.handle();
     db.exec("BEGIN");
     try {
       db.exec("DELETE FROM users; DELETE FROM teams; DELETE FROM api_keys; DELETE FROM meta;");
       const u = db.prepare("INSERT INTO users(id, json) VALUES(?, ?)");
-      for (const user of Object.values(this.data.users)) if (!this.ephemeralUserIds.has(user.id)) u.run(user.id, JSON.stringify(user));
+      for (const user of Object.values(persisted.users)) u.run(user.id, JSON.stringify(user));
       const t = db.prepare("INSERT INTO teams(id, json) VALUES(?, ?)");
-      for (const team of Object.values(this.data.teams)) t.run(team.id, JSON.stringify(persistedTeam(team, this.ephemeralUserIds)));
+      for (const team of Object.values(persisted.teams)) t.run(team.id, JSON.stringify(team));
       const k = db.prepare("INSERT INTO api_keys(id, hash, owner_user_id, disabled, json) VALUES(?, ?, ?, ?, ?)");
-      for (const key of Object.values(this.data.keys)) if (!this.ephemeralUserIds.has(key.ownerUserId)) k.run(key.id, key.hash, key.ownerUserId, key.disabled ? 1 : 0, JSON.stringify(key));
+      for (const key of Object.values(persisted.keys)) k.run(key.id, key.hash, key.ownerUserId, key.disabled ? 1 : 0, JSON.stringify(key));
       const m = db.prepare("INSERT INTO meta(k, json) VALUES(?, ?)");
-      if (this.data.orgBudget) m.run("orgBudget", JSON.stringify(this.data.orgBudget));
-      if (this.data.pricing) m.run("pricing", JSON.stringify(this.data.pricing));
+      if (persisted.orgBudget) m.run("orgBudget", JSON.stringify(persisted.orgBudget));
+      if (persisted.pricing) m.run("pricing", JSON.stringify(persisted.pricing));
       db.exec("COMMIT");
     } catch (error) {
       db.exec("ROLLBACK");
@@ -118,11 +120,14 @@ export class IdentityStore {
     if (id === "everyone") return false;
     if (!this.data.teams[id]) return false;
     const previous = this.data;
-    this.data = cloneIdentity(previous);
-    try {
-      delete this.data.teams[id];
-      for (const user of Object.values(this.data.users)) user.teamIds = user.teamIds.filter((t) => t !== id);
-      for (const key of Object.values(this.data.keys)) if (key.teamId === id) key.disabled = true;
+      this.data = cloneIdentity(previous);
+      try {
+        delete this.data.teams[id];
+        for (const user of Object.values(this.data.users)) user.teamIds = user.teamIds.filter((t) => t !== id);
+      for (const key of Object.values(this.data.keys)) if (key.teamId === id) {
+        key.disabled = true;
+        delete key.teamId;
+      }
       await this.save();
       return true;
     } catch (error) {
@@ -153,6 +158,14 @@ function normalizeUser(user: User, data: IdentityData): User {
 
 function persistedTeam(team: Team, ephemeralUserIds: Set<string>): Team {
   return { ...team, managerIds: team.managerIds.filter((id) => !ephemeralUserIds.has(id)) };
+}
+
+function persistedIdentity(data: IdentityData, ephemeralUserIds: Set<string>): IdentityData {
+  const persisted = cloneIdentity(data);
+  for (const id of ephemeralUserIds) delete persisted.users[id];
+  for (const key of Object.values(persisted.keys)) if (ephemeralUserIds.has(key.ownerUserId)) delete persisted.keys[key.id];
+  for (const team of Object.values(persisted.teams)) persisted.teams[team.id] = persistedTeam(team, ephemeralUserIds);
+  return persisted;
 }
 
 function cloneIdentity(data: IdentityData): IdentityData {

@@ -9,6 +9,8 @@ export function normalizedManifest(manifest: AuditManifest): AuditManifest {
   safe.path = safePath(safe.path);
   safe.targetHost = safeToken(redactSecrets(safe.targetHost).text, "target");
   safe.method = safe.method.replace(/[^A-Z]/gi, "").toUpperCase().slice(0, 12) || "GET";
+  safe.retrievalIds = safe.retrievalIds.map(safeRetrievalId).filter((item): item is string => Boolean(item)).slice(0, 50);
+  safe.compressorsUsed = safe.compressorsUsed.map((item) => redactedToken(String(item), "compressor")).slice(0, 20);
   safe.warnings = safe.warnings.map((item) => safeWarning(redactSecrets(String(item)).text)).slice(0, 20);
   if (safe.client) safe.client = safeClient(safe.client);
   return safe;
@@ -20,8 +22,8 @@ export function isAuditManifest(value: unknown): value is AuditManifest {
     && typeof item.method === "string" && typeof item.path === "string" && typeof item.targetHost === "string"
     && typeof item.compressedItems === "number" && typeof item.estimatedOriginalTokens === "number"
     && typeof item.estimatedCompressedTokens === "number" && typeof item.estimatedSavedTokens === "number"
-    && typeof item.redactedSecrets === "number" && Array.isArray(item.retrievalIds) && Array.isArray(item.compressorsUsed)
-    && Array.isArray(item.warnings));
+    && typeof item.redactedSecrets === "number" && finiteOptionalNumber(item.statusCode) && finiteOptionalNumber(item.durationMs)
+    && stringArray(item.retrievalIds) && stringArray(item.compressorsUsed) && stringArray(item.warnings));
 }
 
 function safeClient(client: NonNullable<AuditManifest["client"]>): NonNullable<AuditManifest["client"]> {
@@ -60,7 +62,20 @@ function safePath(path: string): string {
   }
 }
 
+function safeRetrievalId(value: string): string | undefined {
+  const redacted = redactSecrets(value).text;
+  return /^molenkopf:\/\/sha256\/[a-f0-9]{64}$/.test(redacted) ? redacted : undefined;
+}
+
 function safeWarning(value: string): string {
   const cleaned = value.replace(/[^a-z0-9._:@/ -]/gi, "_").replace(/\s+/g, " ").trim().slice(0, 160);
   return cleaned || "warning";
+}
+
+function stringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function finiteOptionalNumber(value: unknown): boolean {
+  return value === undefined || (typeof value === "number" && Number.isFinite(value));
 }

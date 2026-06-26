@@ -76,6 +76,21 @@ test("normalizes path and client metadata outside AuditStore.write", () => {
   assert.match(encoded, /REDACTED_SECRET/);
 });
 
+test("normalizes audit retrieval and compressor arrays", () => {
+  const validRef = `molenkopf://sha256/${"a".repeat(64)}`;
+  const safe = normalizedManifest({
+    ...manifest("req_arrays", "2026-01-01T00:00:00.000Z"),
+    retrievalIds: [`mk_${"c".repeat(32)}`, validRef],
+    compressorsUsed: ["password=hunter2", "embedded-log"],
+    warnings: []
+  });
+  const encoded = JSON.stringify(safe);
+  assert.deepEqual(safe.retrievalIds, [validRef]);
+  assert.equal(safe.compressorsUsed.length, 2);
+  assert.doesNotMatch(encoded, /mk_cccc|hunter2/);
+  assert.match(encoded, /REDACTED_SECRET|embedded-log/);
+});
+
 test("lists audit manifests by bounded pages", async () => {
   const dir = await mkdtemp(join(tmpdir(), "audit-page-"));
   const store = new AuditStore(dir);

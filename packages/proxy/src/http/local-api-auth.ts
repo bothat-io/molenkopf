@@ -68,11 +68,11 @@ export async function setupAdmin(req: IncomingMessage, res: ServerResponse, stat
     return writeJson(res, 400, { error: "weak_password" });
   }
   if (passwordTooLong(password)) return writeJson(res, 400, { error: "password_too_long" });
-  if (!state.identity.getTeam("everyone")) {
-    await state.identity.putTeam({ id: "everyone", name: "Everyone", allowedProviders: "*", managerIds: [id], createdAt: new Date().toISOString() });
-  }
+  const createdEveryone = !state.identity.getTeam("everyone");
+  if (createdEveryone) await state.identity.putTeam({ id: "everyone", name: "Everyone", allowedProviders: "*", managerIds: [], createdAt: new Date().toISOString() });
   const user: User = { id, displayName: typeof body.displayName === "string" && body.displayName.trim() ? body.displayName.trim() : id, role: "admin", password: await hashPasswordAsync(password), teamIds: ["everyone"], sessionVersion: 0, createdAt: new Date().toISOString() };
   await state.identity.putUser(user);
+  if (createdEveryone) await state.identity.putTeam({ ...state.identity.getTeam("everyone")!, managerIds: [id] });
   clearFailures(state, setupAttempt);
   const token = signSession(user.id, state.sessionSecret, undefined, undefined, user.sessionVersion ?? 0);
   res.writeHead(200, authHeaders(req, `${COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200`));

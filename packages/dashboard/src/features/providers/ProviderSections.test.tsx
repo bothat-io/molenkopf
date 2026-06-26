@@ -1,12 +1,11 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { PluginSections, ProviderSection } from "./ProviderSections";
+import { isSafePluginPagePath, PluginSections, ProviderSection } from "./ProviderSections";
 
 describe("PluginSections", () => {
   it("renders optional plugins with capabilities and toggle actions", () => {
     const html = renderToString(<PluginSections
       summary={{ savedTokens: 0, redactedSecrets: 2 }}
-      onMove={() => {}}
       onToggle={() => {}}
       plugins={{
         items: [
@@ -23,6 +22,21 @@ describe("PluginSections", () => {
     expect(html).toContain("Open plugin page");
     expect(html).toContain("Turn on");
     expect(html).toContain("Turn off");
+  });
+
+  it("does not expose launch actions for unsafe plugin page paths", () => {
+    const html = renderToString(<PluginSections
+      summary={{ savedTokens: 0, redactedSecrets: 0 }}
+      onToggle={() => {}}
+      plugins={{ items: [
+        { id: "bad", name: "Bad", enabled: true, canToggle: true, pagePath: "https://example.test/plugin", traffic: { mutates: ["none"] } }
+      ] }}
+    />);
+
+    expect(html).not.toContain("Open plugin page");
+    expect(isSafePluginPagePath("/__molenkopf/plugins/context-compressor-plugin/page")).toBe(true);
+    expect(isSafePluginPagePath("/__molenkopf/plugins/context-compressor-plugin/page?x=1")).toBe(false);
+    expect(isSafePluginPagePath("https://example.test/plugin")).toBe(false);
   });
 });
 

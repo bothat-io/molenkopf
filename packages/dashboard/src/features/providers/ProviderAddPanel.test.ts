@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { friendlyCheckMessage, readableRuntimeError } from "./ProviderAddPanel";
+import { textFileSizeError } from "../../components/forms/FormControls";
+import { clearRuntimeDraft, friendlyCheckMessage, readableRuntimeError, runtimeImportBody, type RuntimeDraft } from "./RuntimeImportForm";
 import { runtimeImportFingerprint, runtimeImportReady } from "./runtimeImportState";
 
 describe("runtimeImportReady", () => {
@@ -25,6 +26,47 @@ describe("readableRuntimeError", () => {
     expect(readableRuntimeError("invalid_sandbox")).toContain("Unsupported Codex sandbox value");
     expect(readableRuntimeError("missing_auth_json")).toContain("auth.json");
     expect(readableRuntimeError("other_error")).toBe("other_error");
+  });
+});
+
+describe("runtime import draft cleanup", () => {
+  it("clears raw auth drafts while preserving selected runtime and optional name", () => {
+    const draft: RuntimeDraft = {
+      runtime: "codex",
+      name: "Local",
+      authJson: "{\"token\":\"secret\"}",
+      profileText: "secret_profile",
+      authFileName: "auth.json",
+      profileFileName: "config.toml",
+      importProof: "proof"
+    };
+    expect(clearRuntimeDraft(draft, { runtime: "claude", name: draft.name })).toEqual({
+      runtime: "claude",
+      name: "Local",
+      authJson: "",
+      profileText: "",
+      authFileName: "",
+      profileFileName: "",
+      importProof: ""
+    });
+  });
+
+  it("builds import bodies without file names or proof state", () => {
+    const body = runtimeImportBody({
+      runtime: "codex",
+      name: "Local",
+      authJson: "{}",
+      profileText: "",
+      authFileName: "auth.json",
+      profileFileName: "",
+      importProof: "proof"
+    });
+    expect(body).toEqual({ runtime: "codex", name: "Local", authJson: "{}", profileText: "", activate: true });
+  });
+
+  it("rejects oversized file reads before text loading", () => {
+    expect(textFileSizeError({ size: 10 }, 10)).toBe("");
+    expect(textFileSizeError({ size: 11 }, 10)).toBe("file_too_large");
   });
 });
 

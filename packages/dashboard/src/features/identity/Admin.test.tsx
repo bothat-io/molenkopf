@@ -21,7 +21,6 @@ describe("AdminTab", () => {
       onNewProvider={() => {}}
       onNewTeam={() => {}}
       onNewUser={() => {}}
-      onPluginMove={() => {}}
       onPluginToggle={() => {}}
       onProviderOptions={() => {}}
       onProviderRemove={() => {}}
@@ -59,7 +58,6 @@ describe("AdminTab", () => {
       onNewProvider={() => {}}
       onNewTeam={() => {}}
       onNewUser={() => {}}
-      onPluginMove={() => {}}
       onPluginToggle={() => {}}
       onProviderOptions={() => {}}
       onProviderRemove={() => {}}

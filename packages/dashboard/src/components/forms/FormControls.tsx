@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import "./FormControls.css";
 
 export type ChoiceOption = { id: string; label: string; meta?: string };
+export const DEFAULT_TEXT_FILE_MAX_BYTES = 256 * 1024;
 
 export function RadioButtonChoice({ label, name, value, options, onChange }: { label: string; name: string; value: string; options: ChoiceOption[]; onChange: (value: string) => void }) {
   return <fieldset className="choice-group"><legend>{label}</legend><div className="radio-row">
@@ -35,13 +36,24 @@ export function SelectControl({ name, value, defaultValue, options, onChange }: 
   </select>;
 }
 
-export function FilePicker({ name, label, fileName, onTextChange }: { name: string; label: string; fileName?: string; onTextChange?: (text: string, fileName: string) => void }) {
+export function FilePicker({ name, label, fileName, maxBytes = DEFAULT_TEXT_FILE_MAX_BYTES, onTextChange, onError }: { name: string; label: string; fileName?: string; maxBytes?: number; onTextChange?: (text: string, fileName: string) => void; onError?: (message: string) => void }) {
   const id = useId();
   return <div className="form-field"><span>{label}</span><label className="file-picker" htmlFor={id}><input id={id} name={name} type="file" onChange={async (event) => {
     const file = event.currentTarget.files?.[0];
     if (!file) return onTextChange?.("", "");
+    const error = textFileSizeError(file, maxBytes);
+    if (error) {
+      event.currentTarget.value = "";
+      onTextChange?.("", "");
+      onError?.(error);
+      return;
+    }
     onTextChange?.(await file.text(), file.name);
   }} /><span>{fileName || "Choose file"}</span></label></div>;
+}
+
+export function textFileSizeError(file: { size: number; name?: string }, maxBytes = DEFAULT_TEXT_FILE_MAX_BYTES): string {
+  return file.size > maxBytes ? "file_too_large" : "";
 }
 
 export function FormActionBar({ primary, secondary, abort = "Abort", primaryDisabled, secondaryDisabled, onSecondary, onAbort }: { primary: string; secondary?: string; abort?: string; primaryDisabled?: boolean; secondaryDisabled?: boolean; onSecondary?: () => void; onAbort?: () => void }) {

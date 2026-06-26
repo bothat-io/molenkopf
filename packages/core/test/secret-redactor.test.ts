@@ -76,6 +76,19 @@ test("redacts sensitive JSON keys with non-string values", () => {
   assert.doesNotMatch(result.text, /object-secret|array-secret|12345/);
 });
 
+test("redacts mixed JSON sensitive keys after structural rewrites", () => {
+  const result = redactSecrets(JSON.stringify({
+    password: { nested: "object-secret" },
+    apiKey: "plain-api",
+    nested: { authorization: "Bearer plain-auth" }
+  }));
+  const parsed = JSON.parse(result.text);
+  assert.match(parsed.password, /^\[REDACTED_SECRET:json_password:sha256:[a-f0-9]{12}\]$/);
+  assert.match(parsed.apiKey, /^\[REDACTED_SECRET:json_apikey:sha256:[a-f0-9]{12}\]$/);
+  assert.match(parsed.nested.authorization, /^\[REDACTED_SECRET:json_authorization:sha256:[a-f0-9]{12}\]$/);
+  assert.doesNotMatch(result.text, /object-secret|plain-api|plain-auth/);
+});
+
 test("fails closed for sensitive JSON beyond safe scan depth", () => {
   const deep = `${'{"nested":'.repeat(1005)}{"password":"deep-secret"}${"}".repeat(1005)}`;
   const result = redactSecrets(deep);
