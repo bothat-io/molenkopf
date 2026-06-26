@@ -25,6 +25,8 @@ const requiredRelease = [
   /actions\/upload-artifact@v4/,
   /actions\/download-artifact@v4/,
   /sha256sum -c molenkopf\.tgz\.sha256/,
+  /publish_npm/,
+  /github\.event\.inputs\.publish_npm == 'true'/,
   /npm publish "\$tarball"/,
   /molenkopf" --help/,
   /molenkopf" self-test/,
@@ -33,10 +35,15 @@ const requiredRelease = [
   /docker save molenkopf:ci \| gzip/,
   /molenkopf-docker-image/,
   /gunzip -c molenkopf-image\.tar\.gz \| docker load/,
+  /type=ref,event=tag/,
+  /type=semver,pattern=\{\{version\}\}/,
+  /type=raw,value=latest,enable=\$\{\{ startsWith\(github\.ref, 'refs\/tags\/v'\) \}\}/,
   /docker push "\$tag"/,
   /__molenkopf\/health/,
   /__molenkopf\/setup-admin/,
+  /startsWith\(github\.ref, 'refs\/tags\/'\)[\s\S]*github\.event_name == 'push'/,
   /github\.event_name == 'workflow_dispatch'[\s\S]*github\.event\.inputs\.dry_run == 'false'/,
+  /actions\/checkout@v4[\s\S]*docker\/login-action@v3/,
   /GITHUB_REF_NAME.*expected/
 ];
 
