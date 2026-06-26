@@ -21,6 +21,8 @@ packages/dashboard/cypress/videos/
 packages/dashboard/cypress/downloads/
 *.log
 *.db
+*.sqlite
+*.sqlite3
 *.db-shm
 *.db-wal
 auth.json
