@@ -18,7 +18,6 @@ import { buildManifest, finishRequest } from "./request-finish.ts";
 import { resolveClientIdentity } from "./proxy-identity.ts";
 import { checkBudgets } from "./budget-gate.ts";
 import { withBudgetWarnings } from "./budget-warnings.ts";
-import { seedAdminFromEnv } from "./auth-state.ts";
 import { IdentityStore } from "../../../core/src/identity/identity-store.ts";
 import { UsageSnapshotStore } from "../../../core/src/identity/usage-snapshot.ts";
 import { isCliProvider, runCliProvider } from "../runtime/cli-provider.ts";
@@ -27,7 +26,7 @@ import { forwardStream } from "./streaming-proxy.ts";
 import { createResponseUsageScanner } from "./encoded-usage-meter.ts";
 import { auditPath } from "./request-path.ts";
 import { inputError, listen, readBody, writeJson, writeRedirect } from "./server-io.ts";
-import { requirePublicBindFlag, requirePublicBindSecurity } from "./public-bind.ts";
+import { requirePublicBindFlag } from "./public-bind.ts";
 import { providerAllowedForClient } from "./provider-access.ts";
 import { restoreUsage } from "./usage-restore.ts";
 import { handleDashboardRequest, isDashboardRequest } from "./dashboard-assets.ts";
@@ -40,14 +39,7 @@ export async function startProxy(options: ProxyOptions): Promise<RunningProxy> {
   const state = createRuntimeState(options, host);
   const identity = new IdentityStore(options.dataDir);
   await identity.load();
-  seedAdminFromEnv(identity, process.env);
   state.identity = identity;
-  try {
-    requirePublicBindSecurity(host, state, proxyKeyRequired());
-  } catch (error) {
-    identity.close();
-    throw error;
-  }
   const usageSnapshot = new UsageSnapshotStore(options.dataDir);
   const store = new RetrievalStore(options.dataDir);
   const audit = new AuditStore(options.dataDir);

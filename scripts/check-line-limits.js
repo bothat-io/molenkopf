@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 
 const tracked = gitLsFiles();
@@ -6,6 +6,7 @@ const handwritten = tracked.filter((file) => /\.(js|ts|tsx|md|json|yml|yaml)$/.t
 const failures = [];
 
 for (const file of handwritten) {
+  if (!existsSync(file)) continue;
   const lines = readFileSync(file, "utf8").split(/\r?\n/).length;
   if (lines > 200) failures.push(`${file}: ${lines} lines`);
 }
@@ -19,7 +20,7 @@ if (failures.length) {
 console.log("line limits ok");
 
 function generated(file) {
-  return file === "FIXME.md" || file.endsWith("package-lock.json") || file.startsWith("docs/MOLENKOPF_EXECUTION_PACKAGES") || file.includes("/dist/");
+  return file.endsWith("package-lock.json") || file.startsWith("docs/MOLENKOPF_EXECUTION_PACKAGES") || file.includes("/dist/");
 }
 
 function gitLsFiles() {

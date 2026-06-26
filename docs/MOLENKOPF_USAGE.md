@@ -5,8 +5,13 @@ This is the practical local test flow for Molenkopf.
 ## Start
 
 ```bash
+cp .env.example .env
+# Edit .env and set MOLENKOPF_SESSION_SECRET.
 npm run dev
 ```
+
+Source runs load `./.env` automatically without overriding values already
+exported in your shell.
 
 Open:
 

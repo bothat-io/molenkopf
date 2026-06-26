@@ -1,7 +1,18 @@
+import { existsSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
-export async function loadEnvFile(file: string, env: Record<string, string | undefined> = process.env): Promise<void> {
-  Object.assign(env, parseEnvFile(await readFile(file, "utf8")));
+type LoadOptions = { overwrite?: boolean };
+
+export async function loadEnvFile(file: string, env: Record<string, string | undefined> = process.env, options: LoadOptions = {}): Promise<void> {
+  applyEnv(parseEnvFile(await readFile(file, "utf8")), env, options);
+}
+
+export function loadDefaultEnvFile(cwd = process.cwd(), env: Record<string, string | undefined> = process.env): boolean {
+  const file = join(cwd, ".env");
+  if (!existsSync(file)) return false;
+  applyEnv(parseEnvFile(readFileSync(file, "utf8")), env, { overwrite: false });
+  return true;
 }
 
 export function parseEnvFile(text: string): Record<string, string> {
@@ -16,6 +27,12 @@ export function parseEnvFile(text: string): Record<string, string> {
     result[key] = unquote(line.slice(index + 1).trim());
   }
   return result;
+}
+
+function applyEnv(values: Record<string, string>, env: Record<string, string | undefined>, options: LoadOptions): void {
+  for (const [key, value] of Object.entries(values)) {
+    if (options.overwrite === true || env[key] === undefined) env[key] = value;
+  }
 }
 
 function unquote(value: string): string {

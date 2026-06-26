@@ -19,10 +19,9 @@ Product intent and non-negotiable plugin semantics live in
 
 Do not run Molenkopf blindly with real provider accounts, private repositories,
 browser sessions, or imported runtime credentials. Review `SECURITY.md` first,
-keep the default loopback bind unless you have configured admin auth and proxy
-key enforcement, and treat `.molenkopf/`, audit files, retrieval
-stores, databases, env files, and runtime-auth profiles as sensitive local
-state.
+keep source runs on the default loopback bind, and treat `.molenkopf/`, audit
+files, retrieval stores, databases, env files, and runtime-auth profiles as
+sensitive local state.
 
 ## Implemented Baseline
 
@@ -41,8 +40,8 @@ Built now:
 - Text-derived memory graph: concepts (files, symbols, error types) are extracted from the
   real redacted transferred text into a bounded co-occurrence graph.
 - Static pipeline with request IDs, redaction, classification, compression, retrieval, audit, SSE events, and upstream routing.
-- Local API under `/__molenkopf/*`: bootstrap endpoints (`health`, `me`,
-  `setup-admin`), user-scoped usage/key endpoints, and admin-only
+- Local API under `/__molenkopf/*`: bootstrap endpoints for health, session
+  status, and first-run admin creation, user-scoped usage/key endpoints, and admin-only
   provider/plugin/agent/stats/events/config metadata plus retention purge.
 - Dashboard shell served at `/__molenkopf/dashboard` with Overview and Admin
   views backed by an isolated React/Vite dashboard package. Dedicated Providers,
@@ -70,15 +69,14 @@ Explicitly not connected:
 
 Core and proxy use Node.js built-ins only. Molenkopf API keys are stored as hashes, imported runtime auth is kept in isolated local profile directories, and Local API responses hide provider credentials. The default upstream route can forward incoming auth headers only when the selected profile requires it; configured provider profiles strip incoming client auth and inject the server-side credential at the forwarding boundary. Prompts and responses are not logged in full. Source code and diffs pass through in safe mode.
 
-Before the first admin exists, only `/__molenkopf/health`, `/__molenkopf/me`,
-and loopback-only `/__molenkopf/setup-admin` are usable. After setup, Local API
-metadata is role-gated: normal users get scoped usage and key data, while
-provider, plugin, agent, routing, stats, events, and retention endpoints are
-admin-only.
+Before the first admin exists, only health, session status, and browser first-run
+admin creation are usable. After setup, Local API metadata is role-gated: normal
+users get scoped usage and key data, while provider, plugin, agent, routing,
+stats, events, and retention endpoints are admin-only.
 
 Use `--allow-public-bind` only when you intentionally want to bind outside
-localhost. Public bind is rejected unless admin auth, proxy-key enforcement, and
-a strong session secret are configured.
+localhost. If Docker is published publicly before an admin exists, the first-run
+screen is reachable there until the first admin is created.
 
 ## Control Plane Usage
 
@@ -125,24 +123,35 @@ Plugin pages open in standalone windows from `/__molenkopf/plugins/context-compr
 Quick Docker start on the Docker host:
 
 ```bash
+cp .env.example .env
+# Edit .env and set a unique MOLENKOPF_SESSION_SECRET.
 docker pull ghcr.io/bothat-io/molenkopf:latest
-docker run --rm --network host -v molenkopf-data:/data ghcr.io/bothat-io/molenkopf:latest
+docker run --rm \
+  --env-file .env \
+  -p 127.0.0.1:8787:8787 \
+  -v molenkopf-data:/data \
+  ghcr.io/bothat-io/molenkopf:latest
 ```
 
 Open `http://127.0.0.1:8787/` and create the first admin user. This quickstart
-keeps Molenkopf bound to loopback on the Docker host. If Docker runs on another
-machine or host networking is unavailable, use `docs/DEPLOYMENT.md` or an SSH
-tunnel.
+publishes Molenkopf only on local host loopback. If Docker runs on another
+machine, open Molenkopf on that host or use an SSH tunnel.
 
-Use `docs/DEPLOYMENT.md` when you need a different port, Docker port
-publishing, env-seeded admin auth, or non-loopback access. Treat those as
-deployment settings: public binds require admin auth, proxy key enforcement, and
-a strong session secret.
+Docker starts require a valid `MOLENKOPF_SESSION_SECRET`; copy `.env.example`
+to `.env`, change the value, and pass it with `--env-file .env`. Docker does
+not automatically read a host `.env` file. Admin usernames and passwords are
+created only in the browser first-run flow.
+
+Use `docs/DEPLOYMENT.md` when you need a different port or non-loopback access.
+Keep local Docker starts published to host loopback unless you intentionally
+want another machine to reach Molenkopf.
 
 For local development, use a source checkout:
 
 ```bash
 npm run bootstrap
+cp .env.example .env
+# Edit .env and set a unique MOLENKOPF_SESSION_SECRET.
 npm run dev
 ```
 

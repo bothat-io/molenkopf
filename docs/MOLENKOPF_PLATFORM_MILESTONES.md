@@ -2,7 +2,7 @@
 
 Date: 2026-06-18
 
-Status: historical target milestone plan. Use `NEXT.md` for current release
+Status: historical target milestone plan. Use `ROADMAP.md` for current release
 work.
 
 This file expands the implementation order for

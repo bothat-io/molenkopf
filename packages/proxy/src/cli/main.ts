@@ -6,7 +6,7 @@ import { RetrievalStore } from "../../../core/src/store/retrieval-store.ts";
 import { startProxy } from "../http/server.ts";
 import { parseArgs, type CliArgs } from "./args.ts";
 import { loadProxyConfig } from "./config-loader.ts";
-import { loadEnvFile } from "./env-file.ts";
+import { loadDefaultEnvFile, loadEnvFile } from "./env-file.ts";
 import { resolveCliTarget } from "./target.ts";
 
 async function main() {
@@ -23,6 +23,7 @@ async function main() {
 async function proxy(args: CliArgs) {
   const envFile = args.flags.get("env-file");
   if (typeof envFile === "string") await loadEnvFile(envFile);
+  loadDefaultEnvFile();
   const loaded = await loadProxyConfig(args.flags);
   const config = loaded.config;
   const explicitConfig = loaded.source === "file" && Boolean(config);

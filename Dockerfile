@@ -29,4 +29,4 @@ EXPOSE 8787
 VOLUME ["/data"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD node -e "fetch('http://127.0.0.1:8787/__molenkopf/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-CMD ["node","--experimental-strip-types","--experimental-sqlite","--disable-warning=ExperimentalWarning","packages/proxy/src/cli/main.ts","proxy","--host","127.0.0.1","--port","8787","--data-dir","/data"]
+CMD ["node","--experimental-strip-types","--experimental-sqlite","--disable-warning=ExperimentalWarning","packages/proxy/src/cli/main.ts","proxy","--host","0.0.0.0","--allow-public-bind","--port","8787","--data-dir","/data"]

@@ -2,7 +2,7 @@
 
 Date: 2026-06-18
 
-Status: historical execution plan. Use `NEXT.md` for current release work.
+Status: historical execution plan. Use `ROADMAP.md` for current release work.
 
 Concrete build packages for [MOLENKOPF_PLATFORM_PLAN.md](MOLENKOPF_PLATFORM_PLAN.md).
 Implement EP0-EP8 here, then continue in [MOLENKOPF_EXECUTION_PACKAGES_2.md](MOLENKOPF_EXECUTION_PACKAGES_2.md).
@@ -11,7 +11,7 @@ Implement EP0-EP8 here, then continue in [MOLENKOPF_EXECUTION_PACKAGES_2.md](MOL
 
 Dependency: none.
 
-Owners: `README.md`, `ROADMAP.md`, `NEXT.md`, `docs/*`, `package-lock.json`.
+Owners: `README.md`, `ROADMAP.md`, `docs/*`, `package-lock.json`.
 
 Build:
 - Decide which untracked product files are canonical.
@@ -99,11 +99,11 @@ Build:
 - Keep `/__molenkopf/health` public.
 - Protect status/config/providers/plugins/agents/requests/audit/events by scope.
 - Require `proxy:use` for `/v1/*`.
-- Refuse public bind unless auth is configured.
+- Refuse non-loopback binds unless public bind is explicit.
 
 Acceptance:
 - Unauthenticated sensitive routes return `401`; insufficient scopes return `403`.
-- Public bind without auth fails at startup.
+- Non-loopback bind without explicit opt-in fails at startup.
 
 Verify:
 - Local API auth tests.

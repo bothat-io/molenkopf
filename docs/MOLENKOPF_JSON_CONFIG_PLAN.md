@@ -163,7 +163,7 @@ Reject before startup:
   `authorization`, `cookie`, or `password`
 - missing provider/profile/policy references from agents
 - active or default routing to disabled providers
-- public bind without configured Molenkopf auth in hardened mode
+- non-loopback bind without explicit public-bind opt-in in hardened mode
 
 Show only redacted metadata through local APIs and dashboard:
 

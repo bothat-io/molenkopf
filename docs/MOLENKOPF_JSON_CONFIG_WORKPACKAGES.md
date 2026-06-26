@@ -3,7 +3,7 @@
 Date: 2026-06-18
 
 Status: historical work package plan with several implemented slices. Use
-`NEXT.md` and `docs/MOLENKOPF_USAGE.md` for the current release flow.
+`docs/MOLENKOPF_USAGE.md` for the current release flow.
 
 Execution plan for [MOLENKOPF_JSON_CONFIG_PLAN.md](MOLENKOPF_JSON_CONFIG_PLAN.md).
 Keep each slice independently testable and do not add Core or Proxy
@@ -113,7 +113,7 @@ Build:
 
 Acceptance:
 
-- Public bind without configured auth fails in hardened mode.
+- Non-loopback bind without explicit opt-in fails in hardened mode.
 - Query secrets never appear in audit, requests, stats, SSE, dashboard, or
   plugin pages.
 

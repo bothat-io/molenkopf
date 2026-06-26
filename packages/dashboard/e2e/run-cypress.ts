@@ -9,6 +9,7 @@ const host = "127.0.0.1";
 const fixedPort = process.env.MOLENKOPF_DASHBOARD_E2E_PORT;
 const port = fixedPort ? Number(fixedPort) : 0;
 const dataDir = await mkdtemp(join(tmpdir(), "molenkopf-dashboard-e2e-"));
+process.env.MOLENKOPF_SESSION_SECRET ??= "test-only-session-secret-please-change-123456";
 const proxy = await startProxy({ port: 0, target: "http://127.0.0.1:9/v1", dataDir });
 
 process.env.MOLENKOPF_DASHBOARD_API_ORIGIN = `http://${host}:${proxy.port}`;
