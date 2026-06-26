@@ -133,9 +133,9 @@ docker run --rm \
   ghcr.io/bothat-io/molenkopf:latest
 ```
 
-Open `http://127.0.0.1:8787/` and create the first admin user. This quickstart
-publishes Molenkopf only on local host loopback. If Docker runs on another
-machine, open Molenkopf on that host or use an SSH tunnel.
+Open `http://127.0.0.1:8787/` and create the first admin user. The quickstart
+binds Molenkopf to `127.0.0.1` on the host for local use. Do not publish the
+port publicly before completing admin setup and configuring deployment security.
 
 Docker starts require a valid `MOLENKOPF_SESSION_SECRET`; copy `.env.example`
 to `.env`, change the value, and pass it with `--env-file .env`. Docker does
@@ -143,8 +143,6 @@ not automatically read a host `.env` file. Admin usernames and passwords are
 created only in the browser first-run flow.
 
 Use `docs/DEPLOYMENT.md` when you need a different port or non-loopback access.
-Keep local Docker starts published to host loopback unless you intentionally
-want another machine to reach Molenkopf.
 
 For local development, use a source checkout:
 
