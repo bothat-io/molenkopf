@@ -122,7 +122,13 @@ Plugin pages open in standalone windows from `/__molenkopf/plugins/context-compr
 
 ## Commands
 
-npm package publication follows. Until then, use a source checkout:
+Pull the published Docker image:
+
+```bash
+docker pull ghcr.io/bothat-io/molenkopf:latest
+```
+
+For local development, use a source checkout:
 
 ```bash
 npm run bootstrap
@@ -151,8 +157,6 @@ Start the local proxy from source:
 ```bash
 npm run dev
 ```
-
-Installed CLI utility usage will be documented with npm publication.
 
 Run tests:
 
