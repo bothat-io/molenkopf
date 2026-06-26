@@ -10,6 +10,10 @@ on:
         description: "Run validation only"
         default: "true"
         required: true
+      publish_npm:
+        description: "Also publish the validated tarball to npm"
+        default: "false"
+        required: true
 
 permissions:
   contents: read
@@ -95,7 +99,7 @@ jobs:
   publish-npm:
     needs: validate
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/') && github.event.inputs.dry_run == 'false'
+    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/') && github.event.inputs.dry_run == 'false' && github.event.inputs.publish_npm == 'true'
     permissions:
       contents: read
       id-token: write
@@ -118,11 +122,12 @@ jobs:
   publish-docker:
     needs: validate
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/') && github.event.inputs.dry_run == 'false'
+    if: startsWith(github.ref, 'refs/tags/') && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'false'))
     permissions:
       contents: read
       packages: write
     steps:
+      - uses: actions/checkout@v4
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -142,6 +147,10 @@ jobs:
         id: meta
         with:
           images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
       - name: Push validated Docker image
         run: |
           while IFS= read -r tag; do
