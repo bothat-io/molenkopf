@@ -16,23 +16,30 @@ Use this workflow when working on Molenkopf releases or Docker publishing.
 - Do not move or recreate a published official tag after GHCR images exist.
 - Do not add Major/Minor floating tags like `:0` or `:0.1` yet.
 - Keep `latest` only for official `v*.*.*` tag releases.
+- Create official `v*.*.*` tags only after the PR has merged to `main` and
+  the `main` test workflow is green.
 
 ## Known Test State
 
 - `v0.1.0` was used to test GHCR publishing from branch
   `codex/defer-npm-publish`.
+- `v0.1.1` was also published from the branch while finalizing the Docker README
+  path.
 - The GHCR image exists at:
   - `ghcr.io/bothat-io/molenkopf:v0.1.0`
   - `ghcr.io/bothat-io/molenkopf:0.1.0`
   - `ghcr.io/bothat-io/molenkopf:latest`
 - Do not reuse `v0.1.0` for a new official release.
+- Do not move or reuse `v0.1.1` either. The next official main-based release
+  should bump the package version again and tag the merged `main` commit.
 
 ## Preferred Next Steps
 
 1. Put workflow, ignore-file, and README updates into a PR to `main`.
 2. Merge before creating the next official release tag.
-3. Use the next real version tag only when the release should be official.
-4. If more workflow testing is needed, add an explicit preview tag path first.
+3. Confirm the `main` push test workflow is green after the merge.
+4. Use the next real version tag only when the release should be official.
+5. If more workflow testing is needed, add an explicit preview tag path first.
 
 ## Preview Release Rule
 
