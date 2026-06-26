@@ -105,7 +105,7 @@ Build:
 - Split counters for original, forwarded, compression saved, redaction saved,
   serialization saved, skipped items, and skip reasons.
 - Commit retrieval artifacts only after compression succeeds.
-- Store redacted originals and derived summaries separately.
+- Store bounded redacted excerpts and derived summaries separately.
 - Backend-owned summary for dashboard/plugin pages.
 
 Acceptance:

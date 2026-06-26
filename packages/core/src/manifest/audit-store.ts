@@ -135,7 +135,12 @@ async function readManifest(dir: string, file: string): Promise<AuditManifest | 
   }
   try {
     const value = JSON.parse(raw) as unknown;
-    return isAuditManifest(value) ? value : undefined;
+    if (!isAuditManifest(value)) return undefined;
+    try {
+      return normalizedManifest(value);
+    } catch {
+      return undefined;
+    }
   } catch (err) {
     if (err instanceof SyntaxError) return undefined;
     throw err;

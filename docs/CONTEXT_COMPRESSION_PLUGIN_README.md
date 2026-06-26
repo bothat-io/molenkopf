@@ -52,7 +52,7 @@ If neither header is present, the gateway falls back to a short SHA-256 fingerpr
 - `Endpoint pressure`: which API routes create token pressure.
 - `Recent grouped activity`: recent manifests grouped by consumer, provider, endpoint, and status class so repeated requests from the same client stay readable.
 - `Agent to upstream token flow`: how raw token pressure becomes a smaller upstream payload.
-- `Retrieval`: local originals stay behind `molenkopf://...` references; the workspace displays counts, not full originals.
+- `Retrieval`: bounded redacted excerpts stay behind `molenkopf://...` references; the workspace displays counts, not full content.
 
 ## Safe Workspace Boundary
 

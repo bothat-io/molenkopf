@@ -117,5 +117,10 @@ expect(after.user?.id === 'admin', 'restart session missing');
 }
 
 function run(args, stdio = "pipe") {
-  return execFileSync("docker", args, { cwd: process.cwd(), stdio });
+  try {
+    return execFileSync("docker", args, { cwd: process.cwd(), stdio });
+  } catch (error) {
+    if (stdio === "ignore") return Buffer.alloc(0);
+    throw error;
+  }
 }

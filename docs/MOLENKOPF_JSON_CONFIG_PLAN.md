@@ -156,7 +156,7 @@ Reject before startup:
 - duplicate provider, profile, policy, or agent IDs
 - provider IDs outside `[a-z0-9][a-z0-9._:-]*`
 - URLs with username, password, query string, or non-HTTP protocols
-- `credentialRef` values other than `secret:id`, `env:NAME`, or `none`
+- `credentialRef` values other than `env:NAME` or `none`
 - ambiguous secret fields such as `apiKey`, `token`, `secret`, `authorization`,
   `cookie`, or `password`; use `auth.credentialRef` for referenced credentials
 - raw secret-looking fields such as `apiKey`, `token`, `secret`,

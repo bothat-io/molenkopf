@@ -15,7 +15,15 @@ export type NormalizedMolenkopfConfig = {
 
 type JsonRecord = Record<string, unknown>;
 
-const FORBIDDEN_KEYS = ["apikey", "token", "secret", "authorization", "cookie", "password", "credential"];
+const FORBIDDEN_KEYS = new Set([
+  "apikey", "xapikey", "authorization", "cookie", "password", "credential", "credentials",
+  "credentialenv", "accesscredential", "clientcredentials", "token", "accesstoken",
+  "refreshtoken", "bearertoken", "sessiontoken", "secret", "clientsecret"
+]);
+const SAFE_ACCOUNTING_KEYS = new Set([
+  "tokenlimit", "tokensperday", "inputtokens", "outputtokens",
+  "estimatedoriginaltokens", "estimatedcompressedtokens", "estimatedsavedtokens"
+]);
 
 export function parseMolenkopfConfigJson(text: string, source = "molenkopf.config.json"): NormalizedMolenkopfConfig {
   let parsed: unknown;
@@ -70,7 +78,14 @@ function assertNoForbiddenKeys(value: unknown, path = "$") {
 }
 
 function isForbiddenSecretKey(normalized: string): boolean {
-  return FORBIDDEN_KEYS.some((key) => normalized.includes(key));
+  if (SAFE_ACCOUNTING_KEYS.has(normalized)) return false;
+  return FORBIDDEN_KEYS.has(normalized)
+    || normalized.endsWith("apikey")
+    || normalized.endsWith("token")
+    || normalized.endsWith("secret")
+    || normalized.endsWith("credential")
+    || normalized.endsWith("credentials")
+    || normalized.endsWith("password");
 }
 
 function isAllowedCredentialRef(path: string, normalized: string): boolean {

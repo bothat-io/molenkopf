@@ -25,8 +25,8 @@ Build:
 
 Acceptance:
 
-- Config accepts `auth.credentialRef` values such as `env:NAME`,
-  `secret:id`, and `none`; inline credentials are rejected.
+- Config accepts `auth.credentialRef` values `env:NAME` and `none`;
+  inline credentials are rejected.
 - Config rejects `apiKey`, `token`, `secret`, `credential`, `authorization`,
   `cookie`, and `password` anywhere in the JSON object.
 

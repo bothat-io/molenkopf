@@ -186,8 +186,8 @@ Owners: `packages/core/src/pipeline/openai-request-rewriter.ts`,
 
 Build:
 - Split compression savings from redaction and serialization savings.
-- Commit retrieval originals only after compression succeeds.
-- Store redacted originals and derived summaries separately.
+- Commit retrieval excerpts only after compression succeeds.
+- Store bounded redacted excerpts and derived summaries separately.
 - Surface skipped reasons.
 - Shipped slice: workspace now renders real audit-backed totals, account/API-key buckets, provider and endpoint breakdowns, and recent safe request rows.
 - Shipped slice: JSON serialization deltas no longer count as compression savings when no item was compressed.

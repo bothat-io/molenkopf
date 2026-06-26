@@ -25,6 +25,13 @@ test("rejects inline credentials and ambiguous secret fields", () => {
     })), /forbidden secret field/);
   }
 
+  for (const key of ["openaiApiKey", "bearerToken", "clientSecret"]) {
+    assert.throws(() => parseMolenkopfConfigJson(JSON.stringify({
+      schemaVersion: 1,
+      providers: [{ id: `bad-${key.toLowerCase()}`, baseUrl: "https://api.openai.com/v1", auth: { credentialRef: "none" }, [key]: "fixture-inline-secret" }]
+    })), /forbidden secret field/);
+  }
+
   assert.throws(() => parseMolenkopfConfigJson(JSON.stringify({
     schemaVersion: 1,
     providers: [{ id: "bad-secret-ref", baseUrl: "https://api.openai.com/v1", auth: { credentialRef: "secret:openai-main" } }]
@@ -33,7 +40,7 @@ test("rejects inline credentials and ambiguous secret fields", () => {
   assert.throws(() => parseMolenkopfConfigJson(JSON.stringify({
     schemaVersion: 1,
     providers: [{ id: "top-ref", baseUrl: "https://api.openai.com/v1", credentialRef: "env:OPENAI_API_KEY" }]
-  })), /forbidden secret field/);
+  })), /top-level credentialRef/);
 
   assert.throws(() => parseMolenkopfConfigJson(JSON.stringify({
     schemaVersion: 1,
@@ -58,4 +65,14 @@ test("rejects invalid explicit provider auth and protocol enums", () => {
   }));
   assert.equal(config.providers[0].authScheme, "none");
   assert.equal(config.providers[0].protocol, "openai-responses");
+});
+
+test("allows safe token accounting field names in JSON config", () => {
+  const config = parseMolenkopfConfigJson(JSON.stringify({
+    schemaVersion: 1,
+    budget: { tokenLimit: 1000, tokensPerDay: 1000 },
+    usage: { inputTokens: 10, outputTokens: 3 },
+    providers: [{ id: "defaulted", baseUrl: "https://api.openai.com/v1", auth: { credentialRef: "none" } }]
+  }));
+  assert.equal(config.providers[0].id, "defaulted");
 });
