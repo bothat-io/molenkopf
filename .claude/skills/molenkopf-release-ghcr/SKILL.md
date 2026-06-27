@@ -95,5 +95,6 @@ dependent on the validated Docker image artifact, not a rebuilt image.
 - First validate from clean `main`: `npm run release:verify`.
 - For a local manual publish, use npm login/session auth and publish with
   `npm publish --access public` from the release commit/package.
-- For later automation, use a granular npm automation token only as a protected
-  GitHub Actions secret/environment secret. Do not commit it.
+- For later automation, prefer npm Trusted Publishing from a protected GitHub
+  Actions environment. If that is not available, use a granular automation token
+  only as a protected GitHub Actions secret/environment secret. Do not commit it.
