@@ -38,3 +38,26 @@ test("manual env-ref providers persist without raw credentials", async () => {
     await rm(dataDir, { recursive: true, force: true });
   }
 });
+
+test("admin-added CLI providers keep runtime metadata across restart", async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), "molenkopf-provider-cli-meta-"));
+  let proxy = await startProxy({ port: 0, target: "http://127.0.0.1:9/v1", dataDir });
+  try {
+    let base = `http://127.0.0.1:${proxy.port}`;
+    let admin = cookieOf(await post(base, "/__molenkopf/setup-admin", { username: "admin", password: "admin-secret" }));
+    assert.equal((await post(base, "/__molenkopf/providers/add", { id: "codex-local", name: "Codex Local", kind: "cli-codex" }, admin)).status, 200);
+    await proxy.close();
+
+    proxy = await startProxy({ port: 0, target: "http://127.0.0.1:9/v1", dataDir });
+    base = `http://127.0.0.1:${proxy.port}`;
+    admin = cookieOf(await post(base, "/__molenkopf/login", { username: "admin", password: "admin-secret" }));
+    const providers = await fetch(`${base}/__molenkopf/providers`, { headers: { cookie: admin } }).then((r) => r.json());
+    const provider = providers.items.find((item: { id: string }) => item.id === "codex-local");
+    assert.equal(provider.kind, "cli");
+    assert.equal(provider.runtime, "codex");
+    assert.equal(provider.target, "cli://codex-local");
+  } finally {
+    await proxy.close().catch(() => {});
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});

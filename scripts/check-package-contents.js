@@ -14,6 +14,7 @@ const requiredFiles = [
   "packages/plugins/obsidian-graph-plugin/descriptor.ts",
   "packages/dashboard/dist/index.html",
   "packages/dashboard/public/molenkopf-logo.png",
+  "packages/dashboard/public/favicon.png",
   "docs/DEPLOYMENT.md",
   "docs/MOLENKOPF_USAGE.md",
   "docs/MOLENKOPF_PLUGIN_API.md",
@@ -31,6 +32,7 @@ const approvedTarballPaths = [
   /^packages\/plugins\/[^/]+\/.+\.(ts|html)$/,
   /^packages\/dashboard\/dist\/.+/,
   /^packages\/dashboard\/public\/molenkopf-logo\.png$/,
+  /^packages\/dashboard\/public\/favicon\.png$/,
   /^docs\/[^/]+\.md$/
 ];
 const exactTarballPaths = new Set([".env.example", "package.json", "README.md", "LICENSE", "SECURITY.md", "molenkopf.config.example.json"]);

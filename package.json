@@ -45,6 +45,7 @@
     "packages/plugins/shared/audit-projects.ts",
     "packages/dashboard/dist/",
     "packages/dashboard/public/molenkopf-logo.png",
+    "packages/dashboard/public/favicon.png",
     "docs/DEPLOYMENT.md",
     "docs/MOLENKOPF_PLUGIN_API.md",
     "docs/MOLENKOPF_PROVIDER_ENV.md",

@@ -22,6 +22,7 @@ test("identity API preserves at least one enabled password admin", async () => {
     const admin = cookieFrom(await post(base, "/__molenkopf/setup-admin", { username: "admin", password: "admin-secret" }));
     assert.equal((await post(base, "/__molenkopf/identity/users", { id: "admin", role: "member" }, admin)).status, 409);
     assert.equal((await post(base, "/__molenkopf/identity/users", { id: "admin", role: "admin", disabled: true }, admin)).status, 409);
+    assert.equal((await post(base, "/__molenkopf/identity/users", { id: "admin", role: "admin", loginDisabled: true }, admin)).status, 409);
     assert.equal((await post(base, "/__molenkopf/identity/users/remove", { id: "admin" }, admin)).status, 409);
 
     assert.equal((await post(base, "/__molenkopf/identity/users", { id: "backup", role: "admin", password: "backup-secret", teamIds: ["everyone"] }, admin)).status, 200);

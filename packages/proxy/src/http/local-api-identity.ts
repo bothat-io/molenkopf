@@ -89,14 +89,20 @@ export async function putIdentityTeam(req: IncomingMessage, res: ServerResponse,
   if (Array.isArray(body.memberIds)) {
     const memberIds = memberList(body.memberIds, id);
     if (memberIds === false) return writeJson(res, 400, { error: "invalid_member" });
-    id.data.teams[team.id] = team;
-    for (const user of id.listUsers()) {
-      const current = new Set(user.teamIds);
-      if (team.id === "everyone" || memberIds.has(user.id)) current.add(team.id);
-      else current.delete(team.id);
-      user.teamIds = [...current];
+    const previous = structuredClone(id.data);
+    try {
+      id.data.teams[team.id] = team;
+      for (const user of id.listUsers()) {
+        const current = new Set(user.teamIds);
+        if (team.id === "everyone" || memberIds.has(user.id)) current.add(team.id);
+        else current.delete(team.id);
+        user.teamIds = [...current];
+      }
+      await id.save();
+    } catch {
+      id.data = previous;
+      return writeJson(res, 500, { error: "persist_failed" });
     }
-    await id.save();
   } else {
     await id.putTeam(team);
   }
@@ -122,7 +128,7 @@ function isLastEnabledAdminWithPassword(store: { listUsers(): User[] }, user: Us
   return !store.listUsers().some((item) => item.id !== user.id && enabledAdminWithPassword(item));
 }
 function enabledAdminWithPassword(user: User): boolean {
-  return user.role === "admin" && user.disabled !== true && Boolean(user.password);
+  return user.role === "admin" && user.disabled !== true && user.loginDisabled !== true && Boolean(user.password);
 }
 function nextBudget(body: Record<string, unknown>, existing: Budget | undefined): Budget | undefined | false {
   if (!Object.hasOwn(body, "budget")) return existing;

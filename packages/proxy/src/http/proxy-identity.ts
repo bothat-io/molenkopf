@@ -66,11 +66,13 @@ function maybeTouch(store: IdentityStore, key: { lastUsedAt?: string }): void {
   const last = key.lastUsedAt ? Date.parse(key.lastUsedAt) : 0;
   if (Date.now() - last > 60_000) {
     touchKey(store, key as any);
-    void store.save();
+    void store.save().catch(() => { /* last-used persistence must not crash auth */ });
   }
 }
 
 function scopedTeamIds(ownerTeamIds: string[], keyTeamId: string | undefined): string[] {
-  if (!keyTeamId) return ownerTeamIds;
+  const explicitTeams = ownerTeamIds.filter((id) => id !== "everyone");
+  if (!keyTeamId) return explicitTeams.length ? explicitTeams : ownerTeamIds;
+  if (keyTeamId === "everyone" && explicitTeams.length) return explicitTeams;
   return ownerTeamIds.includes(keyTeamId) ? [keyTeamId] : [];
 }

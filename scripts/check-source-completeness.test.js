@@ -30,6 +30,7 @@ async function fixtureRoot(files) {
   await writeFile(join(root, "bin", "molenkopf.js"), "");
   await mkdir(join(root, "packages", "dashboard", "public"), { recursive: true });
   await writeFile(join(root, "packages", "dashboard", "public", "molenkopf-logo.png"), "");
+  await writeFile(join(root, "packages", "dashboard", "public", "favicon.png"), "");
   await writeFile(join(root, "package.json"), JSON.stringify({ bin: { molenkopf: "bin/molenkopf.js" }, files }));
   return root;
 }

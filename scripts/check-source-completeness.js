@@ -62,7 +62,7 @@ function checkRelativeTsImports(root, failures) {
 function checkDashboardPublicAssets(root, failures) {
   const publicDir = "packages/dashboard/public";
   if (!isDir(root, publicDir)) failures.push(`${publicDir} missing`);
-  for (const asset of ["packages/dashboard/public/molenkopf-logo.png"]) {
+  for (const asset of ["packages/dashboard/public/molenkopf-logo.png", "packages/dashboard/public/favicon.png"]) {
     if (!exists(root, asset)) failures.push(`dashboard public asset missing: ${asset}`);
   }
 }

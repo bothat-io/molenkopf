@@ -6,6 +6,8 @@ import { buildProviderStatus } from "./local-api-state.ts";
 import { readJson, writeJson } from "./local-api-io.ts";
 import { persistRuntimeAuthProvider, persistRuntimeAuthSelection, removeRuntimeAuthProvider } from "./runtime-auth-registry.ts";
 import { persistRuntimeSettings } from "./runtime-settings.ts";
+import { restoreProviderRouting, snapshotProviderRouting } from "./provider-routing-snapshot.ts";
+import { buildProviderFromInput, validEnv } from "./provider-input.ts";
 
 export async function selectProvider(req: IncomingMessage, res: ServerResponse, state: RuntimeState) {
   const body = await readJson(req);
@@ -13,9 +15,13 @@ export async function selectProvider(req: IncomingMessage, res: ServerResponse, 
   const provider = state.providers.find((item) => item.id === id);
   if (!provider) return writeJson(res, 404, { error: "unknown_provider" });
   if (provider.enabled === false) return writeJson(res, 409, { error: "provider_disabled" });
+  const previous = snapshotProviderRouting(state);
   state.activeProviderId = provider.id;
   state.providerSelectedAt = new Date().toISOString();
-  await persistProviderRouting(state);
+  try { await persistProviderRouting(state); } catch {
+    restoreProviderRouting(state, previous);
+    return writeJson(res, 500, { error: "persist_failed" });
+  }
   writeJson(res, 200, buildProviderStatus(state));
 }
 
@@ -26,8 +32,12 @@ export async function setProviderWeight(req: IncomingMessage, res: ServerRespons
   if (typeof body.weight !== "number" || !Number.isFinite(body.weight) || body.weight < 0 || body.weight > 1000) return writeJson(res, 400, { error: "invalid_weight" });
   const weights = { ...state.providerWeights, [id]: body.weight };
   if (distributionEligible(provider) && !hasPositiveDistributionWeight(state, weights)) return writeJson(res, 409, { error: "last_provider_weight" });
+  const previous = snapshotProviderRouting(state);
   state.providerWeights[id] = body.weight;
-  await persistRuntimeSettings(state);
+  try { await persistRuntimeSettings(state); } catch {
+    restoreProviderRouting(state, previous);
+    return writeJson(res, 500, { error: "persist_failed" });
+  }
   writeJson(res, 200, buildProviderStatus(state));
 }
 
@@ -43,9 +53,13 @@ export async function setProviderWeights(req: IncomingMessage, res: ServerRespon
   const merged = { ...state.providerWeights, ...next };
   if (body.mode === "distribute" && !hasPositiveDistributionWeight(state, merged)) return writeJson(res, 409, { error: "no_weighted_provider" });
   if (state.routingMode === "distribute" && !hasPositiveDistributionWeight(state, merged)) return writeJson(res, 409, { error: "last_provider_weight" });
+  const previous = snapshotProviderRouting(state);
   Object.assign(state.providerWeights, next);
   if (body.mode === "manual" || body.mode === "distribute") state.routingMode = body.mode;
-  await persistProviderRouting(state);
+  try { await persistProviderRouting(state); } catch {
+    restoreProviderRouting(state, previous);
+    return writeJson(res, 500, { error: "persist_failed" });
+  }
   writeJson(res, 200, { routingMode: state.routingMode, providers: buildProviderStatus(state) });
 }
 
@@ -116,11 +130,17 @@ export async function removeProvider(req: IncomingMessage, res: ServerResponse, 
   if (id === "default") return writeJson(res, 409, { error: "cannot_remove_default" });
   const index = state.providers.findIndex((item) => item.id === id);
   if (index < 0) return writeJson(res, 404, { error: "unknown_provider" });
+  const previous = snapshotProviderRouting(state);
   const [removed] = state.providers.splice(index, 1);
   delete state.providerWeights[id];
   repairActiveProvider(state);
-  await removeRuntimeAuthProvider(removed);
-  await persistProviderRouting(state);
+  try { await persistProviderRouting(state); } catch {
+    restoreProviderRouting(state, previous);
+    return writeJson(res, 500, { error: "persist_failed" });
+  }
+  try { await removeRuntimeAuthProvider(removed); } catch {
+    return writeJson(res, 500, { error: "remove_failed" });
+  }
   writeJson(res, 200, buildProviderStatus(state));
 }
 
@@ -128,38 +148,13 @@ export async function setRoutingMode(req: IncomingMessage, res: ServerResponse, 
   const body = await readJson(req);
   if (body.mode !== "manual" && body.mode !== "distribute") return writeJson(res, 400, { error: "invalid_routing_mode" });
   if (body.mode === "distribute" && !hasPositiveDistributionWeight(state)) return writeJson(res, 409, { error: "no_weighted_provider" });
+  const previous = snapshotProviderRouting(state);
   state.routingMode = body.mode;
-  await persistProviderRouting(state);
-  writeJson(res, 200, { routingMode: state.routingMode, providers: buildProviderStatus(state) });
-}
-
-function buildProviderFromInput(id: string, name: string, body: Record<string, unknown>): { provider: ProviderConfig } | { error: string } {
-  const kind = String(body.kind ?? "openai");
-  if (!knownKind(kind)) return { error: "invalid_kind" };
-  const credential = typeof body.credential === "string" && body.credential.trim() ? body.credential.trim() : undefined;
-  const credentialEnv = typeof body.credentialEnv === "string" && body.credentialEnv.trim() ? body.credentialEnv.trim() : undefined;
-  if (credentialEnv && !validEnv(credentialEnv)) return { error: "invalid_credential_env" };
-  if (kind === "cli-claude" || kind === "cli-codex") {
-    const runtime = kind === "cli-codex" ? "codex" : "claude";
-    return { provider: { id, name, kind: "cli", target: `cli://${id}`, runtime, cliCommand: runtime, cliArgs: runtime === "codex" ? ["exec"] : ["--print"], cliInputMode: "stdin", authScheme: "none", credentialRef: "none", enabled: true } };
+  try { await persistProviderRouting(state); } catch {
+    restoreProviderRouting(state, previous);
+    return writeJson(res, 500, { error: "persist_failed" });
   }
-  const target = providerTarget(kind, body);
-  const providerKind = kind === "local" || kind === "ollama" ? "local" : "api";
-  try { validateProviderTarget(target, { path: "provider target", allowPrivate: providerKind === "local" }); } catch { return { error: "invalid_target" }; }
-  const authScheme = kind === "anthropic" ? "x-api-key" : providerKind === "local" ? "none" : credential || credentialEnv ? "bearer" : "none";
-  return { provider: { id, name, kind: providerKind, target, authScheme, protocol: providerProtocol(kind), credentialValue: credential, credentialEnv, credentialRef: credential ? "inline" : credentialEnv ? `env:${credentialEnv}` : "none", enabled: true } };
-}
-
-function providerTarget(kind: string, body: Record<string, unknown>): string {
-  const target = typeof body.target === "string" ? body.target.trim() : "";
-  return target || (kind === "ollama" ? "http://127.0.0.1:11434/v1" : "");
-}
-
-function providerProtocol(kind: string): ProviderConfig["protocol"] {
-  if (kind === "anthropic") return "anthropic-messages";
-  if (kind === "ollama") return "ollama-tags";
-  if (kind === "local") return "openai-chat";
-  return "openai-responses";
+  writeJson(res, 200, { routingMode: state.routingMode, providers: buildProviderStatus(state) });
 }
 
 async function persistProviderRouting(state: RuntimeState): Promise<void> {
@@ -175,14 +170,6 @@ function originOf(target: string): string {
 
 function hasCredential(provider: ProviderConfig): boolean {
   return Boolean(provider.credentialValue || provider.credentialEnv || (provider.credentialRef && provider.credentialRef !== "none"));
-}
-
-function validEnv(value: string): boolean {
-  return /^[A-Z_][A-Z0-9_]*$/i.test(value);
-}
-
-function knownKind(kind: string): boolean {
-  return ["openai", "openai-compatible", "anthropic", "local", "ollama", "cli-claude", "cli-codex"].includes(kind);
 }
 
 function hasPositiveDistributionWeight(state: RuntimeState, weights = state.providerWeights): boolean {

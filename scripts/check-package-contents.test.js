@@ -51,7 +51,8 @@ function manifest() {
     "packages/plugins/obsidian-graph-plugin/plugin.ts",
     "packages/plugins/obsidian-graph-plugin/page.html",
     "packages/plugins/shared/audit-projects.ts", "packages/dashboard/dist/",
-    "packages/dashboard/public/molenkopf-logo.png", "docs/DEPLOYMENT.md",
+    "packages/dashboard/public/molenkopf-logo.png",
+    "packages/dashboard/public/favicon.png", "docs/DEPLOYMENT.md",
     "docs/MOLENKOPF_USAGE.md", "docs/MOLENKOPF_PLUGIN_API.md",
     "docs/PRODUCT_INTENT.md", "docs/THREAT_MODEL.md",
     "molenkopf.config.example.json", "README.md", "LICENSE", "SECURITY.md"
@@ -67,7 +68,8 @@ function requiredPaths() {
     "packages/plugins/context-compressor-plugin/plugin.ts",
     "packages/plugins/obsidian-graph-plugin/descriptor.ts",
     "packages/dashboard/dist/index.html",
-    "packages/dashboard/public/molenkopf-logo.png", "docs/DEPLOYMENT.md",
+    "packages/dashboard/public/molenkopf-logo.png",
+    "packages/dashboard/public/favicon.png", "docs/DEPLOYMENT.md",
     "docs/MOLENKOPF_USAGE.md", "docs/MOLENKOPF_PLUGIN_API.md",
     "docs/PRODUCT_INTENT.md", "docs/THREAT_MODEL.md",
     "molenkopf.config.example.json", "README.md", "LICENSE", "SECURITY.md"
