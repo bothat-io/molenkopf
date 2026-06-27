@@ -43,12 +43,15 @@ Use this workflow when working on Molenkopf releases or Docker publishing.
 2. Wait for required PR checks to pass on the exact PR head commit.
 3. Merge the PR through GitHub using the repository's required merge method.
 4. Wait for the `main` push test workflow to pass on the merged `main` commit.
-5. Run `npm run release:verify` from clean synced `main`.
-6. Use the next real version tag only when the release should be official.
-7. Push the tag and wait for GHCR Docker publishing to finish.
-8. For npm, tell the user to run
+5. Sync local `main` to `origin/main` after the GitHub merge. If GitHub used a
+   squash merge, expect old local commits to diverge; do not continue while
+   `main` shows ahead/behind.
+6. Run `npm run release:verify` from clean synced `main`.
+7. Use the next real version tag only when the release should be official.
+8. Push the tag and wait for GHCR Docker publishing to finish.
+9. For npm, tell the user to run
    `npm run release:npm:publish -- --tag vX.Y.Z` as the final manual step.
-9. If more workflow testing is needed, add an explicit preview tag path first.
+10. If more workflow testing is needed, add an explicit preview tag path first.
 
 ## Preview Release Rule
 
@@ -108,9 +111,9 @@ dependent on the validated Docker image artifact, not a rebuilt image.
 - First validate from clean tagged `main`: `npm run release:verify`.
 - For a local manual publish, tell the user to run
   `npm run release:npm:publish -- --tag vX.Y.Z`. The script validates the tag,
-  checks the successful release workflow, creates a clean tag worktree, and then
-  runs `npm publish --access public` interactively so the user can enter npm
-  login or OTP prompts.
+  checks that local `main` matches `origin/main`, checks the successful release
+  workflow, creates a clean tag worktree, and then runs `npm publish --access
+  public` interactively so the user can enter npm login or OTP prompts.
 - For later automation, prefer npm Trusted Publishing from a protected GitHub
   Actions environment. If that is not available, use a granular automation token
   only as a protected GitHub Actions secret/environment secret. Do not commit it.

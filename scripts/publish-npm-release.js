@@ -52,13 +52,23 @@ export function npmPublishArgs(dryRun = false) {
   return ["publish", "--access", "public", ...(dryRun ? ["--dry-run"] : [])];
 }
 
+export function localMainSyncFailures(state) {
+  const failures = [];
+  if (!state.localMain) failures.push("local main branch is missing");
+  if (!state.originMain) failures.push("origin/main is missing; run git fetch origin main --tags");
+  if (state.localMain && state.originMain && state.localMain !== state.originMain) {
+    failures.push("local main must match origin/main before npm publish; sync it after preserving any local work");
+  }
+  return failures;
+}
+
 async function main() {
   const currentPkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   const options = parsePublishArgs(process.argv.slice(2), currentPkg.version);
   run("git", ["fetch", "origin", "main", "--tags"], root, "inherit");
   const tagSha = output("git", ["rev-parse", `${options.tag}^{commit}`], root).trim();
   const tagPkg = JSON.parse(output("git", ["show", `${options.tag}:package.json`], root));
-  const failures = publishPackageFailures(tagPkg, options.tag);
+  const failures = [...publishPackageFailures(tagPkg, options.tag), ...localMainSyncFailures(gitMainState())];
   if (!isAncestor(tagSha, "origin/main")) failures.push(`${options.tag} must point to a commit contained in origin/main`);
   if (await npmVersionExists(tagPkg.name, options.version)) failures.push(`${tagPkg.name}@${options.version} is already published`);
   if (!options.skipGithubCheck) await requireSuccessfulReleaseRun(options.tag, tagSha);
@@ -118,6 +128,21 @@ function isAncestor(sha, ref) {
     return true;
   } catch {
     return false;
+  }
+}
+
+function gitMainState() {
+  return {
+    localMain: maybeOutput("git", ["rev-parse", "main"], root).trim(),
+    originMain: maybeOutput("git", ["rev-parse", "origin/main"], root).trim()
+  };
+}
+
+function maybeOutput(command, args, cwd) {
+  try {
+    return output(command, args, cwd);
+  } catch {
+    return "";
   }
 }
 

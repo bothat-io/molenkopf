@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { npmPublishArgs, parsePublishArgs, publishPackageFailures, releaseRunSucceeded, repoFullName } from "./publish-npm-release.js";
+import { localMainSyncFailures, npmPublishArgs, parsePublishArgs, publishPackageFailures, releaseRunSucceeded, repoFullName } from "./publish-npm-release.js";
 
 test("parsePublishArgs defaults to the current package version tag", () => {
   assert.deepEqual(parsePublishArgs([], "0.1.2"), { tag: "v0.1.2", version: "0.1.2", dryRun: false, skipGithubCheck: false });
@@ -28,6 +28,13 @@ test("releaseRunSucceeded requires the exact successful tag run", () => {
   assert.equal(releaseRunSucceeded(runs, "v0.1.2", "abc"), true);
   assert.equal(releaseRunSucceeded(runs, "v0.1.3", "abc"), false);
   assert.equal(releaseRunSucceeded([{ ...runs[0], conclusion: "failure" }], "v0.1.2", "abc"), false);
+});
+
+test("localMainSyncFailures requires local main to match origin/main", () => {
+  assert.deepEqual(localMainSyncFailures({ localMain: "abc", originMain: "abc" }), []);
+  assert.match(localMainSyncFailures({ localMain: "abc", originMain: "def" }).join("\n"), /local main must match origin\/main/);
+  assert.match(localMainSyncFailures({ localMain: "", originMain: "def" }).join("\n"), /local main branch is missing/);
+  assert.match(localMainSyncFailures({ localMain: "abc", originMain: "" }).join("\n"), /origin\/main is missing/);
 });
 
 test("repoFullName parses GitHub origin URLs", () => {
