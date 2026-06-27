@@ -33,8 +33,8 @@ function TeamGroup({ team, users, keys, onEdit, onKey, onRemove, onAssign, onMem
       { key: "cost", header: "Cost", className: "num", cell: (user) => eur(user.usage?.costEur) },
       ...(canRemoveMembers ? [{ key: "actions", header: "", width: "54px", align: "right" as const, cell: (user: UserView) => <IconButton icon="trash" label="Remove from team" danger onClick={() => { void onMemberRemove?.(user.id, team.id); }} /> }] : [])
     ];
-  const body = open ? users.length ? <DataTable wrapClassName="tree-table-wrap" className="tree-table" rows={users} rowKey={(user) => user.id} columns={columns} /> : <div className="empty tree-empty">No members in this team.</div> : null;
-  return <CollapsibleGroup title={team.name} subtitle={`${team.id} - ${users.length} members - ${keys.length} keys - ${providerPolicy(team)}`} open={open} onToggle={setOpen} actions={actions} metrics={[{ key: "requests", content: `${num(requests)} requests` }, { key: "tokens", content: `${num(tokens)} tokens` }, { key: "cost", content: eur(cost) }]} onDropValue={canAssign ? async (userId) => { setOpen(true); await onAssign?.(userId, team.id); } : undefined}>{body}</CollapsibleGroup>;
+  const body = users.length ? <DataTable wrapClassName="tree-table-wrap" className="tree-table" rows={users} rowKey={(user) => user.id} columns={columns} /> : <div className="empty tree-empty">No members in this team.</div>;
+  return <CollapsibleGroup title={team.name} subtitle={`${team.id} - ${users.length} members - ${keys.length} keys - ${providerPolicy(team)}`} open={open} onToggle={setOpen} actions={actions} bodyClassName="team-group-body" metrics={[{ key: "requests", content: `${num(requests)} requests` }, { key: "tokens", content: `${num(tokens)} tokens` }, { key: "cost", content: eur(cost) }]} onDropValue={canAssign ? async (userId) => { setOpen(true); await onAssign?.(userId, team.id); } : undefined}>{body}</CollapsibleGroup>;
 }
 
 function usersForTeam(team: TeamView, users: UserView[]): UserView[] {

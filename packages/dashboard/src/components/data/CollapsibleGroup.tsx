@@ -7,7 +7,7 @@ export function CollapsiblePanel({ children, className = "" }: { children: React
 }
 
 export function CollapsibleGroup({
-  title, subtitle, metrics, actions, open, children, empty, onToggle, onDropValue, variant
+  title, subtitle, metrics, actions, open, children, empty, onToggle, onDropValue, summaryClassName = "", bodyClassName = "", mainClassName = "", sideClassName = ""
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
@@ -18,7 +18,10 @@ export function CollapsibleGroup({
   empty?: ReactNode;
   onToggle: (open: boolean) => void;
   onDropValue?: (value: string) => void;
-  variant?: "default" | "admin-row";
+  summaryClassName?: string;
+  bodyClassName?: string;
+  mainClassName?: string;
+  sideClassName?: string;
 }) {
   const [dropActive, setDropActive] = useState(false);
   const [isOpen, setIsOpen] = useState(open);
@@ -35,16 +38,16 @@ export function CollapsibleGroup({
       const value = event.dataTransfer.getData("text/molenkopf-user");
       if (value) onDropValue(value);
     }}>
-    <summary>
-      <div className="collapsible-main"><strong>{title}</strong>{subtitle ? <span>{subtitle}</span> : null}</div>
-      <div className="collapsible-side">
+    <summary className={summaryClassName}>
+      <div className={`collapsible-main ${mainClassName}`.trim()}><strong>{title}</strong>{subtitle ? <span>{subtitle}</span> : null}</div>
+      <div className={`collapsible-side ${sideClassName}`.trim()}>
         {metrics?.map((metric) => metric.content !== undefined
           ? <span key={metric.key}>{metric.content}</span>
           : <span key={metric.key} className="collapsible-metric"><b>{metric.label}</b><span>{metric.value}</span></span>)}
         {actions ? <span className="collapsible-actions" onClick={(event) => event.stopPropagation()}>{actions}</span> : null}
       </div>
     </summary>
-    {isOpen ? children : empty || null}
+    {isOpen ? <div className={`collapsible-body ${bodyClassName}`.trim()}>{children}</div> : empty || null}
   </details>;
 }
 
