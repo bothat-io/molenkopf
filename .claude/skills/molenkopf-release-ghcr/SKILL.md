@@ -46,7 +46,8 @@ Use this workflow when working on Molenkopf releases or Docker publishing.
 5. Run `npm run release:verify` from clean synced `main`.
 6. Use the next real version tag only when the release should be official.
 7. Push the tag and wait for GHCR Docker publishing to finish.
-8. Run `npm run release:npm:check`, then publish npm manually if desired.
+8. For npm, tell the user to run
+   `npm run release:npm:publish -- --tag vX.Y.Z` as the final manual step.
 9. If more workflow testing is needed, add an explicit preview tag path first.
 
 ## Preview Release Rule
@@ -105,11 +106,11 @@ dependent on the validated Docker image artifact, not a rebuilt image.
 - Do not store npm usernames, passwords, 2FA codes, access tokens, or recovery
   codes in repo files, skills, docs, Docker images, or workflow logs.
 - First validate from clean tagged `main`: `npm run release:verify`.
-- Use `npm run release:npm:check` before manual npm publish. The script checks
-  the package scope, public access config, clean `main`, matching `vX.Y.Z` tag,
-  and npm login. It does not publish.
-- For a local manual publish, use npm login/session auth and publish with
-  `npm publish --access public` from the release commit/package.
+- For a local manual publish, tell the user to run
+  `npm run release:npm:publish -- --tag vX.Y.Z`. The script validates the tag,
+  checks the successful release workflow, creates a clean tag worktree, and then
+  runs `npm publish --access public` interactively so the user can enter npm
+  login or OTP prompts.
 - For later automation, prefer npm Trusted Publishing from a protected GitHub
   Actions environment. If that is not available, use a granular automation token
   only as a protected GitHub Actions secret/environment secret. Do not commit it.
