@@ -76,6 +76,13 @@ function isSensitiveKey(key: string): boolean {
 
 function sensitiveMarker(key: string, value: unknown): string {
   const kind = key.toLowerCase().replace(/[^a-z0-9]+/g, "_") || "secret";
-  const text = typeof value === "string" ? value : JSON.stringify(value);
+  const text = typeof value === "string" ? value : sensitiveValueLabel(value);
   return `[REDACTED_SECRET:event_${kind}:sha256:${shortHash(text ?? "")}]`;
+}
+
+function sensitiveValueLabel(value: unknown): string {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "[array]";
+  if (typeof value === "object") return "[object]";
+  return String(value ?? "");
 }

@@ -2,17 +2,33 @@ import { redactSecrets } from "../security/secret-redactor.ts";
 import type { AuditManifest } from "./audit-store.ts";
 
 export function normalizedManifest(manifest: AuditManifest): AuditManifest {
-  const safe = JSON.parse(JSON.stringify(manifest)) as AuditManifest;
-  if (!isAuditManifest(safe)) throw new Error("invalid audit manifest");
-  safe.requestId = safeName(redactSecrets(safe.requestId).text);
-  if (Number.isNaN(Date.parse(safe.timestamp))) safe.timestamp = new Date().toISOString();
-  safe.path = safePath(safe.path);
-  safe.targetHost = safeToken(redactSecrets(safe.targetHost).text, "target");
-  safe.method = safe.method.replace(/[^A-Z]/gi, "").toUpperCase().slice(0, 12) || "GET";
-  safe.retrievalIds = safe.retrievalIds.map(safeRetrievalId).filter((item): item is string => Boolean(item)).slice(0, 50);
-  safe.compressorsUsed = safe.compressorsUsed.map((item) => redactedToken(String(item), "compressor")).slice(0, 20);
-  safe.warnings = safe.warnings.map((item) => safeWarning(redactSecrets(String(item)).text)).slice(0, 20);
-  if (safe.client) safe.client = safeClient(safe.client);
+  if (!isAuditManifest(manifest)) throw new Error("invalid audit manifest");
+  const safe: AuditManifest = {
+    requestId: safeName(redactSecrets(manifest.requestId).text),
+    timestamp: Number.isNaN(Date.parse(manifest.timestamp)) ? new Date().toISOString() : manifest.timestamp,
+    method: manifest.method.replace(/[^A-Z]/gi, "").toUpperCase().slice(0, 12) || "GET",
+    path: safePath(manifest.path),
+    targetHost: safeToken(redactSecrets(manifest.targetHost).text, "target"),
+    compressedItems: finiteNumber(manifest.compressedItems),
+    estimatedOriginalTokens: finiteNumber(manifest.estimatedOriginalTokens),
+    estimatedCompressedTokens: finiteNumber(manifest.estimatedCompressedTokens),
+    estimatedSavedTokens: finiteNumber(manifest.estimatedSavedTokens),
+    redactedSecrets: finiteNumber(manifest.redactedSecrets),
+    retrievalIds: manifest.retrievalIds.map(safeRetrievalId).filter((item): item is string => Boolean(item)).slice(0, 50),
+    compressorsUsed: manifest.compressorsUsed.map((item) => redactedToken(String(item), "compressor")).slice(0, 20),
+    warnings: manifest.warnings.map((item) => safeWarning(redactSecrets(String(item)).text)).slice(0, 20)
+  };
+  const statusCode = finiteOptional(manifest.statusCode);
+  const durationMs = finiteOptional(manifest.durationMs);
+  const upstreamInputTokens = finiteOptional(manifest.upstreamInputTokens);
+  const upstreamOutputTokens = finiteOptional(manifest.upstreamOutputTokens);
+
+  if (manifest.providerId) safe.providerId = redactedToken(manifest.providerId, "provider");
+  if (manifest.client) safe.client = safeClient(manifest.client);
+  if (statusCode !== undefined) safe.statusCode = statusCode;
+  if (durationMs !== undefined) safe.durationMs = durationMs;
+  if (upstreamInputTokens !== undefined) safe.upstreamInputTokens = upstreamInputTokens;
+  if (upstreamOutputTokens !== undefined) safe.upstreamOutputTokens = upstreamOutputTokens;
   return safe;
 }
 
@@ -28,17 +44,33 @@ export function isAuditManifest(value: unknown): value is AuditManifest {
 
 function safeClient(client: NonNullable<AuditManifest["client"]>): NonNullable<AuditManifest["client"]> {
   const source = safeSource(client.source);
-  const safe = { ...client, source, id: redactedToken(client.id, "client"), label: redactedToken(client.label, source) };
-  if (client.userId) safe.userId = redactedToken(client.userId, "user");
-  if (client.agentId) safe.agentId = redactedToken(client.agentId, "agent");
-  if (client.teamIds) safe.teamIds = client.teamIds.map((id) => redactedToken(id, "team")).slice(0, 50);
-  if (client.keyId) safe.keyId = redactedToken(client.keyId, "key");
-  if (client.project) safe.project = redactedToken(client.project, "project");
+  const safe: NonNullable<AuditManifest["client"]> = {
+    source,
+    id: redactedToken(text(client.id, "client"), "client"),
+    label: redactedToken(text(client.label, source), source)
+  };
+  if (client.userId) safe.userId = redactedToken(text(client.userId, "user"), "user");
+  if (client.agentId) safe.agentId = redactedToken(text(client.agentId, "agent"), "agent");
+  if (client.teamIds) safe.teamIds = client.teamIds.map((id) => redactedToken(text(id, "team"), "team")).slice(0, 50);
+  if (client.keyId) safe.keyId = redactedToken(text(client.keyId, "key"), "key");
+  if (client.project) safe.project = redactedToken(text(client.project, "project"), "project");
   return safe;
 }
 
 function safeName(value: string): string {
   return value.replace(/[^a-z0-9._:-]/gi, "_").slice(0, 96) || "request";
+}
+
+function finiteNumber(value: number): number {
+  return Number.isFinite(value) ? value : 0;
+}
+
+function finiteOptional(value: number | undefined): number | undefined {
+  return Number.isFinite(value) ? value : undefined;
+}
+
+function text(value: unknown, fallback: string): string {
+  return typeof value === "string" ? value : fallback;
 }
 
 function safeToken(value: string, fallback: string): string {

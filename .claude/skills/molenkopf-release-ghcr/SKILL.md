@@ -83,3 +83,17 @@ dependent on the validated Docker image artifact, not a rebuilt image.
 - README can show `docker pull ghcr.io/bothat-io/molenkopf:latest` after the
   GHCR path has been verified.
 - Avoid "npm coming soon" wording while npm publishing is intentionally deferred.
+
+## npm Publishing
+
+- The npm package scope is `@bothat-io`; publish `@bothat-io/molenkopf`.
+- The npm org is `bothat-io`. Use a maintainer account with publish rights for
+  that org.
+- Keep npm publish manual/protected until the release policy is stable.
+- Do not store npm usernames, passwords, 2FA codes, access tokens, or recovery
+  codes in repo files, skills, docs, Docker images, or workflow logs.
+- First validate from clean `main`: `npm run release:verify`.
+- For a local manual publish, use npm login/session auth and publish with
+  `npm publish --access public` from the release commit/package.
+- For later automation, use a granular npm automation token only as a protected
+  GitHub Actions secret/environment secret. Do not commit it.
