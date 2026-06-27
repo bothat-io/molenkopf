@@ -64,7 +64,7 @@ export function summarizeAudit(manifests: AuditManifest[]): AuditSummary {
     add(totals, manifest);
     addStatus(status, manifest.statusCode);
     if (manifest.warnings.length > 0) warningRequests++;
-    const client = manifest.client ?? { id: "anonymous", label: "unattributed client", source: "anonymous" as const };
+    const client = manifest.client ?? { id: "unattributed", label: "unattributed client", source: "unattributed" as const };
     addGroup(bucketFor(buckets, client), manifest);
     addGroup(breakdownFor(providers, providerId(manifest), providerLabel(manifest)), manifest);
     addGroup(breakdownFor(endpoints, endpointId(manifest), endpointLabel(manifest)), manifest);

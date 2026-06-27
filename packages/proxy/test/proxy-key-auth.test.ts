@@ -6,9 +6,11 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
+import { presentedSecret, stripMolenkopfAuthHeaders } from "../src/http/proxy-identity.ts";
 import { IdentityStore } from "../../core/src/identity/identity-store.ts";
 import { issueApiKey, revokeKey } from "../../core/src/identity/api-keys.ts";
 import type { User } from "../../core/src/identity/types.ts";
+import { setupAdmin } from "./proxy-auth-utils.ts";
 
 async function listenOn(server: Server): Promise<number> {
   server.listen(0, "127.0.0.1");
@@ -36,7 +38,6 @@ test("proxy authenticates by Molenkopf API key, attributes to user, never leaks 
   const issued = (await issueApiKey(seed, "bob", { agentLabel: "ci-bot", project: "project-alpha", teamId: "alpha" }))!;
   seed.close();
 
-  process.env.MOLENKOPF_REQUIRE_KEY = "1";
   let proxy;
   try {
     proxy = await startProxy({ port: 0, target: `http://127.0.0.1:${upstreamPort}/v1`, dataDir });
@@ -60,12 +61,59 @@ test("proxy authenticates by Molenkopf API key, attributes to user, never leaks 
     const usage = await fetch(`${base}/__molenkopf/usage`, { headers: { cookie: admin } }).then((r) => r.json());
     assert.equal(usage.teams.find((t: any) => t.id === "alpha").usage.requests, 1);
   } finally {
-    delete process.env.MOLENKOPF_REQUIRE_KEY;
     if (proxy) await proxy.close();
     upstream.close();
   }
 });
 
+test("proxy accepts x-molenkopf-token without stripping upstream authorization", async () => {
+  let lastAuth: string | undefined;
+  const upstream = createServer((req, res) => {
+    lastAuth = req.headers.authorization;
+    req.resume();
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end("{}");
+  });
+  const upstreamPort = await listenOn(upstream);
+  const dataDir = await mkdtemp(join(tmpdir(), "molenkopf-local-token-"));
+  const seed = new IdentityStore(dataDir);
+  await seed.load();
+  await seed.putTeam({ id: "alpha", name: "Alpha", allowedProviders: "*", managerIds: [], createdAt: "x" });
+  await seed.putUser({ id: "bob", displayName: "Bob", role: "member", teamIds: ["alpha"], createdAt: "x" });
+  const issued = (await issueApiKey(seed, "bob", { project: "project-alpha", teamId: "alpha" }))!;
+  seed.close();
+  const proxy = await startProxy({ port: 0, target: `http://127.0.0.1:${upstreamPort}/v1`, dataDir });
+  try {
+    const ok = await fetch(`http://127.0.0.1:${proxy.port}/v1/messages`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer upstream-secret", "x-molenkopf-token": issued.secret },
+      body: "{}"
+    });
+    assert.equal(ok.status, 200);
+    assert.equal(lastAuth, "Bearer upstream-secret");
+  } finally {
+    await proxy.close();
+    upstream.close();
+  }
+});
+
+test("Molenkopf auth headers are recognized and stripped locally", () => {
+  const headers = new Headers({ authorization: "Bearer upstream-secret", "x-molenkopf-token": "mk_local" });
+  assert.equal(presentedSecret(headers), "mk_local");
+  stripMolenkopfAuthHeaders(headers);
+  assert.equal(headers.get("authorization"), "Bearer upstream-secret");
+  assert.equal(headers.get("x-molenkopf-token"), null);
+
+  const bearer = new Headers({ authorization: "Bearer mk_bearer" });
+  assert.equal(presentedSecret(bearer), "mk_bearer");
+  stripMolenkopfAuthHeaders(bearer);
+  assert.equal(bearer.get("authorization"), null);
+
+  const xkey = new Headers({ "x-api-key": "  mk_xkey  " });
+  assert.equal(presentedSecret(xkey), "mk_xkey");
+  stripMolenkopfAuthHeaders(xkey);
+  assert.equal(xkey.get("x-api-key"), null);
+});
 test("API key provider scopes block forbidden provider selection", async () => {
   const hits: Record<string, number> = {};
   const primary = countingUpstream("default", hits);
@@ -79,7 +127,6 @@ test("API key provider scopes block forbidden provider selection", async () => {
   await seed.putTeam({ id: "alpha", name: "Alpha", allowedProviders: "*", managerIds: [], createdAt: "2026-06-21T00:00:00.000Z" });
   await seed.putUser(bob);
   const issued = (await issueApiKey(seed, "bob", { agentLabel: "scoped", project: "project-alpha", teamId: "alpha", scopes: ["default"] }))!;
-  process.env.MOLENKOPF_REQUIRE_KEY = "1";
   let proxy: Awaited<ReturnType<typeof startProxy>> | undefined;
   try {
     proxy = await startProxy({
@@ -103,7 +150,6 @@ test("API key provider scopes block forbidden provider selection", async () => {
     assert.equal(hits.default, 1);
     assert.equal(hits.backup ?? 0, 0);
   } finally {
-    delete process.env.MOLENKOPF_REQUIRE_KEY;
     if (proxy) await proxy.close().catch(() => {});
     primary.close();
     backup.close();
@@ -126,8 +172,6 @@ test("invalid revoked and disabled-owner Molenkopf keys never fall back upstream
   seed.getUser("dana")!.disabled = true;
   await seed.save();
   seed.close();
-  const previousRequireKey = process.env.MOLENKOPF_REQUIRE_KEY;
-  delete process.env.MOLENKOPF_REQUIRE_KEY;
   let proxy: Awaited<ReturnType<typeof startProxy>> | undefined;
   try {
     proxy = await startProxy({ port: 0, target: `http://127.0.0.1:${upstreamPort}/v1`, dataDir });
@@ -136,7 +180,6 @@ test("invalid revoked and disabled-owner Molenkopf keys never fall back upstream
     assert.equal((await authedPost(proxy.port, disabledOwner.secret)).status, 401);
     assert.equal(hits.upstream ?? 0, 0);
   } finally {
-    if (previousRequireKey === undefined) delete process.env.MOLENKOPF_REQUIRE_KEY; else process.env.MOLENKOPF_REQUIRE_KEY = previousRequireKey;
     if (proxy) await proxy.close().catch(() => {});
     upstream.close();
   }
@@ -153,9 +196,4 @@ function countingUpstream(label: string, hits: Record<string, number>): Server {
 
 function authedPost(port: number, secret: string): Promise<Response> {
   return fetch(`http://127.0.0.1:${port}/v1/messages`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${secret}` }, body: "{}" });
-}
-
-async function setupAdmin(base: string): Promise<string> {
-  const response = await fetch(`${base}/__molenkopf/setup-admin`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: "admin-secret" }) });
-  return (response.headers.get("set-cookie") ?? "").split(";")[0];
 }

@@ -59,7 +59,6 @@ test("team budget blocks with 429 + Retry-After after it is spent", async () => 
   const issued = (await issueApiKey(s, "bob", { project: "project-alpha" }))!;
   s.close();
 
-  process.env.MOLENKOPF_REQUIRE_KEY = "1";
   let proxy;
   try {
     proxy = await startProxy({ port: 0, target: `http://127.0.0.1:${upstreamPort}/v1`, dataDir });
@@ -76,7 +75,6 @@ test("team budget blocks with 429 + Retry-After after it is spent", async () => 
     assert.equal(body.tier, "team");
     assert.equal(body.error, "budget_exceeded_team");
   } finally {
-    delete process.env.MOLENKOPF_REQUIRE_KEY;
     if (proxy) await proxy.close();
     upstream.close();
   }
@@ -93,7 +91,6 @@ test("warn budget never blocks", async () => {
   const issued = (await issueApiKey(s, "ann", { project: "project-alpha" }))!;
   s.close();
 
-  process.env.MOLENKOPF_REQUIRE_KEY = "1";
   let proxy;
   try {
     proxy = await startProxy({ port: 0, target: `http://127.0.0.1:${upstreamPort}/v1`, dataDir });
@@ -106,7 +103,6 @@ test("warn budget never blocks", async () => {
     const latest = await waitForLatestWarning(base, admin, "user:ann over tokens budget");
     assert.ok(latest.warnings.some((warning: string) => warning.includes("user:ann over tokens budget")));
   } finally {
-    delete process.env.MOLENKOPF_REQUIRE_KEY;
     if (proxy) await proxy.close();
     upstream.close();
   }
@@ -125,7 +121,6 @@ test("key cost budget blocks after recorded euro spend", async () => {
   const issued = (await issueApiKey(s, "bob", { project: "project-alpha", budget: { costLimitEur: 0.5, period: "total", onExceed: "block" } }))!;
   s.close();
 
-  process.env.MOLENKOPF_REQUIRE_KEY = "1";
   let proxy;
   try {
     proxy = await startProxy({ port: 0, target: `http://127.0.0.1:${upstreamPort}/v1`, dataDir });
@@ -140,7 +135,6 @@ test("key cost budget blocks after recorded euro spend", async () => {
     assert.equal(body.tier, "key");
     assert.equal(body.metric, "cost");
   } finally {
-    delete process.env.MOLENKOPF_REQUIRE_KEY;
     if (proxy) await proxy.close();
     upstream.close();
   }

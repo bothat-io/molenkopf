@@ -54,6 +54,7 @@ tracked through the roadmap, GitHub issues, and release PRs.
 - `__molenkopf/*` control APIs require auth after setup; provider, plugin,
   routing, agent, stats, event, config metadata, and retention endpoints are
   admin-only.
+- `/v1/*` proxy traffic requires a valid Molenkopf API key.
 - Non-loopback source binds require an explicit `--allow-public-bind` opt-in.
 - Molenkopf tokens are stored as hashes and shown once.
 - Retrieval writes happen only after a real compression artifact is committed.
@@ -85,7 +86,7 @@ tracked through the roadmap, GitHub issues, and release PRs.
 
 - Query secret does not appear in `/requests`, latest audit, summaries, SSE, dashboard, or plugin pages.
 - Nested JSON secrets are redacted before compression and audit.
-- `x-molenkopf-token` and attribution headers never reach upstream.
+- `x-molenkopf-token` and local routing headers never reach upstream.
 - Unauthenticated control APIs return `401`; insufficient scopes return `403`.
 - Non-loopback bind without explicit opt-in fails at startup.
 - Revoked/expired tokens cannot call `/v1/*` or control APIs.

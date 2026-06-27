@@ -68,12 +68,15 @@ dependent on the validated Docker image artifact, not a rebuilt image.
 - The active Docker context may be remote, such as `proxmox-docker`.
 - If the Docker context is remote, host port mappings are exposed on that remote
   Docker host, not necessarily on local Windows `127.0.0.1`.
-- For public bind tests, start with `--host 0.0.0.0 --allow-public-bind` and set:
-  - `MOLENKOPF_REQUIRE_KEY=1`
-  - `MOLENKOPF_ADMIN_PASSWORD`
-  - `MOLENKOPF_SESSION_SECRET`
-- With `MOLENKOPF_ADMIN_PASSWORD`, use `/__molenkopf/login`; do not expect
-  `/__molenkopf/setup-admin` to be available on public bind.
+- Docker starts require `MOLENKOPF_SESSION_SECRET`; pass it with
+  `--env-file .env` or `-e`.
+- Do not seed admin usernames or passwords through environment variables.
+  Create the first admin through the normal browser first-run flow.
+- `/v1/...` proxy traffic always requires a Molenkopf API key. Use
+  `Authorization: Bearer mk_...`, or `x-molenkopf-token: mk_...` when
+  `Authorization` must stay reserved for the upstream provider.
+- The Docker quickstart should bind the published host port to loopback:
+  `-p 127.0.0.1:8787:8787`.
 
 ## Documentation Timing
 

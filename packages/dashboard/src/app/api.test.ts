@@ -55,7 +55,7 @@ describe("api helpers", () => {
     vi.useRealTimers();
   });
 
-  it("treats unauthorized session load as anonymous", async () => {
+  it("treats unauthorized session load as signed out", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 })));
     await expect(loadSession()).resolves.toEqual({});
   });

@@ -12,7 +12,7 @@ export function projectMetrics(manifests: AuditManifest[]) {
     item.inputTokens += manifest.upstreamInputTokens ?? 0;
     item.outputTokens += manifest.upstreamOutputTokens ?? 0;
     item.savedTokens += confirmedSavedTokens(manifest);
-    item.clients.add(manifest.client?.id ?? "anonymous");
+    item.clients.add(manifest.client?.id ?? "unattributed");
     if (!item.latestAt || manifest.timestamp > item.latestAt) item.latestAt = manifest.timestamp;
     map.set(id, item);
   }

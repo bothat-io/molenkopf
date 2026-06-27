@@ -4,7 +4,7 @@ import type { ProviderAllowlist } from "./provider-access.ts";
 export type ClientIdentity = {
   id: string;
   label: string;
-  source: "user" | "agent" | "api_key" | "anonymous";
+  source: "user" | "agent" | "api_key" | "unattributed";
   userId?: string;
   agentId?: string;
   keyAgentLabel?: string;
@@ -15,16 +15,14 @@ export type ClientIdentity = {
 };
 
 export function deriveClientIdentity(headers: Headers): ClientIdentity {
-  const user = clean(headers.get("x-molenkopf-user"));
   const agent = agentIdFromHeaders(headers);
-  if (user) return { id: `user:${slug(user)}`, label: `user:${user}`, source: "user", agentId: agent };
   if (agent) return { id: clientIdForAgent(agent), label: `agent:${safeSubjectId(agent)}`, source: "agent", agentId: agent };
   const credential = headers.get("authorization") || headers.get("x-api-key");
   if (credential) {
     const hash = createHash("sha256").update(credential).digest("hex").slice(0, 12);
     return { id: `api-key:${hash}`, label: `api-key sha256:${hash}`, source: "api_key" };
   }
-  return { id: "anonymous", label: "unattributed client", source: "anonymous" };
+  return { id: "unattributed", label: "unattributed client", source: "unattributed" };
 }
 
 export function clientIdForAgent(agentId: string): string {

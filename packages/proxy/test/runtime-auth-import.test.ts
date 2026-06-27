@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
 import { installFakeClaude, installFakeCodex, postJson, runtimeProof, setupAdmin, withPath } from "./runtime-auth-test-utils.ts";
+import { auth, issueKey } from "./proxy-auth-utils.ts";
 
 test("imports a supplied runtime auth JSON without exposing the secret", async () => {
   const dir = await mkdtemp(join(tmpdir(), "molenkopf-runtime-auth-"));
@@ -130,10 +131,11 @@ test("pasted auth JSON creates, selects, and tests an imported account without a
     assert.equal(importedJson.providers.activeProvider.id, importedJson.imported.id);
     assert.equal(importedJson.providers.activeProvider.runtimeAuthConfigured, true);
     assert.doesNotMatch(JSON.stringify(importedJson), /colleague-secret/);
+    const key = await issueKey(base, admin, "runtime-import");
 
     const response = await fetch(`${base}/v1/responses`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: auth(key, { "content-type": "application/json" }),
       body: JSON.stringify({ input: "test imported account" })
     });
     assert.equal(response.status, 200);

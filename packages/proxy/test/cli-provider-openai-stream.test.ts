@@ -4,6 +4,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
+import { auth, cookieOf, issueKey } from "./proxy-auth-utils.ts";
 
 test("Codex CLI providers satisfy OpenAI Responses streaming clients", async () => {
   const dir = await mkdtemp(join(tmpdir(), "molenkopf-cli-openai-stream-"));
@@ -33,10 +34,13 @@ test("Codex CLI providers satisfy OpenAI Responses streaming clients", async () 
       providerCatalogMode: "explicit",
       dataDir: dir
     });
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const admin = cookieOf(await fetch(`${base}/__molenkopf/setup-admin`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: "admin-secret" }) }));
+    const key = await issueKey(base, admin, "cli-openai-stream");
 
-    const response = await fetch(`http://127.0.0.1:${proxy.port}/v1/responses`, {
+    const response = await fetch(`${base}/v1/responses`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: auth(key, { "content-type": "application/json" }),
       body: JSON.stringify({ stream: true, model: "codex-client-model", input: "hello stream" })
     });
     assert.equal(response.status, 200);

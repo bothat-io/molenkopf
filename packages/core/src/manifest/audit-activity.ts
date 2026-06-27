@@ -31,7 +31,7 @@ export function summarizeRecentActivity(manifests: AuditManifest[], limit = 8): 
 }
 
 function add(groups: Map<string, AuditActivityGroup>, manifest: AuditManifest) {
-  const client: NonNullable<AuditManifest["client"]> = manifest.client ?? { id: "anonymous", label: "unattributed client", source: "anonymous" };
+  const client: NonNullable<AuditManifest["client"]> = manifest.client ?? { id: "unattributed", label: "unattributed client", source: "unattributed" };
   const providerId = manifest.providerId || manifest.targetHost || "unknown";
   const endpoint = `${manifest.method} ${pathOnly(manifest.path)}`;
   const status = statusGroup(manifest.statusCode);

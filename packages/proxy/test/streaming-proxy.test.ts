@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
 import type { RunningProxy } from "../src/http/server-types.ts";
 import { readBody } from "../src/http/server-io.ts";
+import { auth, issueKey, setupKey } from "./proxy-auth-utils.ts";
 async function listenOn(server: Server): Promise<number> {
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -45,7 +46,9 @@ test("streams an SSE response through incrementally without buffering", async ()
   const upstreamPort = await listenOn(upstream);
   const proxy: RunningProxy = await startProxy({ target: `http://127.0.0.1:${upstreamPort}/v1`, port: 0, dataDir: dir });
   try {
-    const res = await fetch(`http://127.0.0.1:${proxy.port}/v1/messages`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const key = await setupKey(base, "stream");
+    const res = await fetch(`${base}/v1/messages`, { method: "POST", headers: auth(key, { "content-type": "application/json" }), body: "{}" });
     assert.equal(res.headers.get("content-type"), "text/event-stream");
     const reader = res.body!.getReader();
     const decoder = new TextDecoder();
@@ -78,7 +81,8 @@ test("passes a gzip-encoded response body through unmodified with intact headers
   try {
     const base = `http://127.0.0.1:${proxy.port}`;
     const admin = await setupAdmin(base);
-    const res = await fetch(`${base}/v1/messages`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    const key = await issueKey(base, admin, "gzip");
+    const res = await fetch(`${base}/v1/messages`, { method: "POST", headers: auth(key, { "content-type": "application/json" }), body: "{}" });
     assert.equal(res.headers.get("content-encoding"), "gzip");
     const decoded = await res.json();
     assert.deepEqual(decoded, { message: "hello transparent gateway", n: 42, usage: { input_tokens: 11, output_tokens: 13 } });
@@ -98,8 +102,10 @@ test("upstream timeout returns a proxy error instead of hanging", async () => {
   const proxy = await startProxy({ target: `http://127.0.0.1:${upstreamPort}/v1`, port: 0, dataDir: dir });
   try {
     process.env.MOLENKOPF_UPSTREAM_TIMEOUT_MS = "100";
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const key = await setupKey(base, "timeout");
     const started = Date.now();
-    const response = await fetch(`http://127.0.0.1:${proxy.port}/v1/messages`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    const response = await fetch(`${base}/v1/messages`, { method: "POST", headers: auth(key, { "content-type": "application/json" }), body: "{}" });
     const elapsed = Date.now() - started;
     const body = await response.json() as { error: string; requestId: string };
     assert.equal(response.status, 502);
@@ -124,7 +130,9 @@ test("proxy request body limit returns 413 before upstream forwarding", async ()
   const proxy = await startProxy({ target: `http://127.0.0.1:${upstreamPort}/v1`, port: 0, dataDir: dir });
   try {
     process.env.MOLENKOPF_PROXY_BODY_LIMIT_BYTES = "8";
-    const response = await fetch(`http://127.0.0.1:${proxy.port}/v1/messages`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input: "too large" }) });
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const key = await setupKey(base, "body-limit");
+    const response = await fetch(`${base}/v1/messages`, { method: "POST", headers: auth(key, { "content-type": "application/json" }), body: JSON.stringify({ input: "too large" }) });
     assert.equal(response.status, 413);
     assert.deepEqual(await response.json(), { error: "request_body_too_large" });
     assert.equal(hits, 0);
@@ -150,7 +158,8 @@ test("aborted upstream response after headers is audited as a proxy error", asyn
   const base = `http://127.0.0.1:${proxy.port}`;
   try {
     const admin = await setupAdmin(base);
-    const response = await fetch(`${base}/v1/messages`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }).catch((error) => error);
+    const key = await issueKey(base, admin, "upstream-abort");
+    const response = await fetch(`${base}/v1/messages`, { method: "POST", headers: auth(key, { "content-type": "application/json" }), body: "{}" }).catch((error) => error);
     if (response instanceof Response) await response.text().catch(() => {});
     const latest = await latestStatus(base, 502, admin);
     assert.equal(latest.statusCode, 502);

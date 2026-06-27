@@ -67,7 +67,7 @@ Explicitly not connected:
 
 ## Security Model
 
-Core and proxy use Node.js built-ins only. Molenkopf API keys are stored as hashes, imported runtime auth is kept in isolated local profile directories, and Local API responses hide provider credentials. The default upstream route can forward incoming auth headers only when the selected profile requires it; configured provider profiles strip incoming client auth and inject the server-side credential at the forwarding boundary. Prompts and responses are not logged in full. Source code and diffs pass through in safe mode.
+Core and proxy use Node.js built-ins only. Molenkopf API keys are stored as hashes, imported runtime auth is kept in isolated local profile directories, and Local API responses hide provider credentials. Proxy traffic on `/v1/...` requires a valid Molenkopf API key. The default upstream route can forward incoming auth headers only when the selected profile requires it; configured provider profiles strip incoming client auth and inject the server-side credential at the forwarding boundary. Prompts and responses are not logged in full. Source code and diffs pass through in safe mode.
 
 Before the first admin exists, only health, session status, and browser first-run
 admin creation are usable. After setup, Local API metadata is role-gated: normal
@@ -83,17 +83,20 @@ screen is reachable there until the first admin is created.
 Open `http://127.0.0.1:8787/__molenkopf/dashboard` after starting Molenkopf.
 Root `/` redirects there, while upstream agent traffic still uses `/v1/...`.
 
-Attribution headers are optional local request metadata. They never expand the
-authenticated API-key/team/provider policy. `x-molenkopf-agent` may select an
-explicit agent binding only when that binding is already allowed for the
-authenticated caller; otherwise the request fails closed.
+Every `/v1/...` proxy request must present a valid Molenkopf API key. Use
+`Authorization: Bearer mk_...` when Molenkopf supplies provider credentials. If
+the client must also forward an upstream `Authorization` header, put the
+Molenkopf key in `x-molenkopf-token: mk_...`; Molenkopf strips that header
+before forwarding upstream.
 
 ```text
-x-molenkopf-user: operator
-x-molenkopf-agent: codex-local
+Authorization: Bearer mk_...
 ```
 
-`x-molenkopf-user` wins over `x-molenkopf-agent` for accounting labels. Molenkopf strips both before forwarding upstream. If neither header is present, audit summaries use a short SHA-256 fingerprint of `Authorization` or `x-api-key`, or `anonymous` when no credential header exists.
+`x-molenkopf-agent` is optional local request metadata. It may select an
+explicit agent binding only when that binding is already allowed for the
+authenticated key, team, and provider policy; otherwise the request fails
+closed.
 
 Manual provider switching happens in the Admin provider section or by posting `{ "id": "openai-env" }` to `/__molenkopf/providers/select`. Explicit provider profiles, API-key scopes, team allowlists, and routing mode are enforced before forwarding; manual selection remains the default route when no explicit profile is attached.
 
@@ -161,27 +164,23 @@ Use Molenkopf as the OpenAI-compatible base URL:
 http://127.0.0.1:8787/v1
 ```
 
-Optional local-only attribution headers:
+Authenticate proxy traffic with a Molenkopf API key:
 
 ```text
-x-molenkopf-user: operator
+Authorization: Bearer mk_...
+```
+
+If your client also sends an upstream provider credential in `Authorization`,
+send the Molenkopf key separately:
+
+```text
+x-molenkopf-token: mk_...
 x-molenkopf-agent: codex-local
 ```
 
-These headers are stripped before upstream forwarding. See `docs/MOLENKOPF_USAGE.md` for a concrete `curl` request, provider setup, and dashboard checks.
-
-Start the local proxy from source:
-
-```bash
-npm run dev
-```
-
-Run tests:
-
-```bash
-npm run bootstrap
-npm test
-```
+These local headers are stripped before upstream forwarding. See
+`docs/MOLENKOPF_USAGE.md` for a concrete `curl` request, provider setup, and
+dashboard checks.
 
 ## Limitations
 

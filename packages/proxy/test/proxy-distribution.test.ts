@@ -9,6 +9,7 @@ import { startProxy } from "../src/http/server.ts";
 import { IdentityStore } from "../../core/src/identity/identity-store.ts";
 import { issueApiKey } from "../../core/src/identity/api-keys.ts";
 import type { User } from "../../core/src/identity/types.ts";
+import { auth, issueKey } from "./proxy-auth-utils.ts";
 
 function usageUpstream(label: string, hits: { [k: string]: number }): Server {
   return createServer((req, res) => {
@@ -63,9 +64,10 @@ test("distribute mode spreads load across providers by weight", async () => {
   const base = `http://127.0.0.1:${proxy.port}`;
   try {
     const admin = await setupAdmin(base);
+    const key = await issueKey(base, admin, "distribution");
     await post(base, "/__molenkopf/routing/mode", { mode: "distribute" }, admin);
     for (let i = 0; i < 4; i++) {
-      await fetch(`${base}/v1/messages`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }).then((r) => r.text());
+      await fetch(`${base}/v1/messages`, { method: "POST", headers: auth(key, { "content-type": "application/json" }), body: "{}" }).then((r) => r.text());
       await pollJson(`${base}/__molenkopf/stats`, (s) => s.requests >= i + 1, 60, admin);
     }
     assert.ok((hits.primary ?? 0) >= 1, "primary provider received traffic");
@@ -159,17 +161,18 @@ test("agent token limit returns 429 once exceeded; disabled agent returns 403", 
   const base = `http://127.0.0.1:${proxy.port}`;
   try {
     const admin = await setupAdmin(base);
+    const key = await issueKey(base, admin, "agent-limit");
     await post(base, "/__molenkopf/agents/draft", { id: "limited", providerId: "default", tokenLimit: 1500 }, admin);
-    const first = await fetch(`${base}/v1/messages`, { method: "POST", headers: { "content-type": "application/json", "x-molenkopf-agent": "limited" }, body: "{}" });
+    const first = await fetch(`${base}/v1/messages`, { method: "POST", headers: auth(key, { "content-type": "application/json", "x-molenkopf-agent": "limited" }), body: "{}" });
     await first.text();
     assert.equal(first.status, 200);
     // wait until the 1500 tokens from the first request are accounted
     await pollJson(`${base}/__molenkopf/agents`, (a) => (a.items.find((i: any) => i.id === "limited")?.usage.inputTokens ?? 0) >= 1000, 60, admin);
-    const second = await fetch(`${base}/v1/messages`, { method: "POST", headers: { "content-type": "application/json", "x-molenkopf-agent": "limited" }, body: "{}" });
+    const second = await fetch(`${base}/v1/messages`, { method: "POST", headers: auth(key, { "content-type": "application/json", "x-molenkopf-agent": "limited" }), body: "{}" });
     assert.equal(second.status, 429);
 
     await post(base, "/__molenkopf/agents/draft", { id: "off", providerId: "default", disabled: true }, admin);
-    const blocked = await fetch(`${base}/v1/messages`, { method: "POST", headers: { "content-type": "application/json", "x-molenkopf-agent": "off" }, body: "{}" });
+    const blocked = await fetch(`${base}/v1/messages`, { method: "POST", headers: auth(key, { "content-type": "application/json", "x-molenkopf-agent": "off" }), body: "{}" });
     assert.equal(blocked.status, 403);
   } finally {
     await proxy.close();

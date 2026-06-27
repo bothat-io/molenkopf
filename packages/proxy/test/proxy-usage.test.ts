@@ -6,6 +6,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
+import { auth, issueKey } from "./proxy-auth-utils.ts";
 
 async function listenOn(server: Server): Promise<number> {
   server.listen(0, "127.0.0.1");
@@ -36,7 +37,8 @@ test("records real upstream token usage from the provider response", async () =>
   const base = `http://127.0.0.1:${proxy.port}`;
   try {
     const admin = await setupAdmin(base);
-    const res = await fetch(`${base}/v1/messages`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    const key = await issueKey(base, admin, "usage");
+    const res = await fetch(`${base}/v1/messages`, { method: "POST", headers: auth(key, { "content-type": "application/json" }), body: "{}" });
     await res.text();
     const latest = await pollJson(`${base}/__molenkopf/requests/latest`, (m) => m.upstreamInputTokens === 1234, 50, admin);
     assert.equal(latest.upstreamInputTokens, 1234);

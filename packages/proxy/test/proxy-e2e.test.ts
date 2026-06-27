@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { staticPluginPipeline } from "../../core/src/plugins/static-pipeline.ts";
 import { startProxy } from "../src/http/server.ts";
+import { auth, issueKey, localAuth } from "./proxy-auth-utils.ts";
 
 test("proxy forwards OpenAI paths, rewrites long body strings, audits, and exposes stats", async () => {
   const dir = await mkdtemp(join(tmpdir(), "molenkopf-e2e-"));
@@ -29,12 +30,13 @@ test("proxy forwards OpenAI paths, rewrites long body strings, audits, and expos
     });
     const base = `http://127.0.0.1:${proxy.port}`;
     const admin = await setupAdmin(base);
+    const key = await issueKey(base, admin, "proxy-e2e");
     // Compression is opt-in (transparent by default); enable it to assert body rewriting.
     await postJson(`${base}/__molenkopf/plugins/toggle`, { id: "context-compressor-plugin", enabled: true }, admin);
     const longLog = Array.from({ length: 260 }, (_, i) => `line ${i}`).join("\n") + "\nERROR done";
     const response = await fetch(`http://127.0.0.1:${proxy.port}/v1/responses`, {
       method: "POST",
-      headers: { authorization: "Bearer secret", "content-type": "application/json", connection: "close" },
+      headers: localAuth(key, { authorization: "Bearer secret", "content-type": "application/json", connection: "close" }),
       body: JSON.stringify({ input: longLog })
     });
     assert.equal(response.status, 200);
@@ -117,6 +119,7 @@ test("plugin hub exposes pages and live toggles compression behavior", async () 
     });
     const base = `http://127.0.0.1:${proxy.port}`;
     const admin = await setupAdmin(base);
+    const key = await issueKey(base, admin, "plugin-hub");
 
     const plugins = await fetch(`${base}/__molenkopf/plugins`, { headers: { cookie: admin } }).then((r) => r.json());
     const compressor = plugins.items.find((item: { id: string }) => item.id === "context-compressor-plugin");
@@ -141,7 +144,7 @@ test("plugin hub exposes pages and live toggles compression behavior", async () 
     const longLog = Array.from({ length: 260 }, (_, i) => `line ${i}`).join("\n") + "\nERROR visible";
     // Default (disabled): the body passes through untouched.
     upstreamBody = "";
-    await fetch(`${base}/v1/responses`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input: longLog }) });
+    await fetch(`${base}/v1/responses`, { method: "POST", headers: auth(key, { "content-type": "application/json" }), body: JSON.stringify({ input: longLog }) });
     assert.doesNotMatch(upstreamBody, /molenkopf compressed/);
     assert.match(upstreamBody, /line 200/);
 
@@ -149,7 +152,7 @@ test("plugin hub exposes pages and live toggles compression behavior", async () 
     const enabled = await postJson(`${base}/__molenkopf/plugins/toggle`, { id: "context-compressor-plugin", enabled: true }, admin);
     assert.equal(enabled.enabled, true);
     upstreamBody = "";
-    await fetch(`${base}/v1/responses`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input: longLog }) });
+    await fetch(`${base}/v1/responses`, { method: "POST", headers: auth(key, { "content-type": "application/json" }), body: JSON.stringify({ input: longLog }) });
     assert.match(upstreamBody, /molenkopf compressed/);
   } finally {
     if (proxy) await proxy.close();

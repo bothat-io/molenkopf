@@ -51,7 +51,7 @@ function redactedToken(value: string, fallback: string): string {
 }
 
 function safeSource(value: string): NonNullable<AuditManifest["client"]>["source"] {
-  return value === "user" || value === "agent" || value === "api_key" || value === "anonymous" ? value : "anonymous";
+  return value === "user" || value === "agent" || value === "api_key" || value === "unattributed" ? value : "unattributed";
 }
 
 function safePath(path: string): string {

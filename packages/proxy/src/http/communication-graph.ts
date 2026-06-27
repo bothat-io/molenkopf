@@ -52,8 +52,8 @@ export function recordCommunicationGraph(graph: CommunicationGraph, manifest: Au
 }
 
 function safeClient(client: AuditManifest["client"]): { id: string; label: string; source: string; kind: string } {
-  if (!client) return { id: "anonymous", label: "unattributed client", source: "anonymous", kind: "agent" };
-  const source = client.source === "user" || client.source === "agent" || client.source === "api_key" ? client.source : "anonymous";
+  if (!client) return { id: "unattributed", label: "unattributed client", source: "unattributed", kind: "agent" };
+  const source = client.source === "user" || client.source === "agent" || client.source === "api_key" ? client.source : "unattributed";
   return {
     id: safeGraphId(client.id || client.label || source),
     label: trim(client.label || client.id || source, 80),
@@ -63,8 +63,8 @@ function safeClient(client: AuditManifest["client"]): { id: string; label: strin
 }
 
 function safeGraphId(value: string): string {
-  const clean = String(value ?? "anonymous").toLowerCase().replace(/[^a-z0-9._:-]+/g, "-");
-  return trim(clean || "anonymous", 80);
+  const clean = String(value ?? "unattributed").toLowerCase().replace(/[^a-z0-9._:-]+/g, "-");
+  return trim(clean || "unattributed", 80);
 }
 
 function safePath(path: string): string | undefined {

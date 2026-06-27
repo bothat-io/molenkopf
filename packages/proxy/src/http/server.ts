@@ -15,7 +15,7 @@ import { handleLocalRequest } from "./local-api.ts";
 import { createRuntimeState, emptyUsage, isPluginEnabled, type RuntimeState } from "./runtime-state.ts";
 import { resolveRouting } from "./agent-router.ts";
 import { buildManifest, finishRequest } from "./request-finish.ts";
-import { resolveClientIdentity } from "./proxy-identity.ts";
+import { resolveClientIdentity, stripMolenkopfAuthHeaders } from "./proxy-identity.ts";
 import { checkBudgets } from "./budget-gate.ts";
 import { withBudgetWarnings } from "./budget-warnings.ts";
 import { IdentityStore } from "../../../core/src/identity/identity-store.ts";
@@ -86,12 +86,12 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
   const path = auditPath(rawPath);
   const inbound = new Headers(req.headers as Record<string, string>);
   const resolved = resolveClientIdentity(state.identity, inbound);
-  if (!resolved.keyOk && (resolved.presentedKey || proxyKeyRequired())) {
+  if (!resolved.keyOk) {
     events.emit("request_failed", { requestId, data: { error: "invalid_api_key" } });
     return writeJson(res, 401, { error: "invalid_api_key" });
   }
   const client = resolved.client;
-  if (resolved.keyOk) { inbound.delete("authorization"); inbound.delete("x-api-key"); }
+  stripMolenkopfAuthHeaders(inbound);
   const budget = checkBudgets(state, client);
   if (budget.ok === false) return rejectBudget(res, events, requestId, budget);
   for (const warning of budget.warnings) events.emit("request_warning", { requestId, data: { warning } });
@@ -187,4 +187,4 @@ const manifest = buildManifest(requestId, req.method ?? "GET", path, target, pro
   await finishRequest(manifest, auditStore, events, state, pluginHost);
 }
 function rejectBudget(res: ServerResponse, events: EventBus, requestId: string, budget: Exclude<ReturnType<typeof checkBudgets>, { ok: true }>) { events.emit("request_failed", { requestId, data: { error: budget.error } }); res.writeHead(budget.status, { "content-type": "application/json", "retry-after": "60" }); return res.end(JSON.stringify({ error: budget.error, tier: budget.tier, scope: budget.scopeId, metric: budget.metric })); }
-const proxyKeyRequired = () => process.env.MOLENKOPF_REQUIRE_KEY === "1", headerValue = (value: number | string | string[] | undefined) => Array.isArray(value) ? value[0] : typeof value === "string" ? value : undefined;
+const headerValue = (value: number | string | string[] | undefined) => Array.isArray(value) ? value[0] : typeof value === "string" ? value : undefined;

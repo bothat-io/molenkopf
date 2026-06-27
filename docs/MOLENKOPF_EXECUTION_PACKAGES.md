@@ -58,7 +58,7 @@ Owners: `packages/core/src/security/secret-redactor.ts`,
 
 Build:
 - Redact nested JSON keys such as `password`, `token`, `authorization`, `api_key`.
-- Strip `x-molenkopf-token` and attribution headers before upstream.
+- Strip `x-molenkopf-token` and local routing headers before upstream.
 - Move toward provider-aware upstream auth instead of forwarding arbitrary cookies.
 
 Acceptance:

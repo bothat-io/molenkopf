@@ -25,18 +25,20 @@ POST /__molenkopf/plugins/toggle
 
 Core safety remains active even when the compressor plugin is off.
 
-## Attribute Token Accounting
+## Authenticated Token Accounting
 
-Use one of these optional local headers from your agent/client:
+Proxy traffic must use a Molenkopf API key. That key owns the project, team, and
+usage bucket for the request. If a client also forwards an upstream
+`Authorization` header, send Molenkopf auth separately:
 
 ```text
-x-molenkopf-user: operator
+x-molenkopf-token: mk_...
 x-molenkopf-agent: codex-local
 ```
 
-If neither header is present, the gateway falls back to a short SHA-256 fingerprint of `Authorization` or `x-api-key`. The raw key is not stored or displayed.
-
-`x-molenkopf-user` takes precedence over `x-molenkopf-agent`. Both attribution headers are local-only and are stripped before the request is forwarded upstream.
+`x-molenkopf-agent` is optional routing metadata inside the authenticated key
+policy. Local Molenkopf headers are stripped before the request is forwarded
+upstream.
 
 ## What The Page Shows
 
@@ -47,7 +49,8 @@ If neither header is present, the gateway falls back to a short SHA-256 fingerpr
   exposes this as `forwardedTokens`.
 - `Token funnel`: original, forwarded, and confirmed compression-saved token estimates.
 - `Optimization state`: whether the compressor is disabled, idle, threshold-limited, or actively saving tokens.
-- `Consumers / API keys`: buckets grouped by `x-molenkopf-user`, `x-molenkopf-agent`, API-key fingerprint, or anonymous traffic.
+- `Consumers / API keys`: buckets grouped by Molenkopf key, project, team, and
+  optional agent routing metadata.
 - `Provider savings`: how much each active provider/account has seen and saved.
 - `Endpoint pressure`: which API routes create token pressure.
 - `Recent grouped activity`: recent manifests grouped by consumer, provider, endpoint, and status class so repeated requests from the same client stay readable.
@@ -62,7 +65,6 @@ If neither header is present, the gateway falls back to a short SHA-256 fingerpr
 - Retrieval IDs point to local storage and should still be treated as sensitive.
 - Manual provider switching is global default runtime state. Explicit agent
   bindings can override it through configured or drafted agent metadata.
-- `anonymous` is only an unattributed-accounting fallback. It is not a product-level agent identity and should not drive memory or graph semantics.
 
 ## API
 

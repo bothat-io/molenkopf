@@ -3,13 +3,14 @@ import assert from "node:assert/strict";
 import { deriveClientIdentity } from "../src/http/client-identity.ts";
 import { buildForwardHeaders } from "../src/http/header-utils.ts";
 
-test("client identity prefers explicit user and never forwards local attribution headers", () => {
-  const headers = new Headers({ "x-molenkopf-user": "Example Admin", authorization: "Bearer fixture-secret" });
+test("client identity ignores spoofed local headers and never forwards them", () => {
+  const headers = new Headers({ "x-molenkopf-role": "admin", "x-molenkopf-agent": "codex-local", authorization: "Bearer fixture-secret" });
   const identity = deriveClientIdentity(headers);
-  assert.equal(identity.id, "user:example-admin");
-  assert.equal(identity.label, "user:Example Admin");
+  assert.equal(identity.id, "agent:codex-local");
+  assert.equal(identity.label, "agent:codex-local");
   const forwarded = buildForwardHeaders(headers);
-  assert.equal(forwarded.has("x-molenkopf-user"), false);
+  assert.equal(forwarded.has("x-molenkopf-role"), false);
+  assert.equal(forwarded.has("x-molenkopf-agent"), false);
   assert.equal(forwarded.get("authorization"), null);
 });
 

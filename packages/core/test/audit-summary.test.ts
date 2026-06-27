@@ -103,12 +103,12 @@ type ManifestOptions = {
 };
 
 function manifest(options: ManifestOptions): AuditManifest {
-  const id = options.id ?? "anonymous";
+  const id = options.id ?? "unattributed";
   const original = options.original ?? 100;
   const compressed = options.compressed ?? 40;
   return {
     requestId: options.requestId, timestamp: "2026-06-16T12:00:00.000Z", method: "POST", path: options.path ?? "/v1/responses", targetHost: options.targetHost ?? "api.openai.com", providerId: options.providerId ?? (options.targetHost === "backup.example" ? "backup" : "openai"),
-    client: { id, label: options.label ?? id, source: id.startsWith("user") ? "user" : id.startsWith("api-key") || options.keyId ? "api_key" : "anonymous", keyId: options.keyId, project: options.project },
+    client: { id, label: options.label ?? id, source: id.startsWith("user") ? "user" : id.startsWith("api-key") || options.keyId ? "api_key" : "unattributed", keyId: options.keyId, project: options.project },
     compressedItems: options.compressedItems ?? 0, estimatedOriginalTokens: original, estimatedCompressedTokens: compressed, estimatedSavedTokens: options.saved ?? (original - compressed),
     redactedSecrets: 0, retrievalIds: [], compressorsUsed: [], warnings: options.warnings ?? [], statusCode: "statusCode" in options ? options.statusCode : 200, durationMs: 1
   };

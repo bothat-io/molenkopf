@@ -10,14 +10,28 @@ import { effectiveProviderAllowlist } from "./provider-access.ts";
 export type ResolvedIdentity = { client: ClientIdentity; presentedKey: boolean; keyOk: boolean };
 
 export function presentedSecret(headers: Headers): string | undefined {
+  const local = headers.get("x-molenkopf-token")?.trim();
+  if (local?.startsWith("mk_")) return local;
   const auth = headers.get("authorization");
   if (auth) {
     const token = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : auth.trim();
     if (token.startsWith("mk_")) return token;
   }
-  const xkey = headers.get("x-api-key");
-  if (xkey?.startsWith("mk_")) return xkey.trim();
+  const xkey = headers.get("x-api-key")?.trim();
+  if (xkey?.startsWith("mk_")) return xkey;
   return undefined;
+}
+
+export function stripMolenkopfAuthHeaders(headers: Headers): void {
+  headers.delete("x-molenkopf-token");
+  if (presentedAuthHeader(headers.get("authorization"))) headers.delete("authorization");
+  if (headers.get("x-api-key")?.trim().startsWith("mk_")) headers.delete("x-api-key");
+}
+
+function presentedAuthHeader(value: string | null): boolean {
+  if (!value) return false;
+  const token = value.toLowerCase().startsWith("bearer ") ? value.slice(7).trim() : value.trim();
+  return token.startsWith("mk_");
 }
 
 export function resolveClientIdentity(identity: IdentityStore | undefined, headers: Headers): ResolvedIdentity {

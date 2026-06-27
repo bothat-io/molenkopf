@@ -83,6 +83,9 @@ same SQLite volume.
 
 - Non-loopback source binds require `--allow-public-bind`.
 - `MOLENKOPF_SESSION_SECRET` is required for every server start.
+- `/v1/...` proxy APIs require a valid Molenkopf API key.
+- `x-molenkopf-token` carries Molenkopf auth when a client must keep
+  `Authorization` for the upstream provider; it is stripped before forwarding.
 - `/__molenkopf/health` is public.
 - Before first admin setup, only health, session status, and first-run admin
   creation are usable.

@@ -12,7 +12,7 @@ import { resolveRouting } from "../src/http/agent-router.ts";
 import { createRuntimeState } from "../src/http/runtime-state.ts";
 import { startProxy } from "../src/http/server.ts";
 
-const anonymousClient = { id: "anonymous", label: "unattributed client", source: "anonymous" as const };
+const unattributedClient = { id: "unattributed", label: "unattributed client", source: "unattributed" as const };
 
 test("spoofed config agent ids cannot select pinned providers", async () => {
   const state = createRuntimeState({
@@ -20,7 +20,7 @@ test("spoofed config agent ids cannot select pinned providers", async () => {
     providers: [{ id: "backup", name: "Backup", kind: "api", target: "http://127.0.0.1:2/v1" }],
     configAgents: [{ id: "beta", providerId: "backup" }]
   }, "127.0.0.1");
-  const routed = resolveRouting(state, new Headers({ "x-molenkopf-agent": "beta" }), anonymousClient);
+  const routed = resolveRouting(state, new Headers({ "x-molenkopf-agent": "beta" }), unattributedClient);
   assert.equal(routed.ok, false);
   if (!routed.ok) assert.equal(routed.error, "agent_forbidden");
 });

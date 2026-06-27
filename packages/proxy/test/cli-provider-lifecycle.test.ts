@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
+import { auth, setupKey } from "./proxy-auth-utils.ts";
 
 test("CLI provider timeout returns a stable client error", async () => {
   const dir = await mkdtemp(join(tmpdir(), "molenkopf-cli-timeout-"));
@@ -23,11 +24,13 @@ test("CLI provider timeout returns a stable client error", async () => {
       providerCatalogMode: "explicit",
       dataDir: dir
     });
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const key = await setupKey(base, "cli-timeout");
 
     const started = Date.now();
-    const response = await fetch(`http://127.0.0.1:${proxy.port}/v1/responses`, {
+    const response = await fetch(`${base}/v1/responses`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: auth(key, { "content-type": "application/json" }),
       body: JSON.stringify({ input: "will hang" })
     });
     const elapsed = Date.now() - started;
@@ -69,7 +72,9 @@ test("imported CLI provider env strips ambient provider credentials", async () =
       providerCatalogMode: "explicit",
       dataDir: dir
     });
-    const response = await fetch(`http://127.0.0.1:${proxy.port}/v1/responses`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input: "env check" }) });
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const key = await setupKey(base, "cli-import-env");
+    const response = await fetch(`${base}/v1/responses`, { method: "POST", headers: auth(key, { "content-type": "application/json" }), body: JSON.stringify({ input: "env check" }) });
     const responseJson = await response.json() as { output_text: string };
     const output = JSON.parse(responseJson.output_text);
     assert.equal(response.status, 200);
@@ -103,7 +108,9 @@ test("plain CLI provider env strips ambient provider credentials", async () => {
       providerCatalogMode: "explicit",
       dataDir: dir
     });
-    const response = await fetch(`http://127.0.0.1:${proxy.port}/v1/responses`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input: "env check" }) });
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const key = await setupKey(base, "cli-plain-env");
+    const response = await fetch(`${base}/v1/responses`, { method: "POST", headers: auth(key, { "content-type": "application/json" }), body: JSON.stringify({ input: "env check" }) });
     const responseJson = await response.json() as { output_text: string };
     assert.deepEqual(JSON.parse(responseJson.output_text).blocked, []);
   } finally {
@@ -127,7 +134,9 @@ test("blank successful CLI output becomes a provider error", async () => {
       providerCatalogMode: "explicit",
       dataDir: dir
     });
-    const response = await fetch(`http://127.0.0.1:${proxy.port}/v1/responses`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input: "blank" }) });
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const key = await setupKey(base, "cli-blank");
+    const response = await fetch(`${base}/v1/responses`, { method: "POST", headers: auth(key, { "content-type": "application/json" }), body: JSON.stringify({ input: "blank" }) });
     const responseJson = await response.json() as { error: string; requestId: string };
     assert.equal(response.status, 502);
     assert.equal(responseJson.error, "proxy_error");
@@ -158,7 +167,9 @@ test("interactive Claude permission prompts return stable client errors", async 
       providerCatalogMode: "explicit",
       dataDir: dir
     });
-    const response = await fetch(`http://127.0.0.1:${proxy.port}/v1/responses`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input: "write test" }) });
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const key = await setupKey(base, "cli-permission");
+    const response = await fetch(`${base}/v1/responses`, { method: "POST", headers: auth(key, { "content-type": "application/json" }), body: JSON.stringify({ input: "write test" }) });
     const responseJson = await response.json() as { error: string; requestId: string };
     assert.equal(response.status, 502);
     assert.equal(responseJson.error, "proxy_error");
