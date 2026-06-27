@@ -33,7 +33,7 @@ test("imports a supplied runtime auth JSON without exposing the secret", async (
     assert.equal(importedJson.imported.id, "codex-work");
     assert.equal(importedJson.imported.runtime, "codex");
     assert.equal(importedJson.imported.authRef, undefined);
-    assert.deepEqual(importedJson.imported.profile.summary, ["sandbox workspace-write", "approval never", "1 add dirs"]);
+    assert.deepEqual(importedJson.imported.profile.summary, ["Codex config", "sandbox workspace-write", "approval never", "1 add dirs"]);
     assert.doesNotMatch(JSON.stringify(importedJson), /codex-session-secret/);
     assert.doesNotMatch(JSON.stringify(importedJson), /runtime-auth:codex-work|cliArgs|example-secret-dir/);
 
@@ -46,13 +46,14 @@ test("imports a supplied runtime auth JSON without exposing the secret", async (
     assert.equal(provider.runtimeAuthDir, undefined);
     assert.equal(provider.authRef, undefined);
     assert.equal(provider.cliArgs, undefined);
-    assert.deepEqual(provider.runtimeProfile.summary, ["sandbox workspace-write", "approval never", "1 add dirs"]);
+    assert.deepEqual(provider.runtimeProfile.summary, ["Codex config", "sandbox workspace-write", "approval never", "1 add dirs"]);
     assert.doesNotMatch(JSON.stringify(providers), /codex-session-secret/);
     assert.doesNotMatch(JSON.stringify(providers), /runtime-auth:codex-work|example-secret-dir/);
 
     const stored = await readFile(join(dir, "runtime-auth", "codex-work", "auth.json"), "utf8");
     assert.match(stored, /codex-session-secret/);
-    await assert.rejects(readFile(join(dir, "runtime-auth", "codex-work", "config.toml"), "utf8"), /ENOENT/);
+    const storedConfig = await readFile(join(dir, "runtime-auth", "codex-work", "config.toml"), "utf8");
+    assert.equal(storedConfig, 'sandbox_mode = "workspace-write"\napproval_policy = "never"');
   } finally {
     if (proxy) await proxy.close();
     restorePath();

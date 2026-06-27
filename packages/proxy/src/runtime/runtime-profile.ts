@@ -24,7 +24,12 @@ export function runtimeProfileFromImport(body: Body, runtime: Runtime): RuntimeP
   }
   const importedConfig = text(body.configToml) || profileText;
   const derived = importedConfig ? codexConfigSummary(importedConfig) : {};
-  return mergeProfile(profile, derived);
+  return mergeProfile(
+    profile,
+    derived,
+    importedConfig ? { configRef: "config.toml" } : {},
+    importedConfig ? { configToml: importedConfig } : {}
+  );
 }
 
 export async function writeRuntimeProfileFiles(authDir: string, runtime: RuntimeProfileImport): Promise<void> {

@@ -9,6 +9,10 @@ const name = `molenkopf-smoke-${process.pid}`;
 const volume = `${name}-data`;
 const tmp = mkdtempSync(join(tmpdir(), "molenkopf-docker-smoke-"));
 const envFile = join(tmp, ".env");
+const host = "127.0.0.1";
+const hostPort = smokeHostPort();
+const baseUrl = `http://${host}:${hostPort}`;
+const hostProbe = dockerHost().startsWith("ssh://") ? "docker-host" : "local-host";
 
 writeFileSync(envFile, "MOLENKOPF_SESSION_SECRET=test-only-session-secret-please-change-123456\n");
 
@@ -16,14 +20,14 @@ try {
   if (!skipBuild) run(["build", "--pull", "-t", image, "."]);
   assertFailsWithoutSecret();
   run(["volume", "create", volume]);
-  run(["run", "-d", "--name", name, "--env-file", envFile, "-v", `${volume}:/data`, image]);
+  run(["run", "-d", "--name", name, "--env-file", envFile, "-p", `${host}:${hostPort}:8787`, "-v", `${volume}:/data`, image]);
   waitForHealth();
   execNode(smokeScript("first"));
   run(["rm", "-f", name], "ignore");
-  run(["run", "-d", "--name", name, "--env-file", envFile, "-v", `${volume}:/data`, image]);
+  run(["run", "-d", "--name", name, "--env-file", envFile, "-p", `${host}:${hostPort}:8787`, "-v", `${volume}:/data`, image]);
   waitForHealth();
   execNode(smokeScript("restart"));
-  console.log("docker smoke ok");
+  console.log(`docker smoke ok (${baseUrl}, ${hostProbe})`);
 } finally {
   run(["rm", "-f", name], "ignore");
   run(["volume", "rm", volume], "ignore");
@@ -44,7 +48,7 @@ function assertFailsWithoutSecret() {
 function waitForHealth() {
   for (let i = 0; i < 30; i++) {
     try {
-      execFileSync("docker", ["exec", name, "node", "-e", "fetch('http://127.0.0.1:8787/__molenkopf/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"], { stdio: "pipe" });
+      execHostNode(`fetch(${JSON.stringify(`${baseUrl}/__molenkopf/health`)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))`);
       return;
     } catch {
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000);
@@ -55,16 +59,24 @@ function waitForHealth() {
 }
 
 function execNode(script) {
-  execFileSync("docker", ["exec", "-i", name, "node", "--input-type=module", "-"], { input: script, stdio: ["pipe", "inherit", "inherit"] });
+  execHostNode(script, "inherit");
+}
+
+function execHostNode(script, stdout = "pipe") {
+  if (hostProbe === "docker-host") {
+    execFileSync("docker", ["run", "--rm", "--network", "host", image, "node", "--input-type=module", "-"], { input: script, stdio: ["pipe", stdout, "inherit"] });
+    return;
+  }
+  execFileSync(process.execPath, ["--input-type=module", "-"], { input: script, stdio: ["pipe", stdout, "inherit"] });
 }
 
 function smokeScript(phase) {
   return `
-const base = 'http://127.0.0.1:8787';
-const get = (path, init) => fetch(base + path, init);
+const base = ${JSON.stringify(baseUrl)};
+const get = (path, init) => fetch(new URL(path, base), init);
 const expect = (condition, message) => { if (!condition) throw new Error(message); };
 const root = await get('/', { redirect: 'manual' });
-expect(root.status === 302 && root.headers.get('location') === '/__molenkopf/dashboard', 'root redirect failed');
+expect(root.status === 302 && new URL(root.headers.get('location') ?? '', base).pathname === '/__molenkopf/dashboard', 'root redirect failed');
 const dashboard = await get('/__molenkopf/dashboard/');
 expect(dashboard.status === 200, 'dashboard failed');
 const html = await dashboard.text();
@@ -122,5 +134,20 @@ function run(args, stdio = "pipe") {
   } catch (error) {
     if (stdio === "ignore") return Buffer.alloc(0);
     throw error;
+  }
+}
+
+function smokeHostPort() {
+  const port = process.env.MOLENKOPF_DOCKER_HOST_PORT || "8787";
+  const value = Number(port);
+  if (!/^[1-9][0-9]{1,4}$/.test(port) || value > 65535) throw new Error("invalid MOLENKOPF_DOCKER_HOST_PORT");
+  return port;
+}
+
+function dockerHost() {
+  try {
+    return JSON.parse(execFileSync("docker", ["context", "inspect", "--format", "{{json .Endpoints.docker.Host}}"], { encoding: "utf8" }).trim()) || "";
+  } catch {
+    return "";
   }
 }
