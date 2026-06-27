@@ -79,6 +79,7 @@
     "pack:dry": "npm pack --dry-run",
     "smoke:installed": "node scripts/smoke-installed-package.js",
     "smoke:docker": "node scripts/smoke-docker.js",
+    "release:npm:check": "node scripts/check-npm-release.js",
     "release:verify": "npm run test:unit && npm run e2e && npm run smoke:installed && npm run smoke:docker",
     "serve:dev": "node --experimental-strip-types --experimental-sqlite --disable-warning=ExperimentalWarning packages/proxy/src/cli/profile-server.ts dev",
     "serve:test": "node --experimental-strip-types --experimental-sqlite --disable-warning=ExperimentalWarning packages/proxy/src/cli/profile-server.ts test",
