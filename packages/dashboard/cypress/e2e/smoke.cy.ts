@@ -45,9 +45,10 @@ describe("dashboard smoke", () => {
   it("manages users and team membership through the current team tree", () => {
     signIn(admin.username, admin.password);
     cy.contains("button", "Admin").click();
-    cy.contains("Teams").should("be.visible");
-    cy.contains(".team-tree-panel details", "Everyone").within(() => {
-      cy.get('button[aria-label="Default team cannot be removed"]').should("be.disabled");
+    cy.contains("section", "Teams").should("be.visible").within(() => {
+      cy.contains("details", "Everyone").within(() => {
+        cy.get('button[aria-label="Default team cannot be removed"]').should("be.disabled");
+      });
     });
 
     cy.contains("button", "+ New team").click();
@@ -55,7 +56,9 @@ describe("dashboard smoke", () => {
       cy.get('input[name="name"]').type("Review");
       cy.contains("button", "Save").click();
     });
-    cy.contains(".team-tree-panel details", "Review").should("be.visible");
+    cy.contains("section", "Teams").within(() => {
+      cy.contains("details", "Review").should("be.visible");
+    });
 
     cy.contains("button", "+ New user").click();
     cy.get(".modal").within(() => {
@@ -81,12 +84,14 @@ describe("dashboard smoke", () => {
 
     const dataTransfer = new DataTransfer();
     cy.contains(".users-table tbody tr", "Member Alpha").trigger("dragstart", { dataTransfer });
-    cy.contains(".team-tree-panel details", "Review").trigger("drop", { dataTransfer });
-    cy.contains(".team-tree-panel details", "Review").click();
-    cy.contains(".team-tree-panel details", "Review").within(() => {
-      cy.contains("Member Alpha").should("be.visible");
-      cy.get('button[aria-label="Remove from team"]').click();
-      cy.contains("No members in this team.").should("be.visible");
+    cy.contains("section", "Teams").within(() => {
+      cy.contains("details", "Review").trigger("drop", { dataTransfer });
+      cy.contains("details", "Review").click();
+      cy.contains("details", "Review").within(() => {
+        cy.contains("Member Alpha").should("be.visible");
+        cy.get('button[aria-label="Remove from team"]').click();
+        cy.contains("No members in this team.").should("be.visible");
+      });
     });
     cy.contains(".users-table tbody tr", "Member Alpha").should("not.contain", "review");
   });
@@ -106,15 +111,12 @@ describe("dashboard smoke", () => {
     cy.get(".modal").should("not.exist");
 
     cy.contains("Plugins").should("be.visible");
-    cy.get(".plugin-table thead").within(() => {
-      cy.contains("Plugin");
-      cy.contains("Status");
-      cy.contains("Actions");
+    cy.contains("section", "Plugins").within(() => {
+      cy.get(".collapsible-panel details").should("have.length", 3);
+      cy.contains("details", "context-compressor-plugin").should("be.visible");
+      cy.contains("details", "obsidian-graph-plugin").should("be.visible");
+      cy.contains("details", "token-optimizer-plugin").should("be.visible");
     });
-    cy.get(".plugin-table tbody tr").should("have.length", 3);
-    cy.contains(".plugin-table tbody tr", "context-compressor-plugin").should("be.visible");
-    cy.contains(".plugin-table tbody tr", "obsidian-graph-plugin").should("be.visible");
-    cy.contains(".plugin-table tbody tr", "token-optimizer-plugin").should("be.visible");
   });
 });
 
