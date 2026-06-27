@@ -1,3 +1,4 @@
+.collapsible-panel{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
 .collapsible-group{background:transparent;border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:none;overflow:hidden}
 .collapsible-group:last-child{border-bottom:0}
 .collapsible-group summary{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 16px;cursor:pointer;list-style:none}
@@ -10,5 +11,8 @@
 .collapsible-main span{color:var(--muted);font-size:12px}
 .collapsible-side{display:flex;gap:12px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
 .collapsible-side span{color:var(--muted);font-size:12px}
+.collapsible-metric{display:grid;gap:2px;min-width:72px}
+.collapsible-metric b{font-size:11px;line-height:1;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.collapsible-metric span{font-size:12px;line-height:1.2;color:var(--ink)}
 .collapsible-actions{display:inline-flex}
 @media(max-width:760px){.collapsible-group summary{align-items:flex-start}.collapsible-side{justify-content:flex-start}}

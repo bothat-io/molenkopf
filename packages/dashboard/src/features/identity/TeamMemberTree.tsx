@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ActionGroup } from "../../components/actions/ActionGroup";
 import { DashboardSection } from "../../components/layout/DashboardSection";
-import { CollapsibleGroup } from "../../components/data/CollapsibleGroup";
+import { CollapsibleGroup, CollapsiblePanel } from "../../components/data/CollapsibleGroup";
 import { DataTable, type DataColumn } from "../../components/data/DataTable";
 import { eur, num, tokensOf } from "../../app/format";
 import { IconButton } from "../../components/actions/IconButton";
@@ -10,9 +10,9 @@ import "./TeamMemberTree.css";
 
 export function TeamMemberTree(props: { teams: TeamView[]; users: UserView[]; keys: ApiKeyView[]; onNewTeam?: () => void; onEditTeam?: (team: TeamView) => void; onTeamKey?: (team: TeamView) => void; onRemoveTeam?: (id: string) => void; onAssignUserToTeam?: (userId: string, teamId: string) => void | Promise<void>; onRemoveUserFromTeam?: (userId: string, teamId: string) => void | Promise<void> }) {
   const actions = props.onNewTeam ? <button className="ghost" onClick={props.onNewTeam}>+ New team</button> : null;
-  return <DashboardSection title="Teams" actions={actions}>{props.teams.length ? <div className="team-tree-panel">
+  return <DashboardSection title="Teams" actions={actions}>{props.teams.length ? <CollapsiblePanel>
     {props.teams.map((team) => <TeamGroup key={team.id} team={team} users={usersForTeam(team, props.users)} keys={props.keys.filter((key) => key.teamId === team.id)} onEdit={props.onEditTeam} onKey={props.onTeamKey} onRemove={props.onRemoveTeam} onAssign={props.onAssignUserToTeam} onMemberRemove={props.onRemoveUserFromTeam} />)}
-  </div> : <div className="empty">No teams yet.</div>}</DashboardSection>;
+  </CollapsiblePanel> : <div className="empty">No teams yet.</div>}</DashboardSection>;
 }
 
 function TeamGroup({ team, users, keys, onEdit, onKey, onRemove, onAssign, onMemberRemove }: { team: TeamView; users: UserView[]; keys: ApiKeyView[]; onEdit?: (team: TeamView) => void; onKey?: (team: TeamView) => void; onRemove?: (id: string) => void; onAssign?: (userId: string, teamId: string) => void | Promise<void>; onMemberRemove?: (userId: string, teamId: string) => void | Promise<void> }) {

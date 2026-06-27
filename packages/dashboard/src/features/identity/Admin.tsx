@@ -4,11 +4,8 @@ import { DataTable } from "../../components/data/DataTable";
 import { canCreateOwnKey, canRevokeOwnKey } from "../keys/keyPermissions";
 import { MetricStrip } from "../../components/layout/MetricStrip";
 import { SectionTitle } from "../../components/layout/DashboardSection";
-import { PluginSections, ProviderSection, configuredProviders } from "../providers/ProviderSections";
-import { EffectivePluginPolicyView } from "../plugins/EffectivePluginPolicyView";
-import { PluginRegistryPanel } from "../plugins/PluginRegistryPanel";
-import { TeamPluginSettings } from "../plugins/TeamPluginSettings";
-import { TokenOptimizerWorkspace } from "../plugins/TokenOptimizerWorkspace";
+import { ProviderSection, configuredProviders } from "../providers/ProviderSections";
+import { PluginWorkspace } from "../plugins/PluginWorkspace";
 import { TeamMemberTree } from "./TeamMemberTree";
 import { tokensOf } from "../../app/format";
 import type { DashboardData, TeamView, UserView } from "../../app/types";
@@ -38,7 +35,6 @@ export function AdminTab(props: {
 }) {
   const users = mergeUsers(props.data.identity?.users || [], props.data.usage.users || []);
   const teams = mergeTeams(props.data.identity?.teams || [], props.data.usage.teams || []);
-  const selectedTeam = teams[0];
   const providers = props.data.providers;
   const providerItems = configuredProviders(providers);
   const providerTokens = providerItems.reduce((sum, p) => sum + tokensOf(p.usage), 0);
@@ -48,11 +44,7 @@ export function AdminTab(props: {
     <ProviderSection providers={providers} teams={teams} testMessages={props.providerMessages} onNew={props.onNewProvider} onWeight={props.onProviderWeight} onRemove={props.onProviderRemove} onOptions={props.onProviderOptions} onTest={props.onProviderTest} />
     <TeamMemberTree teams={teams} users={users} keys={props.data.usage.keys || []} onNewTeam={props.onNewTeam} onEditTeam={props.onEditTeam} onTeamKey={props.onTeamKey} onRemoveTeam={props.onRemoveTeam} onAssignUserToTeam={props.onAssignUserToTeam} onRemoveUserFromTeam={props.onRemoveUserFromTeam} />
     <UsersTable users={users} onNew={props.onNewUser} onEdit={props.onEditUser} onKey={props.onUserKey} onRemove={props.onRemoveUser} />
-    <PluginSections plugins={props.data.plugins} summary={props.data.summary} onToggle={props.onPluginToggle} />
-    <PluginRegistryPanel plugins={props.data.plugins} globalPolicy={props.data.pluginPolicies?.global} onSave={props.onSaveGlobalPluginPolicy} />
-    <TeamPluginSettings team={selectedTeam} plugins={props.data.plugins} teamPolicy={selectedTeam ? props.data.pluginPolicies?.teams?.[selectedTeam.id] : undefined} effectivePolicy={selectedTeam ? props.data.pluginPolicies?.effective?.[selectedTeam.id] : undefined} onSave={selectedTeam ? (pluginId, value) => props.onSaveTeamPluginPolicy(selectedTeam.id, pluginId, value) : undefined} onReset={selectedTeam ? (pluginId) => props.onResetTeamPluginPolicy(selectedTeam.id, pluginId) : undefined} />
-    <EffectivePluginPolicyView effective={selectedTeam ? props.data.pluginPolicies?.effective?.[selectedTeam.id] : undefined} />
-    <TokenOptimizerWorkspace data={props.data.tokenOptimizer} />
+    <PluginWorkspace data={props.data} teams={teams} onPluginToggle={props.onPluginToggle} onSaveGlobalPluginPolicy={props.onSaveGlobalPluginPolicy} onSaveTeamPluginPolicy={props.onSaveTeamPluginPolicy} onResetTeamPluginPolicy={props.onResetTeamPluginPolicy} />
   </>;
 }
 

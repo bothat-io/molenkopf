@@ -17,7 +17,7 @@ export function GlobalPluginSettingsForm({
 }) {
   const [draft, setDraft] = useState({ enabled, maxRisk });
   useEffect(() => setDraft({ enabled, maxRisk }), [enabled, maxRisk]);
-  return <form className="plugin-settings-form" onSubmit={(event) => { event.preventDefault(); void onSave(draft); }}>
+  return <form className="plugin-inline-form" onSubmit={(event) => { event.preventDefault(); void onSave(draft); }}>
     <label><span>Enabled</span><select value={String(draft.enabled)} onChange={(event) => setDraft((prev) => ({ ...prev, enabled: event.currentTarget.value === "true" }))}>
       <option value="true">enabled</option>
       <option value="false">disabled</option>
@@ -28,7 +28,7 @@ export function GlobalPluginSettingsForm({
       <option value="orange">orange</option>
       <option value="red">red</option>
     </select></label>
-    <button type="submit" className="ghost">Save global defaults</button>
+    <button type="submit" className="primary">Save global defaults</button>
   </form>;
 }
 
@@ -61,7 +61,7 @@ export function TeamPluginSettingsForm({
       <option value="red">red</option>
     </select></label>
     <div className="plugin-settings-actions">
-      <button type="submit" className="ghost">Save team overrides</button>
+      <button type="submit" className="primary">Save team overrides</button>
       <button type="button" className="ghost" onClick={() => void onReset()}>Reset team overrides</button>
     </div>
   </form>;
