@@ -122,6 +122,13 @@ For a step-by-step local setup and test flow, read `docs/MOLENKOPF_USAGE.md`.
 Plugin pages open in standalone windows from `/__molenkopf/plugins/context-compressor-plugin/page` and `/__molenkopf/plugins/obsidian-graph-plugin/page`. The graph workspace is derived from safe request metadata and redacted transferred text. Context and graph pages group by project/key where available and surface plugin-data failures explicitly.
 
 ## Commands
+Install from npm with Node.js 24 or newer:
+
+```bash
+npm install -g @bothat-io/molenkopf
+node -e "require('node:fs').writeFileSync('.env','MOLENKOPF_SESSION_SECRET='+require('node:crypto').randomBytes(32).toString('hex')+'\n')"
+molenkopf proxy
+```
 
 Quick Docker start on the Docker host:
 
@@ -136,14 +143,10 @@ docker run --rm \
   ghcr.io/bothat-io/molenkopf:latest
 ```
 
-Open `http://127.0.0.1:8787/` and create the first admin user. The quickstart
-binds Molenkopf to `127.0.0.1` on the host for local use. Do not publish the
-port publicly before completing admin setup and configuring deployment security.
-
-Docker starts require a valid `MOLENKOPF_SESSION_SECRET`; copy `.env.example`
-to `.env`, change the value, and pass it with `--env-file .env`. Docker does
-not automatically read a host `.env` file. Admin usernames and passwords are
-created only in the browser first-run flow.
+Open `http://127.0.0.1:8787/` and create the first admin user. The Docker
+quickstart binds Molenkopf to `127.0.0.1` on the host for local use; do not
+publish the port publicly before admin setup and deployment security are done.
+Docker requires `--env-file .env`; admin users are created only in the browser.
 
 Use `docs/DEPLOYMENT.md` when you need a different port or non-loopback access.
 
