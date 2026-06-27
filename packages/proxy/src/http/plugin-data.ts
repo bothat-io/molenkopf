@@ -17,8 +17,7 @@ export async function buildPluginData(id: string, audit: AuditStore, state: Runt
   if (!plugin) return { status: 404, payload: { error: "plugin_not_found" } };
   if (!plugin.dataPath) return { status: 404, payload: { error: "plugin_data_not_found" } };
   const policy = resolveEffectivePluginPolicy(state, id, user?.teamIds);
-  if (!policy?.enabled) return { status: 403, payload: { error: "plugin_disabled" } };
-  if (!canReadPluginData(policy.capabilities)) return { status: 403, payload: { error: "plugin_data_forbidden" } };
+  if (!policy || !canReadPluginData(policy.capabilities)) return { status: 403, payload: { error: "plugin_data_forbidden" } };
   const scope = canManage(state, user) ? "adminSafe" : "strict";
   const result = await host.data(id, {
     canManage: canManage(state, user),

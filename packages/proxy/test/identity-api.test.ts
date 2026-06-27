@@ -137,7 +137,7 @@ test("member local read APIs are scoped to own key and project traffic", async (
     assert.ok(consumers.items.some((item: any) => item.id === "user:bob"));
     assert.ok(!consumers.items.some((item: any) => item.id === "user:ana"));
     const pluginData = await fetch(`${base}/__molenkopf/plugins/context-compressor-plugin/data`, init);
-    assert.equal(pluginData.status, 403);
+    assert.equal(pluginData.status, 200);
   } finally {
     if (proxy) await proxy.close();
     upstream.close();

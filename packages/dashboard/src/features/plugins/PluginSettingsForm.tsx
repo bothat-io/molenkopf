@@ -18,11 +18,11 @@ export function GlobalPluginSettingsForm({
   const [draft, setDraft] = useState({ enabled, maxRisk });
   useEffect(() => setDraft({ enabled, maxRisk }), [enabled, maxRisk]);
   return <form className="plugin-inline-form" onSubmit={(event) => { event.preventDefault(); void onSave(draft); }}>
-    <label><span>Enabled</span><select value={String(draft.enabled)} onChange={(event) => setDraft((prev) => ({ ...prev, enabled: event.currentTarget.value === "true" }))}>
+    <label><span>Enabled</span><select value={String(draft.enabled)} onChange={(event) => { const value = event.currentTarget.value; setDraft((prev) => ({ ...prev, enabled: value === "true" })); }}>
       <option value="true">enabled</option>
       <option value="false">disabled</option>
     </select></label>
-    <label><span>Max risk</span><select value={draft.maxRisk} onChange={(event) => setDraft((prev) => ({ ...prev, maxRisk: event.currentTarget.value as Risk }))}>
+    <label><span>Max risk</span><select value={draft.maxRisk} onChange={(event) => { const value = event.currentTarget.value as Risk; setDraft((prev) => ({ ...prev, maxRisk: value })); }}>
       <option value="green">green</option>
       <option value="yellow">yellow</option>
       <option value="orange">orange</option>
@@ -42,19 +42,19 @@ export function TeamPluginSettingsForm({
   const [local, setLocal] = useState(draft);
   useEffect(() => setLocal(draft), [draft]);
   return <form className="plugin-settings-form" onSubmit={(event) => { event.preventDefault(); void onSave(local); }}>
-    <label><span>Enabled mode</span><select value={local.enabledMode} onChange={(event) => setLocal((prev) => ({ ...prev, enabledMode: event.currentTarget.value as TeamDraft["enabledMode"] }))}>
+    <label><span>Enabled mode</span><select value={local.enabledMode} onChange={(event) => { const value = event.currentTarget.value as TeamDraft["enabledMode"]; setLocal((prev) => ({ ...prev, enabledMode: value })); }}>
       <option value="inherit">inherit global</option>
       <option value="override">override team</option>
     </select></label>
-    <label><span>Enabled value</span><select disabled={local.enabledMode === "inherit"} value={String(local.enabled)} onChange={(event) => setLocal((prev) => ({ ...prev, enabled: event.currentTarget.value === "true" }))}>
+    <label><span>Enabled value</span><select disabled={local.enabledMode === "inherit"} value={String(local.enabled)} onChange={(event) => { const value = event.currentTarget.value; setLocal((prev) => ({ ...prev, enabled: value === "true" })); }}>
       <option value="true">enabled</option>
       <option value="false">disabled</option>
     </select></label>
-    <label><span>Risk mode</span><select value={local.maxRiskMode} onChange={(event) => setLocal((prev) => ({ ...prev, maxRiskMode: event.currentTarget.value as TeamDraft["maxRiskMode"] }))}>
+    <label><span>Risk mode</span><select value={local.maxRiskMode} onChange={(event) => { const value = event.currentTarget.value as TeamDraft["maxRiskMode"]; setLocal((prev) => ({ ...prev, maxRiskMode: value })); }}>
       <option value="inherit">inherit global</option>
       <option value="override">override team</option>
     </select></label>
-    <label><span>Risk value</span><select disabled={local.maxRiskMode === "inherit"} value={local.maxRisk} onChange={(event) => setLocal((prev) => ({ ...prev, maxRisk: event.currentTarget.value as Risk }))}>
+    <label><span>Risk value</span><select disabled={local.maxRiskMode === "inherit"} value={local.maxRisk} onChange={(event) => { const value = event.currentTarget.value as Risk; setLocal((prev) => ({ ...prev, maxRisk: value })); }}>
       <option value="green">green</option>
       <option value="yellow">yellow</option>
       <option value="orange">orange</option>

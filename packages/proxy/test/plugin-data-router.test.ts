@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { getAuth, putAuth, setupAdmin, startPolicyProxy } from "./plugin-policy-api-test-utils.ts";
 
-test("generic plugin data route returns contract errors for missing and disabled plugins", async () => {
+test("generic plugin data route returns contract errors for missing plugins and keeps workspace data readable when disabled", async () => {
   const env = await startPolicyProxy("molenkopf-plugin-data-router-");
   try {
     const admin = await setupAdmin(env.base);
@@ -15,8 +15,9 @@ test("generic plugin data route returns contract errors for missing and disabled
       globalPluginPolicy: { "obsidian-graph-plugin": { enabled: false } }
     }, admin);
     const disabled = await getAuth(env.base, "/__molenkopf/plugins/obsidian-graph-plugin/data", admin);
-    assert.equal(disabled.status, 403);
-    assert.deepEqual(await disabled.json(), { error: "plugin_disabled" });
+    assert.equal(disabled.status, 200);
+    const payload = await disabled.json();
+    assert.equal(payload.plugin.id, "obsidian-graph-plugin");
   } finally {
     await env.close();
   }
