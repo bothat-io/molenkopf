@@ -52,38 +52,10 @@ jobs:
           name: molenkopf-npm-package
           path: release-artifacts/
           if-no-files-found: error
-      - run: docker build --pull -t molenkopf:ci .
       - name: Smoke final image
-        run: |
-          docker run -d --name molenkopf-ci molenkopf:ci
-          trap 'docker rm -f molenkopf-ci' EXIT
-          ready=0
-          for i in $(seq 1 30); do
-            if docker exec molenkopf-ci node -e "fetch('http://127.0.0.1:8787/__molenkopf/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
-              ready=1
-              break
-            fi
-            sleep 1
-          done
-          if [ "$ready" = "1" ]; then
-            docker exec -i molenkopf-ci node - <<'NODE'
-          const base = 'http://127.0.0.1:8787';
-          const before = await fetch(`${base}/__molenkopf/me`).then((r) => r.json());
-          if (!before.needsSetup) throw new Error('expected first-run setup');
-          const setup = await fetch(`${base}/__molenkopf/setup-admin`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ username: 'admin', password: 'admin-secret' })
-          });
-          if (!setup.ok) throw new Error(`setup failed: ${setup.status}`);
-          const cookie = setup.headers.get('set-cookie')?.split(';')[0];
-          const after = await fetch(`${base}/__molenkopf/me`, { headers: { cookie } }).then((r) => r.json());
-          if (after.user?.id !== 'admin') throw new Error('authenticated setup session missing');
-          NODE
-            exit 0
-          fi
-          docker logs molenkopf-ci
-          exit 1
+        run: npm run smoke:docker
+        env:
+          MOLENKOPF_DOCKER_IMAGE: molenkopf:ci
       - name: Save smoked Docker image
         run: |
           mkdir -p docker-artifacts

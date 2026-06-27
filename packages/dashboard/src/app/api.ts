@@ -40,13 +40,17 @@ export async function loadSession(options?: ApiOptions): Promise<Session> {
 }
 
 export async function loadDashboardData(canManage: boolean, options?: ApiOptions): Promise<DashboardData> {
-  const [usage, keys, config] = await Promise.all([
+  if (!canManage) {
+    const [usage, keys] = await Promise.all([
+      getJson<DashboardData["usage"]>("/__molenkopf/usage", options),
+      getJson<DashboardData["keys"]>("/__molenkopf/keys", options)
+    ]);
+    return { usage, keys, config: {}, providers: {}, summary: {}, plugins: {} };
+  }
+  const [usage, keys, config, providers, summary, plugins, identity] = await Promise.all([
     getJson<DashboardData["usage"]>("/__molenkopf/usage", options),
     getJson<DashboardData["keys"]>("/__molenkopf/keys", options),
-    getJson<DashboardData["config"]>("/__molenkopf/config", options)
-  ]);
-  if (!canManage) return { usage, keys, config, providers: {}, summary: {}, plugins: {} };
-  const [providers, summary, plugins, identity] = await Promise.all([
+    getJson<DashboardData["config"]>("/__molenkopf/config", options),
     getJson<DashboardData["providers"]>("/__molenkopf/providers", options),
     getJson<DashboardData["summary"]>("/__molenkopf/audit/summary", options),
     getJson<DashboardData["plugins"]>("/__molenkopf/plugins", options),

@@ -76,6 +76,19 @@ test("redacts sensitive JSON keys with non-string values", () => {
   assert.doesNotMatch(result.text, /object-secret|array-secret|12345/);
 });
 
+test("redacts mixed JSON sensitive keys after structural rewrites", () => {
+  const result = redactSecrets(JSON.stringify({
+    password: { nested: "object-secret" },
+    apiKey: "plain-api",
+    nested: { authorization: "Bearer plain-auth" }
+  }));
+  const parsed = JSON.parse(result.text);
+  assert.match(parsed.password, /^\[REDACTED_SECRET:json_password:sha256:[a-f0-9]{12}\]$/);
+  assert.match(parsed.apiKey, /^\[REDACTED_SECRET:json_apikey:sha256:[a-f0-9]{12}\]$/);
+  assert.match(parsed.nested.authorization, /^\[REDACTED_SECRET:json_authorization:sha256:[a-f0-9]{12}\]$/);
+  assert.doesNotMatch(result.text, /object-secret|plain-api|plain-auth/);
+});
+
 test("fails closed for sensitive JSON beyond safe scan depth", () => {
   const deep = `${'{"nested":'.repeat(1005)}{"password":"deep-secret"}${"}".repeat(1005)}`;
   const result = redactSecrets(deep);
@@ -129,4 +142,11 @@ test("redacts extended service tokens and secret-bearing URLs", () => {
   for (const kind of ["authorization_basic", "gitlab_token", "npm_token", "slack_token", "stripe_secret", "google_api_key", "db_url", "basic_auth_url", "sentry_dsn", "account_key", "sensitive_assignment"]) {
     assert.match(result.text, new RegExp(`REDACTED_SECRET:${kind}:sha256:[a-f0-9]{12}`));
   }
+});
+
+test("redacts standalone Molenkopf API keys", () => {
+  const key = `mk_${"a".repeat(32)}`;
+  const result = redactSecrets(`Use ${key} in OPENAI_API_KEY or JSON {"note":"${key}"}`);
+  assert.doesNotMatch(result.text, new RegExp(key));
+  assert.match(result.text, /\[REDACTED_SECRET:molenkopf_api_key:sha256:[a-f0-9]{12}\]/);
 });

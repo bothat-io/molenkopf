@@ -6,6 +6,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
+import { auth, issueKey } from "./proxy-auth-utils.ts";
 
 async function listenOn(server: Server): Promise<number> {
   server.listen(0, "127.0.0.1");
@@ -27,7 +28,8 @@ test("admin can purge persisted audit state", async () => {
     proxy = await startProxy({ port: 0, target: `http://127.0.0.1:${upstreamPort}/v1`, dataDir });
     const base = `http://127.0.0.1:${proxy.port}`;
     const admin = cookieOf(await post(base, "/__molenkopf/setup-admin", { username: "admin", password: "admin-secret" }));
-    await fetch(`${base}/v1/messages`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }).then((r) => r.text());
+    const key = await issueKey(base, admin, "retention");
+    await fetch(`${base}/v1/messages`, { method: "POST", headers: auth(key, { "content-type": "application/json" }), body: "{}" }).then((r) => r.text());
     const latest = await fetch(`${base}/__molenkopf/requests/latest`, { headers: { cookie: admin } }).then((r) => r.json());
     assert.ok(latest.requestId, "audit entry exists before purge");
     assert.equal((await post(base, "/__molenkopf/retention/purge", { scope: "audit" })).status, 401);

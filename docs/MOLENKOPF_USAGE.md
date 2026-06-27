@@ -5,53 +5,55 @@ This is the practical local test flow for Molenkopf.
 ## Start
 
 ```bash
+cp .env.example .env
+# Edit .env and set MOLENKOPF_SESSION_SECRET.
 npm run dev
 ```
 
-Open:
+Source runs load `./.env` automatically without overriding values already
+exported in your shell.
+
+Open `http://127.0.0.1:8787/__molenkopf/dashboard`. Use
+`http://127.0.0.1:8787/v1` as the OpenAI-compatible base URL in local clients.
+
+## Authenticate Proxy Traffic
+
+Create a Molenkopf API key in the dashboard after first-run setup. Every
+`/v1/...` proxy request needs that key. Use `Authorization: Bearer mk_...` when
+Molenkopf supplies provider credentials. If your client also needs to forward an
+upstream `Authorization` header, send the Molenkopf key as `x-molenkopf-token`.
 
 ```text
-http://127.0.0.1:8787/__molenkopf/dashboard
+Authorization: Bearer mk_...
+x-molenkopf-token: mk_...
 ```
 
-Use this as the OpenAI-compatible base URL in a local client:
-
-```text
-http://127.0.0.1:8787/v1
-```
-
-## Attribute Traffic
-
-Optional local-only headers let the dashboard group usage. They do not grant
-provider access. `x-molenkopf-agent` can select only an agent/provider binding
-that is already allowed by the authenticated key, team, and profile policy.
-
-```text
-x-molenkopf-user: operator
-x-molenkopf-agent: codex-local
-```
-
-Molenkopf strips these before forwarding upstream. If neither is present, it groups by a short fingerprint of `Authorization` or `x-api-key`, or by `anonymous`.
+`x-molenkopf-agent` is optional local request metadata. It can select only an
+agent/provider binding already allowed by the authenticated key, team, and
+profile policy. Molenkopf strips local Molenkopf auth and routing headers before
+forwarding upstream.
 
 ## Test Request
 
 Send a normal OpenAI-compatible request through the proxy. Then refresh the dashboard.
 
 ```bash
+MOLENKOPF_API_KEY="mk_..."
 curl http://127.0.0.1:8787/v1/responses \
+  -H "x-molenkopf-token: ${MOLENKOPF_API_KEY}" \
   -H "authorization: Bearer ${OPENAI_API_KEY}" \
   -H "content-type: application/json" \
-  -H "x-molenkopf-user: local-test" \
   -d '{"model":"gpt-4.1-mini","input":"short local test"}'
 ```
 
 PowerShell:
 
 ```powershell
+$env:MOLENKOPF_API_KEY = "mk_..."
 curl.exe http://127.0.0.1:8787/v1/responses `
+  -H "x-molenkopf-token: $env:MOLENKOPF_API_KEY" `
   -H "authorization: Bearer $env:OPENAI_API_KEY" `
   -H "content-type: application/json" `
-  -H "x-molenkopf-user: local-test" `
   -d '{ "model": "gpt-4.1-mini", "input": "short local test" }'
 ```
 
@@ -142,7 +144,10 @@ user belongs to one team, Molenkopf can use that team automatically.
 
 - Dashboard stuck on `connecting`: restart the proxy so the current dashboard bundle is served.
 - `EADDRINUSE`: another proxy is already listening on the port; stop that process or start on another port.
-- `OPENAI_API_KEY missing`: set the environment variable or send an `Authorization` header from the client.
+- `invalid_api_key`: create a Molenkopf project key in the dashboard and send it
+  as `Authorization: Bearer mk_...` or `x-molenkopf-token: mk_...`.
+- `OPENAI_API_KEY missing`: set the provider environment variable or forward an
+  upstream `Authorization` header with `x-molenkopf-token` for Molenkopf auth.
 - No graph nodes: send API traffic through `/v1/...`; internal dashboard requests are intentionally ignored.
 - Saved tokens stay `0`: the payload may be small or the compressor is disabled.
 - Imported Claude auth works but write/edit prompts still appear: that is the outer Claude harness permission profile, not the imported runtime auth. Track and fix this separately from provider auth.

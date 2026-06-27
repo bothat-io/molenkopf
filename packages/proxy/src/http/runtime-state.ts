@@ -4,7 +4,6 @@ import { buildProviderCatalog, type ProviderConfig } from "../../../core/src/pro
 import type { AuditManifest } from "../../../core/src/manifest/audit-store.ts";
 import { createCommunicationGraph, type CommunicationGraph } from "./communication-graph.ts";
 import { createMemoryGraph, type MemoryGraph } from "../../../core/src/memory/memory-graph.ts";
-import { newSessionSecret } from "../../../core/src/auth/session.ts";
 import type { AuthUser } from "./auth-state.ts";
 import type { IdentityStore } from "../../../core/src/identity/identity-store.ts";
 import type { UsageSnapshotStore } from "../../../core/src/identity/usage-snapshot.ts";
@@ -12,6 +11,7 @@ import type { ResolvedAgent } from "../../../core/src/config/config-policies.ts"
 import { restoreRuntimeAuthProviders } from "./runtime-auth-registry.ts";
 import { loadRuntimeSettings } from "./runtime-settings.ts";
 import type { RuntimeAuthProofStore } from "./runtime-auth-proof.ts";
+import { requireSessionSecret } from "./session-secret.ts";
 
 export type { ResolvedAgent };
 export type RuntimeOptions = {
@@ -130,7 +130,7 @@ export function createRuntimeState(options: RuntimeOptions, host: string): Runti
     agentDrafts: (settings.agentDrafts ?? []).filter((draft) => providers.some((provider) => provider.id === draft.providerId && provider.enabled !== false)),
     communicationGraph: createCommunicationGraph(),
     memoryGraph: createMemoryGraph(),
-    sessionSecret: process.env.MOLENKOPF_SESSION_SECRET ?? newSessionSecret(),
+    sessionSecret: requireSessionSecret(),
     authAttempts: {},
     runtimeAuthProofs: {},
     settingsLoadWarning: loadedSettings.warning,

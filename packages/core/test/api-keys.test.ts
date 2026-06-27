@@ -111,6 +111,20 @@ test("default everyone team does not make key team selection ambiguous", async (
   assert.equal(await issueApiKey(s, "bob", { project: "project-alpha" }), undefined);
 });
 
+test("everyone is not selectable when a user has a specific team", async () => {
+  const root = await mkdtemp(join(tmpdir(), "molenkopf-keys-everyone-select-"));
+  const s = new IdentityStore(root);
+  await s.load();
+  await s.putTeam({ id: "everyone", name: "Everyone", allowedProviders: "*", managerIds: [], createdAt: "x" });
+  await s.putTeam({ id: "alpha", name: "Alpha", allowedProviders: ["default"], managerIds: [], createdAt: "x" });
+  await s.putUser({ id: "bob", displayName: "Bob", role: "member", teamIds: ["alpha"], createdAt: "x" });
+  assert.equal(await issueApiKey(s, "bob", { project: "project-alpha", teamId: "everyone" }), undefined);
+  const rootKeyOwner = { id: "root", displayName: "Root", role: "admin" as const, teamIds: ["everyone"], createdAt: "x" };
+  await s.putUser(rootKeyOwner);
+  const issued = await issueApiKey(s, "root", { project: "root-project", teamId: "everyone" });
+  assert.equal(issued?.view.teamId, "everyone");
+});
+
 test("issued key survives a store reload", async () => {
   const s = await storeWithUser();
   const issued = (await issueApiKey(s, "bob", { project: "project-alpha" }))!;

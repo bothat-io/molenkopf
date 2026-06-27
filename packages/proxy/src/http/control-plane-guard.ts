@@ -8,9 +8,6 @@ export type ControlPlaneGuardResult = { ok: true } | { ok: false; status: number
 
 export function checkControlPlaneWrite(req: IncomingMessage, path: string, state: RuntimeState): ControlPlaneGuardResult {
   if (!WRITE_METHODS.has(req.method ?? "GET")) return { ok: true };
-  if (path === "/__molenkopf/setup-admin" && !isLoopbackBindHost(state.host)) {
-    return { ok: false, status: 403, error: "setup_loopback_required" };
-  }
   if (!originAllowed(req.headers.origin, req.headers.host, process.env.MOLENKOPF_DASHBOARD_DEV_ORIGIN)) {
     return { ok: false, status: 403, error: "bad_origin" };
   }

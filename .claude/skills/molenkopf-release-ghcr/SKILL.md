@@ -1,6 +1,6 @@
 ---
 name: molenkopf-release-ghcr
-description: Molenkopf release workflow memory for GHCR Docker publishing, npm deferral, preview testing, SemVer tag handling, and README update timing. Use when changing release.yml, tagging releases, publishing containers, testing GHCR images, or documenting Docker install instructions.
+description: Molenkopf release workflow memory for GHCR Docker publishing, protected npm publishing, preview testing, SemVer tag handling, and README update timing. Use when changing release.yml, tagging releases, publishing containers, testing GHCR images, publishing npm packages, or documenting install instructions.
 ---
 
 # Molenkopf GHCR Release Workflow
@@ -11,6 +11,8 @@ Use this workflow when working on Molenkopf releases or Docker publishing.
 
 - Treat `main` as the source for official releases.
 - Keep npm publishing manual and protected.
+- Ship Docker automatically from official SemVer tags; ship npm manually after
+  the same release commit has passed validation.
 - Publish official Docker releases from SemVer tags matching `v*.*.*`.
 - Do not create extra official SemVer tags just to test workflow changes.
 - Do not move or recreate a published official tag after GHCR images exist.
@@ -38,8 +40,11 @@ Use this workflow when working on Molenkopf releases or Docker publishing.
 1. Put workflow, ignore-file, and README updates into a PR to `main`.
 2. Merge before creating the next official release tag.
 3. Confirm the `main` push test workflow is green after the merge.
-4. Use the next real version tag only when the release should be official.
-5. If more workflow testing is needed, add an explicit preview tag path first.
+4. Run `npm run release:verify` from clean `main`.
+5. Use the next real version tag only when the release should be official.
+6. Push the tag and wait for GHCR Docker publishing to finish.
+7. Run `npm run release:npm:check`, then publish npm manually if desired.
+8. If more workflow testing is needed, add an explicit preview tag path first.
 
 ## Preview Release Rule
 
@@ -68,15 +73,38 @@ dependent on the validated Docker image artifact, not a rebuilt image.
 - The active Docker context may be remote, such as `proxmox-docker`.
 - If the Docker context is remote, host port mappings are exposed on that remote
   Docker host, not necessarily on local Windows `127.0.0.1`.
-- For public bind tests, start with `--host 0.0.0.0 --allow-public-bind` and set:
-  - `MOLENKOPF_REQUIRE_KEY=1`
-  - `MOLENKOPF_ADMIN_PASSWORD`
-  - `MOLENKOPF_SESSION_SECRET`
-- With `MOLENKOPF_ADMIN_PASSWORD`, use `/__molenkopf/login`; do not expect
-  `/__molenkopf/setup-admin` to be available on public bind.
+- Docker starts require `MOLENKOPF_SESSION_SECRET`; pass it with
+  `--env-file .env` or `-e`.
+- Do not seed admin usernames or passwords through environment variables.
+  Create the first admin through the normal browser first-run flow.
+- `/v1/...` proxy traffic always requires a Molenkopf API key. Use
+  `Authorization: Bearer mk_...`, or `x-molenkopf-token: mk_...` when
+  `Authorization` must stay reserved for the upstream provider.
+- The Docker quickstart should bind the published host port to loopback:
+  `-p 127.0.0.1:8787:8787`.
 
 ## Documentation Timing
 
 - README can show `docker pull ghcr.io/bothat-io/molenkopf:latest` after the
   GHCR path has been verified.
 - Avoid "npm coming soon" wording while npm publishing is intentionally deferred.
+
+## npm Publishing
+
+- The npm package scope is `@bothat-io`; publish `@bothat-io/molenkopf`.
+- The npm org is `bothat-io`. Use a maintainer account with publish rights for
+  that org.
+- The first `npm publish --access public` creates the org-scoped package when it
+  does not already exist.
+- Keep npm publish manual/protected until the release policy is stable.
+- Do not store npm usernames, passwords, 2FA codes, access tokens, or recovery
+  codes in repo files, skills, docs, Docker images, or workflow logs.
+- First validate from clean tagged `main`: `npm run release:verify`.
+- Use `npm run release:npm:check` before manual npm publish. The script checks
+  the package scope, public access config, clean `main`, matching `vX.Y.Z` tag,
+  and npm login. It does not publish.
+- For a local manual publish, use npm login/session auth and publish with
+  `npm publish --access public` from the release commit/package.
+- For later automation, prefer npm Trusted Publishing from a protected GitHub
+  Actions environment. If that is not available, use a granular automation token
+  only as a protected GitHub Actions secret/environment secret. Do not commit it.

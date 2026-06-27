@@ -1,28 +1,10 @@
 import type { MolenkopfPluginModule, PluginRuntimeContext } from "../../core/src/plugins/plugin-api.ts";
-import type { PluginDescriptor } from "../../core/src/plugins/plugin-descriptor.ts";
 import { compressJsonBody } from "../../core/src/pipeline/openai-request-rewriter.ts";
 import { summarizeRecentActivity } from "../../core/src/manifest/audit-activity.ts";
 import { summarizeAudit } from "../../core/src/manifest/audit-summary.ts";
 import type { RetrievalStore } from "../../core/src/store/retrieval-store.ts";
 import { projectMetrics } from "../shared/audit-projects.ts";
-
-export const descriptor: PluginDescriptor = {
-  id: "context-compressor-plugin",
-  name: "context-compressor-plugin",
-  type: "transformer",
-  category: "compression",
-  description: "Compresses large safe context and keeps retrievable originals locally.",
-  traffic: { reads: ["redacted-body", "audit"], mutates: ["transform"] },
-  permissions: ["body:read", "body:write", "audit:read", "audit:write"],
-  hooks: ["request:body:rewrite", "audit:manifest", "workspace:local-page"],
-  toggle: { defaultEnabled: false, canDisable: true },
-  modulePath: "plugin.ts",
-  workspace: {
-    pagePath: "/__molenkopf/plugins/context-compressor-plugin/page",
-    dataPath: "/__molenkopf/plugins/context-compressor-plugin/data",
-    dataScopes: ["metrics", "audit-summary", "requests"]
-  }
-};
+export { descriptor } from "./descriptor.ts";
 
 export const plugin: MolenkopfPluginModule = {
   async onRequest(ctx, runtime) {

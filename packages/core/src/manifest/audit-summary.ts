@@ -7,7 +7,6 @@ export type AuditSummaryTotals = {
   errors: number;
   unknown: number;
   originalTokens: number;
-  compressedTokens: number;
   forwardedTokens: number;
   savedTokens: number;
   savedPercent: number;
@@ -65,7 +64,7 @@ export function summarizeAudit(manifests: AuditManifest[]): AuditSummary {
     add(totals, manifest);
     addStatus(status, manifest.statusCode);
     if (manifest.warnings.length > 0) warningRequests++;
-    const client = manifest.client ?? { id: "anonymous", label: "unattributed client", source: "anonymous" as const };
+    const client = manifest.client ?? { id: "unattributed", label: "unattributed client", source: "unattributed" as const };
     addGroup(bucketFor(buckets, client), manifest);
     addGroup(breakdownFor(providers, providerId(manifest), providerLabel(manifest)), manifest);
     addGroup(breakdownFor(endpoints, endpointId(manifest), endpointLabel(manifest)), manifest);
@@ -87,7 +86,7 @@ export function summarizeAudit(manifests: AuditManifest[]): AuditSummary {
 }
 
 function empty(): MutableTotals {
-  return { requests: 0, ok: 0, errors: 0, unknown: 0, originalTokens: 0, compressedTokens: 0, forwardedTokens: 0, savedTokens: 0, upstreamInputTokens: 0, upstreamOutputTokens: 0, compressedItems: 0, redactedSecrets: 0, warnings: 0 };
+  return { requests: 0, ok: 0, errors: 0, unknown: 0, originalTokens: 0, forwardedTokens: 0, savedTokens: 0, upstreamInputTokens: 0, upstreamOutputTokens: 0, compressedItems: 0, redactedSecrets: 0, warnings: 0 };
 }
 
 function emptyStatus(): StatusAccumulator { return { unknown: 0, byClass: new Map(), byCode: new Map() }; }
@@ -99,7 +98,6 @@ function add(target: MutableTotals, manifest: AuditManifest) {
   else if (status === "error") target.errors++;
   else target.unknown++;
   target.originalTokens += manifest.estimatedOriginalTokens;
-  target.compressedTokens += manifest.estimatedCompressedTokens;
   target.forwardedTokens += manifest.estimatedCompressedTokens;
   target.savedTokens += confirmedSavedTokens(manifest);
   target.upstreamInputTokens += manifest.upstreamInputTokens ?? 0;

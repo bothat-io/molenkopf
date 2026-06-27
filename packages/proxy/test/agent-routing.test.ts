@@ -11,7 +11,7 @@ import { createRuntimeState } from "../src/http/runtime-state.ts";
 import { IdentityStore } from "../../core/src/identity/identity-store.ts";
 import { issueApiKey } from "../../core/src/identity/api-keys.ts";
 import type { User } from "../../core/src/identity/types.ts";
-const anonymousClient = { id: "anonymous", label: "unattributed client", source: "anonymous" as const };
+const unattributedClient = { id: "unattributed", label: "unattributed client", source: "unattributed" as const };
 const cookieOf = (res: Response) => (res.headers.get("set-cookie") ?? "").split(";")[0];
 function countingUpstream(label: string, hits: { [k: string]: number }): Server {
   return createServer((req, res) => {
@@ -59,7 +59,7 @@ test("routes each agent to its bound provider via x-molenkopf-agent", async () =
   try {
     await fetch(`${base}/v1/responses`, { method: "POST", headers: { authorization: `Bearer ${betaKey.secret}`, "x-molenkopf-agent": "beta" }, body: "{}" });
     await fetch(`${base}/v1/responses`, { method: "POST", headers: { authorization: `Bearer ${alphaKey.secret}`, "x-molenkopf-agent": "alpha" }, body: "{}" });
-    await fetch(`${base}/v1/responses`, { method: "POST", body: "{}" }); // no agent -> global default
+    await fetch(`${base}/v1/responses`, { method: "POST", headers: { authorization: `Bearer ${alphaKey.secret}` }, body: "{}" }); // no agent -> global default
     assert.equal(hits.backup, 1, "agent beta routes to backup");
     assert.equal(hits.primary, 2, "agent alpha + unattributed route to default");
   } finally {
@@ -75,7 +75,7 @@ test("disabled pinned agent providers fail closed instead of falling back", () =
     providers: [{ id: "backup", name: "Backup", kind: "local", target: "http://127.0.0.1:2/v1", enabled: false }],
     configAgents: [{ id: "beta", providerId: "backup" }]
   }, "127.0.0.1");
-  const routed = resolveRouting(state, new Headers({ "x-molenkopf-agent": "beta" }), { ...anonymousClient, source: "api_key", keyAgentLabel: "beta" });
+  const routed = resolveRouting(state, new Headers({ "x-molenkopf-agent": "beta" }), { ...unattributedClient, source: "api_key", keyAgentLabel: "beta" });
   assert.equal(routed.ok, false);
   if (!routed.ok) assert.equal(routed.error, "provider_unavailable");
 });
@@ -87,12 +87,12 @@ test("distribution includes CLI providers only when explicitly enabled", () => {
     providers: [{ id: "cli-account", name: "CLI", kind: "cli", target: "cli://cli-account", runtime: "claude", cliCommand: "claude", authScheme: "none" }]
   }, "127.0.0.1");
   state.routingMode = "distribute";
-  let routed = resolveRouting(state, new Headers(), anonymousClient);
+  let routed = resolveRouting(state, new Headers(), unattributedClient);
   assert.equal(routed.ok, false);
   if (!routed.ok) assert.equal(routed.error, "no_eligible_provider");
 
   state.providers[0].allowDistribution = true;
-  routed = resolveRouting(state, new Headers(), anonymousClient);
+  routed = resolveRouting(state, new Headers(), unattributedClient);
   assert.equal(routed.ok, true);
   if (routed.ok) assert.equal(routed.provider.id, "cli-account");
 });
@@ -103,14 +103,14 @@ test("provider project fields are ignored because projects live on API keys", ()
     providerCatalogMode: "explicit",
     providers: [{ id: "claude-prod", name: "Claude Prod", kind: "api", target: "http://127.0.0.1:2/v1", allowedProjects: ["client-a"], blockedProjects: ["client-b"] } as any]
   }, "127.0.0.1");
-  const allowed = resolveRouting(state, new Headers(), { ...anonymousClient, project: "client-a" });
+  const allowed = resolveRouting(state, new Headers(), { ...unattributedClient, project: "client-a" });
   assert.equal(allowed.ok, true);
   if (allowed.ok) assert.equal(allowed.provider.id, "claude-prod");
 
-  const missing = resolveRouting(state, new Headers(), { ...anonymousClient, project: "client-c" });
+  const missing = resolveRouting(state, new Headers(), { ...unattributedClient, project: "client-c" });
   assert.equal(missing.ok, true);
 
-  const blocked = resolveRouting(state, new Headers(), { ...anonymousClient, project: "client-b" });
+  const blocked = resolveRouting(state, new Headers(), { ...unattributedClient, project: "client-b" });
   assert.equal(blocked.ok, true);
 });
 

@@ -36,28 +36,28 @@ keep Node built-ins only.
 
 ## Docker Run
 
-The image starts with a safe loopback bind inside the container. For host port
-publishing, override the command explicitly and provide the public-bind security
-inputs:
+The published image listens on `0.0.0.0:8787` inside the container so Docker port
+publishing works. For local use, publish it only to host loopback:
 
 ```powershell
-$adminPassword = Read-Host "Molenkopf admin password" -AsSecureString
-$sessionSecret = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
-$adminPlain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($adminPassword))
+Copy-Item .env.example .env
+# Edit .env and set a unique MOLENKOPF_SESSION_SECRET.
+
 docker run --rm `
+  --env-file .env `
   -p 127.0.0.1:8787:8787 `
   -v molenkopf-data:/data `
-  -e MOLENKOPF_REQUIRE_KEY=1 `
-  -e MOLENKOPF_ADMIN_PASSWORD=$adminPlain `
-  -e MOLENKOPF_SESSION_SECRET=$sessionSecret `
-  molenkopf:local `
-  node --experimental-strip-types --experimental-sqlite --disable-warning=ExperimentalWarning packages/proxy/src/cli/main.ts proxy --host 0.0.0.0 --allow-public-bind --port 8787 --data-dir /data
+  molenkopf:local
 ```
 
-Use a strong `MOLENKOPF_SESSION_SECRET` in real deployments. Configure provider
-credentials through environment variables or a mounted config file that uses
-credential references. Do not bake provider keys, imported runtime auth, or
-local data into the image.
+Open `http://127.0.0.1:8787/` and create the first admin in the browser. Do not
+seed admin usernames or passwords through environment variables. Docker starts
+require a valid `MOLENKOPF_SESSION_SECRET`; copy `.env.example` to `.env`,
+change the value, and pass it with `--env-file .env`. Docker does not
+automatically read a host `.env` file. Configure provider credentials through
+environment variables or a mounted config file that uses credential references.
+Do not bake provider keys, imported runtime auth, `.env`, or local data into the
+image.
 
 ## Data Volume
 
@@ -81,12 +81,14 @@ same SQLite volume.
 
 ## Security Gates
 
-- Non-loopback bind requires `--allow-public-bind`.
-- Public bind also requires configured admin auth, `MOLENKOPF_REQUIRE_KEY=1`,
-  and a strong session secret.
+- Non-loopback source binds require `--allow-public-bind`.
+- `MOLENKOPF_SESSION_SECRET` is required for every server start.
+- `/v1/...` proxy APIs require a valid Molenkopf API key.
+- `x-molenkopf-token` carries Molenkopf auth when a client must keep
+  `Authorization` for the upstream provider; it is stripped before forwarding.
 - `/__molenkopf/health` is public.
-- Before first admin setup, only `/__molenkopf/health`, `/__molenkopf/me`, and
-  loopback-only `/__molenkopf/setup-admin` are usable.
+- Before first admin setup, only health, session status, and first-run admin
+  creation are usable.
 - Control-plane APIs require auth after an admin exists; provider, plugin,
   routing, agent, stats, event, config metadata, and retention endpoints are
   admin-only.

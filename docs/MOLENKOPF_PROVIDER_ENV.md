@@ -26,6 +26,8 @@ Use provider API keys for API routing:
 PowerShell:
 
 ```powershell
+Copy-Item .env.example .env
+# Edit .env and set MOLENKOPF_SESSION_SECRET.
 $env:OPENAI_API_KEY = "replace-with-openai-api-key"
 $env:ANTHROPIC_API_KEY = "replace-with-anthropic-api-key"
 npm run dev
@@ -83,15 +85,12 @@ npm run dev
 
 ## Private Env File
 
-`.molenkopf.env.local` is ignored by git. You can start with:
+`.env` is ignored by git and loaded automatically by source runs. It may contain
+the required session secret and provider environment variables. Replace the
+placeholder session secret before starting Molenkopf:
 
-```powershell
-node --experimental-strip-types --experimental-sqlite --disable-warning=ExperimentalWarning packages/proxy/src/cli/main.ts proxy --env-file .molenkopf.env.local
-```
-
-File format:
-
-```text
+```env
+MOLENKOPF_SESSION_SECRET=replace-with-at-least-32-random-characters
 MOLENKOPF_PROVIDER_IDS=openai-main,claude-main
 MOLENKOPF_PROVIDER_OPENAI_MAIN_NAME=OpenAI Main
 MOLENKOPF_PROVIDER_OPENAI_MAIN_TARGET=https://api.openai.com/v1
@@ -103,6 +102,10 @@ MOLENKOPF_PROVIDER_CLAUDE_MAIN_CREDENTIAL_ENV=ANTHROPIC_MAIN_API_KEY
 MOLENKOPF_PROVIDER_CLAUDE_MAIN_AUTH=x-api-key
 ANTHROPIC_MAIN_API_KEY=replace-with-anthropic-main-api-key
 ```
+
+`--env-file FILE` remains available when you intentionally want a different
+private file. Docker does not automatically read host `.env` files; pass the
+file explicitly with `docker run --env-file .env ...`.
 
 ## Fields
 

@@ -5,12 +5,16 @@ import { pathToFileURL } from "node:url";
 
 const root = process.cwd();
 const requiredFiles = [
+  ".env.example",
   "bin/molenkopf.js",
   "packages/core/src/security/secret-redactor.ts",
   "packages/proxy/src/cli/main.ts",
+  "packages/plugins/context-compressor-plugin/descriptor.ts",
   "packages/plugins/context-compressor-plugin/plugin.ts",
+  "packages/plugins/obsidian-graph-plugin/descriptor.ts",
   "packages/dashboard/dist/index.html",
   "packages/dashboard/public/molenkopf-logo.png",
+  "packages/dashboard/public/favicon.png",
   "docs/DEPLOYMENT.md",
   "docs/MOLENKOPF_USAGE.md",
   "docs/MOLENKOPF_PLUGIN_API.md",
@@ -28,9 +32,10 @@ const approvedTarballPaths = [
   /^packages\/plugins\/[^/]+\/.+\.(ts|html)$/,
   /^packages\/dashboard\/dist\/.+/,
   /^packages\/dashboard\/public\/molenkopf-logo\.png$/,
+  /^packages\/dashboard\/public\/favicon\.png$/,
   /^docs\/[^/]+\.md$/
 ];
-const exactTarballPaths = new Set(["package.json", "README.md", "LICENSE", "SECURITY.md", "molenkopf.config.example.json"]);
+const exactTarballPaths = new Set([".env.example", "package.json", "README.md", "LICENSE", "SECURITY.md", "molenkopf.config.example.json"]);
 const forbiddenPatterns = [
   /(^|\/)node_modules(\/|$)/i,
   /(^|\/)\.molenkopf(\/|$)/i,
@@ -73,6 +78,7 @@ function isApprovedTarballPath(path) {
 }
 
 function isForbidden(path) {
+  if (path === ".env.example") return false;
   return forbiddenPatterns.some((pattern) => pattern.test(path));
 }
 

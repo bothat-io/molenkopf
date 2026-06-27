@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { ensurePrivateDirSync } from "../../../core/src/storage/private-state.ts";
 import { validateProviderTarget } from "../../../core/src/security/target-policy.ts";
+import { loadDefaultEnvFile } from "./env-file.ts";
 
 const WATCH_DIRS = ["packages/core/src", "packages/proxy/src"];
 const RESTART_DEBOUNCE_MS = 250;
@@ -54,6 +55,7 @@ function spawnProxy(profile: Profile, revision?: string) {
 }
 
 function run() {
+  loadDefaultEnvFile();
   const profile = resolveProfile(process.argv[2] || "dev");
   ensurePrivateDirSync(profile.dataDir);
   console.log(`Molenkopf ${profile.name}: http://${profile.host}:${profile.port}`);

@@ -20,8 +20,7 @@ export function ProviderSection({ providers, teams, testMessages, onNew, onWeigh
   ]} /></section>;
 }
 
-export function PluginSections({ plugins, summary, onToggle, onMove }: { plugins: PluginState; summary: SummaryView; onToggle: (id: string, enabled: boolean) => void; onMove: (id: string, direction: "up" | "down") => void }) {
-  void onMove;
+export function PluginSections({ plugins, summary, onToggle }: { plugins: PluginState; summary: SummaryView; onToggle: (id: string, enabled: boolean) => void }) {
   const items = [...(plugins.items || [])].sort((a, b) => a.name.localeCompare(b.name));
   return <section><SectionTitle label="Plugins" /><DataTable className="plugin-table" rows={items} rowKey={(p) => p.id} empty={<div className="empty">No plugins registered.</div>} columns={[
     { key: "plugin", header: "Plugin", width: "34%", cell: (p) => <PluginSummary plugin={p} /> },
@@ -106,14 +105,19 @@ function PluginActions({ plugin, onToggle }: { plugin: PluginView; onToggle: (id
   const enabled = plugin.enabled !== false;
   const label = enabled ? "Turn off" : "Turn on";
   return <ActionGroup>
-    {plugin.pagePath ? <IconButton icon="open" label="Open plugin page" onClick={() => openPluginPage(plugin.pagePath || "")} /> : null}
+    {isSafePluginPagePath(plugin.pagePath) ? <IconButton icon="open" label="Open plugin page" onClick={() => openPluginPage(plugin.pagePath || "")} /> : null}
     {plugin.canToggle ? <button type="button" className={`plugin-toggle ${enabled ? "is-on" : "is-off"}`} aria-pressed={enabled} title={label} onClick={() => onToggle(plugin.id, !enabled)}><span className="plugin-toggle-dot" />{label}</button> : null}
   </ActionGroup>;
 }
 
-function openPluginPage(path: string) {
+export function openPluginPage(path: string) {
+  if (!isSafePluginPagePath(path)) return;
   if (!path) return;
   window.open(path, "_blank", "noopener,noreferrer");
+}
+
+export function isSafePluginPagePath(path: string | undefined): boolean {
+  return typeof path === "string" && /^\/__molenkopf\/plugins\/[a-z0-9-]+\/page$/.test(path);
 }
 
 function statePill(p: { enabled?: boolean; lifecycleStatus?: string }) {

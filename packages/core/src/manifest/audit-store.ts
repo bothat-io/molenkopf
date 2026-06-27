@@ -13,7 +13,7 @@ export type AuditManifest = {
   path: string;
   targetHost: string;
   providerId?: string;
-  client?: { id: string; label: string; source: "user" | "agent" | "api_key" | "anonymous"; userId?: string; agentId?: string; teamIds?: string[]; keyId?: string; project?: string };
+  client?: { id: string; label: string; source: "user" | "agent" | "api_key" | "unattributed"; userId?: string; agentId?: string; teamIds?: string[]; keyId?: string; project?: string };
   compressedItems: number;
   estimatedOriginalTokens: number;
   estimatedCompressedTokens: number;
@@ -46,7 +46,6 @@ export class AuditStore {
 
   async write(manifest: AuditManifest): Promise<void> {
     const safe = normalizedManifest(manifest);
-    safe.path = safePath(safe.path);
     const dir = join(this.root, "audit");
     ensurePrivateDirSync(dir);
     const name = `${safe.timestamp.replace(/[:.]/g, "-")}-${safeName(safe.requestId)}.json`;
@@ -136,7 +135,12 @@ async function readManifest(dir: string, file: string): Promise<AuditManifest | 
   }
   try {
     const value = JSON.parse(raw) as unknown;
-    return isAuditManifest(value) ? value : undefined;
+    if (!isAuditManifest(value)) return undefined;
+    try {
+      return normalizedManifest(value);
+    } catch {
+      return undefined;
+    }
   } catch (err) {
     if (err instanceof SyntaxError) return undefined;
     throw err;
@@ -149,14 +153,6 @@ function isFsCode(err: unknown, code: string): boolean {
 
 async function quarantine(dir: string, file: string): Promise<void> {
   await rename(join(dir, file), join(dir, `${file}.corrupt`)).catch(() => {});
-}
-
-function safePath(path: string): string {
-  try {
-    return new URL(path, "http://local").pathname || "/";
-  } catch {
-    return path.split("?")[0] || "/";
-  }
 }
 
 function safeName(value: string): string {

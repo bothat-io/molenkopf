@@ -6,6 +6,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
+import { auth, issueKey } from "./proxy-auth-utils.ts";
 
 async function listenOn(server: Server): Promise<number> {
   server.listen(0, "127.0.0.1");
@@ -50,11 +51,12 @@ test("adds a provider at runtime and routes to it", async () => {
   const base = `http://127.0.0.1:${proxy.port}`;
   try {
     const admin = cookieOf(await post(base, "/__molenkopf/setup-admin", { username: "admin", password: "admin-secret" }));
+    const key = await issueKey(base, admin, "provider-add");
     const ok = await post(base, "/__molenkopf/providers/add", { id: "local-2", name: "Local 2", kind: "local", target: `http://127.0.0.1:${aPort}/v1` }, admin).then((r) => r.json());
     assert.ok(ok.items.some((p: any) => p.id === "local-2"), "provider appears in catalog");
     // select it and route a request
     await post(base, "/__molenkopf/providers/select", { id: "local-2" }, admin);
-    await fetch(`${base}/v1/messages`, { method: "POST", body: "{}" }).then((r) => r.text());
+    await fetch(`${base}/v1/messages`, { method: "POST", headers: auth(key), body: "{}" }).then((r) => r.text());
     assert.equal(hits.added, 1, "new provider received the request");
 
     const dup = await post(base, "/__molenkopf/providers/add", { id: "local-2", kind: "local", target: "http://127.0.0.1:1/v1" }, admin);

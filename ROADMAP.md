@@ -2,10 +2,8 @@
 
 Current status: Molenkopf is a local proxy/control-plane with admin auth, scoped
 API keys, project-attributed usage, imported Claude/Codex runtime profiles, and
-audit-backed plugin workspaces. Product direction lives here; active execution
-work is tracked in `FIXME.md`, and `NEXT.md` is a dated verification record.
-Older target-design notes
-remain in these historical docs:
+audit-backed plugin workspaces. Product direction lives here. Older
+target-design notes remain in these historical docs:
 
 - `docs/MOLENKOPF_PLATFORM_PLAN.md`
 - `docs/MOLENKOPF_PLATFORM_MILESTONES.md`
@@ -72,4 +70,4 @@ npm test
 ```
 
 Keep project files below repo line limits. Active release work is tracked in
-`FIXME.md`.
+GitHub issues, PRs, and the release workflow.

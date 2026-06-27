@@ -15,7 +15,7 @@ export type AuditActivityGroup = {
   errors: number;
   unknown: number;
   originalTokens: number;
-  compressedTokens: number;
+  forwardedTokens: number;
   savedTokens: number;
   compressedItems: number;
   retrievalRefs: number;
@@ -31,21 +31,21 @@ export function summarizeRecentActivity(manifests: AuditManifest[], limit = 8): 
 }
 
 function add(groups: Map<string, AuditActivityGroup>, manifest: AuditManifest) {
-  const client: NonNullable<AuditManifest["client"]> = manifest.client ?? { id: "anonymous", label: "unattributed client", source: "anonymous" };
+  const client: NonNullable<AuditManifest["client"]> = manifest.client ?? { id: "unattributed", label: "unattributed client", source: "unattributed" };
   const providerId = manifest.providerId || manifest.targetHost || "unknown";
   const endpoint = `${manifest.method} ${pathOnly(manifest.path)}`;
   const status = statusGroup(manifest.statusCode);
   const id = [client.id, client.keyId ?? "", client.project ?? "", providerId, endpoint, status].join("|");
   const group: AuditActivityGroup = groups.get(id) ?? {
     id, label: `${client.label} -> ${providerId}`, clientId: client.id, clientLabel: client.label, keyId: client.keyId, project: client.project,
-    providerId, endpoint, status, requests: 0, errors: 0, unknown: 0, originalTokens: 0, compressedTokens: 0,
+    providerId, endpoint, status, requests: 0, errors: 0, unknown: 0, originalTokens: 0, forwardedTokens: 0,
     savedTokens: 0, compressedItems: 0, retrievalRefs: 0
   };
   group.requests++;
   if (statusKind(manifest.statusCode) === "error") group.errors++;
   if (statusKind(manifest.statusCode) === "unknown") group.unknown++;
   group.originalTokens += manifest.estimatedOriginalTokens;
-  group.compressedTokens += manifest.estimatedCompressedTokens;
+  group.forwardedTokens += manifest.estimatedCompressedTokens;
   group.savedTokens += confirmedSavedTokens(manifest);
   group.compressedItems += manifest.compressedItems;
   group.retrievalRefs += manifest.retrievalIds.length;

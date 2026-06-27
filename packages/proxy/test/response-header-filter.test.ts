@@ -6,6 +6,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
+import { auth, setupKey } from "./proxy-auth-utils.ts";
 
 async function listenOn(server: Server): Promise<number> {
   server.listen(0, "127.0.0.1");
@@ -29,7 +30,9 @@ test("filters upstream response headers that could affect the dashboard origin",
   const upstreamPort = await listenOn(upstream);
   const proxy = await startProxy({ target: `http://127.0.0.1:${upstreamPort}/v1`, port: 0, dataDir: dir });
   try {
-    const response = await fetch(`http://127.0.0.1:${proxy.port}/v1/messages`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const key = await setupKey(base, "header-filter");
+    const response = await fetch(`${base}/v1/messages`, { method: "POST", headers: auth(key, { "content-type": "application/json" }), body: "{}" });
     assert.equal(response.headers.get("set-cookie"), null);
     assert.equal(response.headers.get("content-security-policy"), null);
     assert.equal(response.headers.get("x-provider-trace"), "safe");

@@ -1,5 +1,7 @@
+import { request as httpRequest, type IncomingHttpHeaders, type OutgoingHttpHeaders } from "node:http";
+import { request as httpsRequest } from "node:https";
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
-import { resolveConnectTarget } from "../../../core/src/security/target-policy.ts";
+import { resolveConnectTarget, type ConnectTarget } from "../../../core/src/security/target-policy.ts";
 import { buildForwardHeaders, missingProviderCredential } from "./header-utils.ts";
 
 type Check = { status: "ok" | "failed" | "missing" | "unknown" | "blocked"; message: string };
@@ -22,17 +24,14 @@ export async function providerHttpTest(provider: ProviderConfig) {
   if (spec.protocol === "anthropic-messages") headers.set("anthropic-version", "2023-06-01");
   const url = smokeUrl(provider.target, spec);
   try {
-    await resolveConnectTarget(url, { path: "provider test target", allowPrivate: provider.kind === "local" });
-    const response = await fetch(url, {
+    const checked = await resolveConnectTarget(url, { path: "provider test target", allowPrivate: provider.kind === "local" });
+    const response = await pinnedRequest(checked, {
       method: spec.method,
       headers,
-      body: spec.body ? JSON.stringify(spec.body) : undefined,
-      redirect: "manual",
-      signal: AbortSignal.timeout(15000)
+      body: spec.body ? JSON.stringify(spec.body) : undefined
     });
     const redirect = await blockedRedirect(response, url, provider.kind === "local");
     if (redirect) return { ...base, model: redirect, http: { statusCode: response.status, path: spec.path, method: spec.method } };
-    await response.arrayBuffer().catch(() => undefined);
     return {
       ...base,
       auth: authFromStatus(response.status, base.auth),
@@ -44,7 +43,23 @@ export async function providerHttpTest(provider: ProviderConfig) {
   }
 }
 
-async function blockedRedirect(response: Response, url: string, allowPrivate: boolean): Promise<Check | undefined> {
+type ProviderHttpResponse = { status: number; headers: Headers };
+
+async function pinnedRequest(checked: ConnectTarget, init: { method: string; headers: Headers; body?: string }): Promise<ProviderHttpResponse> {
+  const transport = checked.url.protocol === "https:" ? httpsRequest : httpRequest;
+  return new Promise((resolve, reject) => {
+    const request = transport(checked.url, { method: init.method, headers: outgoingHeaders(init.headers, checked.url.host), lookup: pinnedLookup(checked.address, checked.family) }, (response) => {
+      response.resume();
+      response.on("end", () => resolve({ status: response.statusCode ?? 0, headers: responseHeaders(response.headers) }));
+      response.on("error", reject);
+    });
+    request.setTimeout(15000, () => request.destroy(new Error("provider test timed out after 15000ms")));
+    request.on("error", reject);
+    request.end(init.body);
+  });
+}
+
+async function blockedRedirect(response: ProviderHttpResponse, url: string, allowPrivate: boolean): Promise<Check | undefined> {
   if (response.status < 300 || response.status > 399) return undefined;
   const location = response.headers.get("location");
   if (!location) return undefined;
@@ -93,4 +108,26 @@ function smokeUrl(target: string, spec: SmokeSpec): string {
 
 function safeError(error: unknown): string {
   return error instanceof Error ? error.message.slice(0, 180) : String(error).slice(0, 180);
+}
+
+function outgoingHeaders(headers: Headers, host: string): OutgoingHttpHeaders {
+  const out: OutgoingHttpHeaders = {};
+  headers.forEach((value, key) => { out[key] = value; });
+  out.host = host;
+  return out;
+}
+
+function responseHeaders(headers: IncomingHttpHeaders): Headers {
+  const out = new Headers();
+  for (const [key, value] of Object.entries(headers)) {
+    if (Array.isArray(value)) for (const item of value) out.append(key, item);
+    else if (value !== undefined) out.set(key, String(value));
+  }
+  return out;
+}
+
+function pinnedLookup(address: string, family: 4 | 6) {
+  return (_hostname: string, _options: unknown, callback: (error: NodeJS.ErrnoException | null, address: string, family: number) => void) => {
+    callback(null, address, family);
+  };
 }

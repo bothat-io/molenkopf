@@ -2,8 +2,8 @@
 
 Date: 2026-06-18
 
-Status: historical target verification plan. Use `NEXT.md` for the current
-release gate.
+Status: historical target verification plan. Use `package.json` scripts for
+the current release gate.
 
 Verification matrix for [MOLENKOPF_PLATFORM_PLAN.md](MOLENKOPF_PLATFORM_PLAN.md)
 and [MOLENKOPF_PLATFORM_MILESTONES.md](MOLENKOPF_PLATFORM_MILESTONES.md).
@@ -17,7 +17,7 @@ and [MOLENKOPF_PLATFORM_MILESTONES.md](MOLENKOPF_PLATFORM_MILESTONES.md).
 - Header policy: strip Molenkopf headers, inject provider credentials only at forward.
 - Error contracts: network failure, invalid provider, 413, upstream 4xx/5xx.
 - Compression: real savings only, skipped reasons, no abandoned retrieval files.
-- Retrieval: redacted originals, derived summaries, valid IDs, metadata persistence.
+- Retrieval: bounded redacted excerpts, derived summaries, valid IDs, metadata persistence.
 - Audit: safe manifest builder, query redaction, bounded summaries and pagination.
 - Plugin runtime: descriptor uniqueness, hook gating, lifecycle events, scoped data.
 - Memory: safe transfer events, semantic graph merge, bounded graph JSON.

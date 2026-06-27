@@ -44,18 +44,18 @@ safe transferred text
 ## Hardened Release Invariants
 
 These are target invariants for the team gateway. Remaining hardening work is
-tracked in `FIXME.md`; `NEXT.md` is a dated verification record.
+tracked through the roadmap, GitHub issues, and release PRs.
 
 - No provider credential values in audit, dashboard, events, docs, or plugin data.
 - No full prompt or full response in audit, dashboard, events, or plugin pages.
 - Query strings are stripped or redacted before audit persistence.
 - First-run open mode exposes only health, current-session status, and
-  loopback-only admin setup.
+  first-run admin creation.
 - `__molenkopf/*` control APIs require auth after setup; provider, plugin,
   routing, agent, stats, event, config metadata, and retention endpoints are
   admin-only.
-- Public bind is rejected unless admin auth, proxy-key enforcement, and a strong
-  session secret are configured.
+- `/v1/*` proxy traffic requires a valid Molenkopf API key.
+- Non-loopback source binds require an explicit `--allow-public-bind` opt-in.
 - Molenkopf tokens are stored as hashes and shown once.
 - Retrieval writes happen only after a real compression artifact is committed.
 - Obsidian writes require dry-run and path guards before apply.
@@ -86,9 +86,9 @@ tracked in `FIXME.md`; `NEXT.md` is a dated verification record.
 
 - Query secret does not appear in `/requests`, latest audit, summaries, SSE, dashboard, or plugin pages.
 - Nested JSON secrets are redacted before compression and audit.
-- `x-molenkopf-token` and attribution headers never reach upstream.
+- `x-molenkopf-token` and local routing headers never reach upstream.
 - Unauthenticated control APIs return `401`; insufficient scopes return `403`.
-- Public bind without configured auth fails at startup.
+- Non-loopback bind without explicit opt-in fails at startup.
 - Revoked/expired tokens cannot call `/v1/*` or control APIs.
 - Retrieval no-op compression leaves no stored original.
 - Obsidian apply cannot write outside the selected vault root.

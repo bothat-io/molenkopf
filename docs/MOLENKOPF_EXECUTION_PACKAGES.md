@@ -2,7 +2,7 @@
 
 Date: 2026-06-18
 
-Status: historical execution plan. Use `NEXT.md` for current release work.
+Status: historical execution plan. Use `ROADMAP.md` for current release work.
 
 Concrete build packages for [MOLENKOPF_PLATFORM_PLAN.md](MOLENKOPF_PLATFORM_PLAN.md).
 Implement EP0-EP8 here, then continue in [MOLENKOPF_EXECUTION_PACKAGES_2.md](MOLENKOPF_EXECUTION_PACKAGES_2.md).
@@ -11,7 +11,7 @@ Implement EP0-EP8 here, then continue in [MOLENKOPF_EXECUTION_PACKAGES_2.md](MOL
 
 Dependency: none.
 
-Owners: `README.md`, `ROADMAP.md`, `NEXT.md`, `docs/*`, `package-lock.json`.
+Owners: `README.md`, `ROADMAP.md`, `docs/*`, `package-lock.json`.
 
 Build:
 - Decide which untracked product files are canonical.
@@ -58,7 +58,7 @@ Owners: `packages/core/src/security/secret-redactor.ts`,
 
 Build:
 - Redact nested JSON keys such as `password`, `token`, `authorization`, `api_key`.
-- Strip `x-molenkopf-token` and attribution headers before upstream.
+- Strip `x-molenkopf-token` and local routing headers before upstream.
 - Move toward provider-aware upstream auth instead of forwarding arbitrary cookies.
 
 Acceptance:
@@ -99,11 +99,11 @@ Build:
 - Keep `/__molenkopf/health` public.
 - Protect status/config/providers/plugins/agents/requests/audit/events by scope.
 - Require `proxy:use` for `/v1/*`.
-- Refuse public bind unless auth is configured.
+- Refuse non-loopback binds unless public bind is explicit.
 
 Acceptance:
 - Unauthenticated sensitive routes return `401`; insufficient scopes return `403`.
-- Public bind without auth fails at startup.
+- Non-loopback bind without explicit opt-in fails at startup.
 
 Verify:
 - Local API auth tests.
@@ -186,8 +186,8 @@ Owners: `packages/core/src/pipeline/openai-request-rewriter.ts`,
 
 Build:
 - Split compression savings from redaction and serialization savings.
-- Commit retrieval originals only after compression succeeds.
-- Store redacted originals and derived summaries separately.
+- Commit retrieval excerpts only after compression succeeds.
+- Store bounded redacted excerpts and derived summaries separately.
 - Surface skipped reasons.
 - Shipped slice: workspace now renders real audit-backed totals, account/API-key buckets, provider and endpoint breakdowns, and recent safe request rows.
 - Shipped slice: JSON serialization deltas no longer count as compression savings when no item was compressed.

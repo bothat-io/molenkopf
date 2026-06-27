@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AuditCursorError, AuditStore } from "../src/manifest/audit-store.ts";
+import { normalizedManifest } from "../src/manifest/audit-safety.ts";
 
 test("writes audit manifest without secret-bearing fields", async () => {
   const dir = await mkdtemp(join(tmpdir(), "audit-"));
@@ -37,17 +38,57 @@ test("writes audit manifest without secret-bearing fields", async () => {
 test("redacts and bounds free-form audit manifest fields at write time", async () => {
   const dir = await mkdtemp(join(tmpdir(), "audit-safe-"));
   const store = new AuditStore(dir);
+  const apiKey = `mk_${"a".repeat(32)}`;
   await store.write({
     ...manifest("req_safe", "2026-01-01T00:00:00.000Z"),
+    path: "/v1/responses?token=path-secret",
     targetHost: "api.example.test Authorization: Bearer raw-token",
-    client: { id: "user:admin", label: "Authorization: Bearer raw-client-token", source: "user", userId: "admin" },
+    client: {
+      id: apiKey,
+      label: "Authorization: Bearer raw-client-token",
+      source: "user",
+      userId: "Authorization: Bearer raw-user-token",
+      agentId: apiKey,
+      teamIds: ["token=team-secret"],
+      keyId: apiKey,
+      project: "password=project-secret"
+    },
     warnings: ["password=hunter2", "plain-warning"]
   });
   const latest = await store.latest();
   const encoded = JSON.stringify(latest);
-  assert.doesNotMatch(encoded, /raw-token|raw-client-token|hunter2/);
+  assert.equal(latest?.path, "/v1/responses");
+  assert.doesNotMatch(encoded, /raw-token|raw-client-token|raw-user-token|hunter2|path-secret|team-secret|project-secret|mk_aaaa/);
   assert.match(encoded, /REDACTED_SECRET|plain-warning/);
   await rm(dir, { recursive: true, force: true });
+});
+
+test("normalizes path and client metadata outside AuditStore.write", () => {
+  const apiKey = `mk_${"b".repeat(32)}`;
+  const safe = normalizedManifest({
+    ...manifest("req_direct", "2026-01-01T00:00:00.000Z"),
+    path: "/v1/messages?api_key=raw-query-secret",
+    client: { id: apiKey, label: "ok", source: "api_key", keyId: apiKey, project: "secret=project-value" }
+  });
+  const encoded = JSON.stringify(safe);
+  assert.equal(safe.path, "/v1/messages");
+  assert.doesNotMatch(encoded, /raw-query-secret|project-value|mk_bbbb/);
+  assert.match(encoded, /REDACTED_SECRET/);
+});
+
+test("normalizes audit retrieval and compressor arrays", () => {
+  const validRef = `molenkopf://sha256/${"a".repeat(64)}`;
+  const safe = normalizedManifest({
+    ...manifest("req_arrays", "2026-01-01T00:00:00.000Z"),
+    retrievalIds: [`mk_${"c".repeat(32)}`, validRef],
+    compressorsUsed: ["password=hunter2", "embedded-log"],
+    warnings: []
+  });
+  const encoded = JSON.stringify(safe);
+  assert.deepEqual(safe.retrievalIds, [validRef]);
+  assert.equal(safe.compressorsUsed.length, 2);
+  assert.doesNotMatch(encoded, /mk_cccc|hunter2/);
+  assert.match(encoded, /REDACTED_SECRET|embedded-log/);
 });
 
 test("lists audit manifests by bounded pages", async () => {

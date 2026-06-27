@@ -19,10 +19,9 @@ Product intent and non-negotiable plugin semantics live in
 
 Do not run Molenkopf blindly with real provider accounts, private repositories,
 browser sessions, or imported runtime credentials. Review `SECURITY.md` first,
-keep the default loopback bind unless you have configured admin auth and proxy
-key enforcement, and treat `.molenkopf/`, audit files, retrieval
-stores, databases, env files, and runtime-auth profiles as sensitive local
-state.
+keep source runs on the default loopback bind, and treat `.molenkopf/`, audit
+files, retrieval stores, databases, env files, and runtime-auth profiles as
+sensitive local state.
 
 ## Implemented Baseline
 
@@ -41,8 +40,8 @@ Built now:
 - Text-derived memory graph: concepts (files, symbols, error types) are extracted from the
   real redacted transferred text into a bounded co-occurrence graph.
 - Static pipeline with request IDs, redaction, classification, compression, retrieval, audit, SSE events, and upstream routing.
-- Local API under `/__molenkopf/*`: bootstrap endpoints (`health`, `me`,
-  `setup-admin`), user-scoped usage/key endpoints, and admin-only
+- Local API under `/__molenkopf/*`: bootstrap endpoints for health, session
+  status, and first-run admin creation, user-scoped usage/key endpoints, and admin-only
   provider/plugin/agent/stats/events/config metadata plus retention purge.
 - Dashboard shell served at `/__molenkopf/dashboard` with Overview and Admin
   views backed by an isolated React/Vite dashboard package. Dedicated Providers,
@@ -68,34 +67,36 @@ Explicitly not connected:
 
 ## Security Model
 
-Core and proxy use Node.js built-ins only. Molenkopf API keys are stored as hashes, imported runtime auth is kept in isolated local profile directories, and Local API responses hide provider credentials. The default upstream route can forward incoming auth headers only when the selected profile requires it; configured provider profiles strip incoming client auth and inject the server-side credential at the forwarding boundary. Prompts and responses are not logged in full. Source code and diffs pass through in safe mode.
+Core and proxy use Node.js built-ins only. Molenkopf API keys are stored as hashes, imported runtime auth is kept in isolated local profile directories, and Local API responses hide provider credentials. Proxy traffic on `/v1/...` requires a valid Molenkopf API key. The default upstream route can forward incoming auth headers only when the selected profile requires it; configured provider profiles strip incoming client auth and inject the server-side credential at the forwarding boundary. Prompts and responses are not logged in full. Source code and diffs pass through in safe mode.
 
-Before the first admin exists, only `/__molenkopf/health`, `/__molenkopf/me`,
-and loopback-only `/__molenkopf/setup-admin` are usable. After setup, Local API
-metadata is role-gated: normal users get scoped usage and key data, while
-provider, plugin, agent, routing, stats, events, and retention endpoints are
-admin-only.
+Before the first admin exists, only health, session status, and browser first-run
+admin creation are usable. After setup, Local API metadata is role-gated: normal
+users get scoped usage and key data, while provider, plugin, agent, routing,
+stats, events, and retention endpoints are admin-only.
 
 Use `--allow-public-bind` only when you intentionally want to bind outside
-localhost. Public bind is rejected unless admin auth, proxy-key enforcement, and
-a strong session secret are configured.
+localhost. If Docker is published publicly before an admin exists, the first-run
+screen is reachable there until the first admin is created.
 
 ## Control Plane Usage
 
 Open `http://127.0.0.1:8787/__molenkopf/dashboard` after starting Molenkopf.
 Root `/` redirects there, while upstream agent traffic still uses `/v1/...`.
 
-Attribution headers are optional local request metadata. They never expand the
-authenticated API-key/team/provider policy. `x-molenkopf-agent` may select an
-explicit agent binding only when that binding is already allowed for the
-authenticated caller; otherwise the request fails closed.
+Every `/v1/...` proxy request must present a valid Molenkopf API key. Use
+`Authorization: Bearer mk_...` when Molenkopf supplies provider credentials. If
+the client must also forward an upstream `Authorization` header, put the
+Molenkopf key in `x-molenkopf-token: mk_...`; Molenkopf strips that header
+before forwarding upstream.
 
 ```text
-x-molenkopf-user: operator
-x-molenkopf-agent: codex-local
+Authorization: Bearer mk_...
 ```
 
-`x-molenkopf-user` wins over `x-molenkopf-agent` for accounting labels. Molenkopf strips both before forwarding upstream. If neither header is present, audit summaries use a short SHA-256 fingerprint of `Authorization` or `x-api-key`, or `anonymous` when no credential header exists.
+`x-molenkopf-agent` is optional local request metadata. It may select an
+explicit agent binding only when that binding is already allowed for the
+authenticated key, team, and provider policy; otherwise the request fails
+closed.
 
 Manual provider switching happens in the Admin provider section or by posting `{ "id": "openai-env" }` to `/__molenkopf/providers/select`. Explicit provider profiles, API-key scopes, team allowlists, and routing mode are enforced before forwarding; manual selection remains the default route when no explicit profile is attached.
 
@@ -121,28 +122,40 @@ For a step-by-step local setup and test flow, read `docs/MOLENKOPF_USAGE.md`.
 Plugin pages open in standalone windows from `/__molenkopf/plugins/context-compressor-plugin/page` and `/__molenkopf/plugins/obsidian-graph-plugin/page`. The graph workspace is derived from safe request metadata and redacted transferred text. Context and graph pages group by project/key where available and surface plugin-data failures explicitly.
 
 ## Commands
+Install from npm with Node.js 24 or newer:
+
+```bash
+npm install -g @bothat-io/molenkopf
+node -e "require('node:fs').writeFileSync('.env','MOLENKOPF_SESSION_SECRET='+require('node:crypto').randomBytes(32).toString('hex')+'\n')"
+molenkopf proxy
+```
 
 Quick Docker start on the Docker host:
 
 ```bash
+cp .env.example .env
+# Edit .env and set a unique MOLENKOPF_SESSION_SECRET.
 docker pull ghcr.io/bothat-io/molenkopf:latest
-docker run --rm --network host -v molenkopf-data:/data ghcr.io/bothat-io/molenkopf:latest
+docker run --rm \
+  --env-file .env \
+  -p 127.0.0.1:8787:8787 \
+  -v molenkopf-data:/data \
+  ghcr.io/bothat-io/molenkopf:latest
 ```
 
-Open `http://127.0.0.1:8787/` and create the first admin user. This quickstart
-keeps Molenkopf bound to loopback on the Docker host. If Docker runs on another
-machine or host networking is unavailable, use `docs/DEPLOYMENT.md` or an SSH
-tunnel.
+Open `http://127.0.0.1:8787/` and create the first admin user. The Docker
+quickstart binds Molenkopf to `127.0.0.1` on the host for local use; do not
+publish the port publicly before admin setup and deployment security are done.
+Docker requires `--env-file .env`; admin users are created only in the browser.
 
-Use `docs/DEPLOYMENT.md` when you need a different port, Docker port
-publishing, env-seeded admin auth, or non-loopback access. Treat those as
-deployment settings: public binds require admin auth, proxy key enforcement, and
-a strong session secret.
+Use `docs/DEPLOYMENT.md` when you need a different port or non-loopback access.
 
 For local development, use a source checkout:
 
 ```bash
 npm run bootstrap
+cp .env.example .env
+# Edit .env and set a unique MOLENKOPF_SESSION_SECRET.
 npm run dev
 ```
 
@@ -154,27 +167,23 @@ Use Molenkopf as the OpenAI-compatible base URL:
 http://127.0.0.1:8787/v1
 ```
 
-Optional local-only attribution headers:
+Authenticate proxy traffic with a Molenkopf API key:
 
 ```text
-x-molenkopf-user: operator
+Authorization: Bearer mk_...
+```
+
+If your client also sends an upstream provider credential in `Authorization`,
+send the Molenkopf key separately:
+
+```text
+x-molenkopf-token: mk_...
 x-molenkopf-agent: codex-local
 ```
 
-These headers are stripped before upstream forwarding. See `docs/MOLENKOPF_USAGE.md` for a concrete `curl` request, provider setup, and dashboard checks.
-
-Start the local proxy from source:
-
-```bash
-npm run dev
-```
-
-Run tests:
-
-```bash
-npm run bootstrap
-npm test
-```
+These local headers are stripped before upstream forwarding. See
+`docs/MOLENKOPF_USAGE.md` for a concrete `curl` request, provider setup, and
+dashboard checks.
 
 ## Limitations
 

@@ -31,7 +31,11 @@ export async function reorderPlugin(req: IncomingMessage, res: ServerResponse, s
   if (j < 0 || j >= order.length) return writeJson(res, 200, { ok: true, order });
   const next = [...order];
   [next[i], next[j]] = [next[j], next[i]];
+  const previous = state.pluginOrder;
   state.pluginOrder = next;
-  await persistRuntimeSettings(state);
+  try { await persistRuntimeSettings(state); } catch {
+    state.pluginOrder = previous;
+    return writeJson(res, 500, { error: "persist_failed" });
+  }
   writeJson(res, 200, { ok: true, order: next });
 }

@@ -11,3 +11,4 @@
 !packages/dashboard/dist/**
 !packages/dashboard/public/
 !packages/dashboard/public/molenkopf-logo.png
+!packages/dashboard/public/favicon.png

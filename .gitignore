@@ -5,6 +5,7 @@ npm-debug.log*
 .env
 .env.local
 .env.*
+!.env.example
 .molenkopf.env
 .molenkopf.env.local
 .molenkopf.env.*

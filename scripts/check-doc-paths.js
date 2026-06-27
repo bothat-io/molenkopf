@@ -2,24 +2,18 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, sep } from "node:path";
 
 const root = process.cwd();
-const localPlanningDocs = new Set(["FIXME.md", "NEXT.md"]);
 const maintainedDocs = ["README.md", "ROADMAP.md", "SECURITY.md"];
-const optionalDocs = ["NEXT.md"].filter((file) => existsExact(file));
-const docs = [...maintainedDocs, ...optionalDocs, ...markdownFiles("docs")];
+const docs = [...maintainedDocs, ...markdownFiles("docs")];
 const failures = [];
 
-for (const file of [...maintainedDocs, ...optionalDocs]) {
+for (const file of maintainedDocs) {
   const text = readText(file);
   for (const token of text.matchAll(/`([^`]+)`/g)) {
     const value = token[1].trim();
-    if (isRepoPath(value) && !existsExact(value) && !localPlanningDocs.has(value)) {
+    if (isRepoPath(value) && !existsExact(value)) {
       failures.push(`${file}: missing or wrong-case path ${value}`);
     }
   }
-}
-
-for (const file of docs) {
-  if (readText(file).includes("NEXT.MD")) failures.push(`${file}: use NEXT.md, not NEXT.MD`);
 }
 
 if (failures.length) {
@@ -43,7 +37,7 @@ function isRepoPath(value) {
   if (!value || value.includes(" ") || value.includes("://") || value.includes("*")) return false;
   if (value.startsWith("/") || value.startsWith(".") || value.endsWith("/")) return false;
   if (value.includes("=") || value.includes(":")) return false;
-  return /^(README|ROADMAP|NEXT|SECURITY|LICENSE|Dockerfile|package(-lock)?\.json)$/.test(value)
+  return /^(README|ROADMAP|SECURITY|LICENSE|Dockerfile|package(-lock)?\.json)$/.test(value)
     || /^(bin|docs|packages|scripts|\.github)\//.test(value)
     || /^packages\\/.test(value);
 }

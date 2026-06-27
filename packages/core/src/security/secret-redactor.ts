@@ -14,6 +14,7 @@ const rules: Rule[] = [
   { kind: "anthropic_api_key", pattern: /\bsk-ant-[A-Za-z0-9_-]{32,}\b/g },
   { kind: "openai_api_key", pattern: /\bsk-(?:proj-|)[A-Za-z0-9_-]{32,}\b/g },
   { kind: "github_token", pattern: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{30,}\b/g },
+  { kind: "molenkopf_api_key", pattern: /(?<![A-Za-z0-9_-])mk_[A-Za-z0-9_-]{24,}(?![A-Za-z0-9_-])/g },
   { kind: "gitlab_token", pattern: /\bglpat-[A-Za-z0-9_-]{20,}\b/g },
   { kind: "npm_token", pattern: /\bnpm_[A-Za-z0-9]{32,}\b/g },
   { kind: "slack_token", pattern: /\bxox[baprs]-[A-Za-z0-9-]{20,}\b/g },
@@ -55,9 +56,9 @@ function redactJsonKeys(input: string, redactions: Redaction[]): string | undefi
   if (!/^\s*[\[{]/.test(input)) return undefined;
   if (exceedsSafeJsonDepth(input)) return containsSensitiveJsonKey(input) ? redactionMarker("json_too_deep", input, redactions) : undefined;
   const structural = redactSensitiveJsonValues(input, redactions);
-  if (structural) return structural;
-  const spans = scanJsonStringValues(input);
-  if (!spans) return undefined;
+  const base = structural ?? input;
+  const spans = scanJsonStringValues(base);
+  if (!spans) return structural;
   const replacements: JsonStringReplacement[] = [];
   for (const span of spans) {
     if (span.key && isSensitiveJsonKey(span.key)) {
@@ -68,7 +69,7 @@ function redactJsonKeys(input: string, redactions: Redaction[]): string | undefi
     const nested = redactJsonKeys(span.value, redactions);
     if (nested && nested !== span.value) replacements.push({ start: span.start, end: span.end, value: nested });
   }
-  return replacements.length ? replaceJsonStrings(input, replacements) : undefined;
+  return replacements.length ? replaceJsonStrings(base, replacements) : structural;
 }
 
 function redactSensitiveJsonValues(input: string, redactions: Redaction[]): string | undefined {

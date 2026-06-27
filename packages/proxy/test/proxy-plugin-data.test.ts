@@ -32,14 +32,14 @@ test("plugin data endpoints expose scoped compression and memory data without qu
     await new AuditStore(dir).write({
       requestId: "old-browser-probe", timestamp: "2026-06-22T10:00:00.000Z", method: "GET",
       path: "/.well-known/appspecific/com.chrome.devtools.json", targetHost: "127.0.0.1", providerId: "default",
-      client: { id: "anonymous", label: "unattributed client", source: "anonymous" },
+      client: { id: "unattributed", label: "unattributed client", source: "unattributed" },
       compressedItems: 0, estimatedOriginalTokens: 0, estimatedCompressedTokens: 0, estimatedSavedTokens: 0,
       redactedSecrets: 0, retrievalIds: [], compressorsUsed: [], warnings: [], statusCode: 404, durationMs: 1
     });
     await new AuditStore(dir).write({
       requestId: "old-favicon-probe", timestamp: "2026-06-22T10:00:01.000Z", method: "GET",
       path: "/favicon.ico?token=favicon-secret", targetHost: "127.0.0.1", providerId: "default",
-      client: { id: "anonymous", label: "unattributed client", source: "anonymous" },
+      client: { id: "unattributed", label: "unattributed client", source: "unattributed" },
       compressedItems: 0, estimatedOriginalTokens: 0, estimatedCompressedTokens: 0, estimatedSavedTokens: 0,
       redactedSecrets: 0, retrievalIds: [], compressorsUsed: [], warnings: [], statusCode: 404, durationMs: 1
     });

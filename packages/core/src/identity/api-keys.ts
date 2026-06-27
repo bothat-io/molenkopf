@@ -115,7 +115,11 @@ function cleanScopes(scopes: string[] | undefined): string[] | undefined | false
 
 function resolveIssueTeam(store: IdentityStore, owner: { teamIds: string[] }, value: string | undefined): string | undefined | false {
   const teamId = value?.trim();
-  if (teamId) return store.getTeam(teamId) && owner.teamIds.includes(teamId) ? teamId : false;
+  if (teamId) {
+    if (!store.getTeam(teamId) || !owner.teamIds.includes(teamId)) return false;
+    if (teamId === "everyone" && billableTeamIds(owner.teamIds).length) return false;
+    return teamId;
+  }
   const billingTeams = billableTeamIds(owner.teamIds);
   if (billingTeams.length === 1) return billingTeams[0];
   if (billingTeams.length > 1) return false;

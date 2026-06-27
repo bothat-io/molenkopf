@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, getJson, loadSession, postJson } from "./api";
+import { ApiError, getJson, loadDashboardData, loadSession, postJson } from "./api";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -55,8 +55,59 @@ describe("api helpers", () => {
     vi.useRealTimers();
   });
 
-  it("treats unauthorized session load as anonymous", async () => {
+  it("treats unauthorized session load as signed out", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 })));
     await expect(loadSession()).resolves.toEqual({});
   });
+
+  it("loads non-admin dashboard data without admin-only config", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (path: RequestInfo | URL) => {
+      const key = String(path);
+      calls.push(key);
+      if (key === "/__molenkopf/usage") return json({ users: [] });
+      if (key === "/__molenkopf/keys") return json({ items: [] });
+      if (key === "/__molenkopf/config") return json({ error: "forbidden" }, 403);
+      return json({ error: "not_found" }, 404);
+    }));
+    await expect(loadDashboardData(false)).resolves.toEqual({
+      usage: { users: [] },
+      keys: { items: [] },
+      config: {},
+      providers: {},
+      summary: {},
+      plugins: {}
+    });
+    expect(calls).toEqual(["/__molenkopf/usage", "/__molenkopf/keys"]);
+  });
+
+  it("loads full dashboard data for admins", async () => {
+    const calls: string[] = [];
+    const payloads: Record<string, unknown> = {
+      "/__molenkopf/usage": { users: [] },
+      "/__molenkopf/keys": { items: [] },
+      "/__molenkopf/config": { port: 8787 },
+      "/__molenkopf/providers": { items: [] },
+      "/__molenkopf/audit/summary": { requests: 0 },
+      "/__molenkopf/plugins": { items: [] },
+      "/__molenkopf/identity": { users: [], teams: [] }
+    };
+    vi.stubGlobal("fetch", vi.fn(async (path: RequestInfo | URL) => {
+      const key = String(path);
+      calls.push(key);
+      return json(payloads[key] ?? { error: "not_found" }, payloads[key] ? 200 : 404);
+    }));
+    await expect(loadDashboardData(true)).resolves.toMatchObject({
+      config: { port: 8787 },
+      providers: { items: [] },
+      summary: { requests: 0 },
+      plugins: { items: [] },
+      identity: { users: [], teams: [] }
+    });
+    expect(calls).toEqual(Object.keys(payloads));
+  });
 });
+
+function json(payload: unknown, status = 200): Response {
+  return new Response(JSON.stringify(payload), { status });
+}

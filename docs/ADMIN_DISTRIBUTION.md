@@ -82,11 +82,10 @@ The `OPENAI_API_KEY` value is an Molenkopf token here. Molenkopf authenticates i
 and then applies the assigned provider policy. It is not an upstream provider
 key.
 
-Optional local identity headers can remain for display/accounting, but auth must
-come from the Molenkopf token:
+Optional local agent metadata can remain for routing, but auth must come from
+the Molenkopf token:
 
 ```text
-x-molenkopf-user: employee-id
 x-molenkopf-agent: codex-local
 ```
 

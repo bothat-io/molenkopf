@@ -5,8 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadProxyConfig } from "../src/cli/config-loader.ts";
 import { startProxy } from "../src/http/server.ts";
-
-const cookieOf = (res: Response) => (res.headers.get("set-cookie") ?? "").split(";")[0];
+import { auth, issueKey, setupAdmin, setupKey } from "./proxy-auth-utils.ts";
 
 test("JSON cli-claude provider executes a local CLI without auditing prompts", async () => {
   const dir = await mkdtemp(join(tmpdir(), "molenkopf-cli-provider-"));
@@ -45,11 +44,12 @@ test("JSON cli-claude provider executes a local CLI without auditing prompts", a
       configSource: { kind: "file", path: "molenkopf.config.json" }
     });
     const base = `http://127.0.0.1:${proxy.port}`;
-    const admin = cookieOf(await fetch(`${base}/__molenkopf/setup-admin`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: "admin-secret" }) }));
+    const admin = await setupAdmin(base);
+    const key = await issueKey(base, admin, "cli-claude");
 
     const response = await fetch(`${base}/v1/responses`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: auth(key, { "content-type": "application/json" }),
       body: JSON.stringify({ model: "claude-client-model", input: "hello local claude" })
     });
     assert.equal(response.status, 200);
@@ -88,10 +88,12 @@ test("Windows command shims are resolved for local Claude providers", async (t) 
     }));
     const config = (await loadProxyConfig(new Map([["config", configFile]]), {}, dir)).config!;
     proxy = await startProxy({ port: 0, target: config.target, providers: config.providers, activeProviderId: config.activeProviderId, providerCatalogMode: "explicit", dataDir: dir });
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const key = await setupKey(base, "cli-shim");
 
-    const response = await fetch(`http://127.0.0.1:${proxy.port}/v1/responses`, {
+    const response = await fetch(`${base}/v1/responses`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: auth(key, { "content-type": "application/json" }),
       body: JSON.stringify({ input: "hello from shim" })
     });
     assert.equal(response.status, 200);
@@ -132,10 +134,12 @@ test("Codex CLI providers receive the imported auth directory as CODEX_HOME", as
       providerCatalogMode: "explicit",
       dataDir: dir
     });
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const key = await setupKey(base, "codex-auth");
 
-    const response = await fetch(`http://127.0.0.1:${proxy.port}/v1/responses`, {
+    const response = await fetch(`${base}/v1/responses`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: auth(key, { "content-type": "application/json" }),
       body: JSON.stringify({ input: "hello imported session" })
     });
     assert.equal(response.status, 200);
@@ -174,10 +178,12 @@ test("CLI provider errors return stable client errors", async () => {
       providerCatalogMode: "explicit",
       dataDir: dir
     });
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const key = await setupKey(base, "cli-error");
 
-    const response = await fetch(`http://127.0.0.1:${proxy.port}/v1/responses`, {
+    const response = await fetch(`${base}/v1/responses`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: auth(key, { "content-type": "application/json" }),
       body: JSON.stringify({ input: "test" })
     });
     assert.equal(response.status, 502);

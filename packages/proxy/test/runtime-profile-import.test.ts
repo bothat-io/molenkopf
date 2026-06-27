@@ -56,11 +56,13 @@ test("invalid imported runtime profile enums fail loudly", () => {
 });
 
 test("Codex profile import accepts current config field names", () => {
+  const configToml = 'sandbox_mode = "workspace_write"\napproval_policy = "on_request"\n';
   const imported = runtimeProfileFromImport({
-    profileText: 'sandbox_mode = "workspace_write"\napproval_policy = "on_request"\n'
+    profileText: configToml
   }, "codex");
 
-  assert.deepEqual(imported.profile?.summary, ["sandbox workspace-write", "approval on-request"]);
+  assert.deepEqual(imported.profile?.summary, ["Codex config", "sandbox workspace-write", "approval on-request"]);
+  assert.equal(imported.configToml, configToml.trim());
   assert.deepEqual(runtimeCliArgs("codex", "C:\\auth", imported.profile), [
     "exec",
     "--sandbox",
@@ -70,7 +72,7 @@ test("Codex profile import accepts current config field names", () => {
   ]);
 });
 
-test("Codex profile import sanitizes full user config files", () => {
+test("Codex profile import stores full config files and summarizes safe fields", () => {
   const imported = runtimeProfileFromImport({
     profileText: [
       'approval_policy = "never"',
@@ -90,9 +92,9 @@ test("Codex profile import sanitizes full user config files", () => {
     ].join("\n")
   }, "codex");
 
-  assert.deepEqual(imported.profile?.summary, ["sandbox danger-full-access", "approval never"]);
+  assert.deepEqual(imported.profile?.summary, ["Codex config", "sandbox danger-full-access", "approval never"]);
   assert.deepEqual(runtimeCliArgs("codex", "C:\\auth", imported.profile), ["exec", "--sandbox", "danger-full-access", "-c", 'approval_policy="never"']);
-  assert.equal(imported.configToml, undefined);
+  assert.match(imported.configToml ?? "", /\[projects\.'c:\\example\\workspace\\app-alpha'\]/);
 });
 
 test("runtime profile import rejects broad or traversing addDirs", () => {

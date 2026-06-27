@@ -8,11 +8,11 @@ flags first.
 ## Safe Use
 
 - Start on loopback only unless you intentionally need network access.
-- Do not use `--allow-public-bind` unless admin auth, proxy-key enforcement, and
-  a strong `MOLENKOPF_SESSION_SECRET` are configured.
+- Set a unique `MOLENKOPF_SESSION_SECRET` before starting Molenkopf. Do not
+  commit `.env` files or bake secrets into Docker images.
+- Do not use `--allow-public-bind` unless you intentionally need network access.
 - First-run bootstrap is intentionally narrow. Before an admin exists, only
-  `/__molenkopf/health`, `/__molenkopf/me`, and loopback-only
-  `/__molenkopf/setup-admin` are usable.
+  health, session status, and first-run admin creation are usable.
 - After setup, provider, plugin, routing, agent, stats, event, config metadata,
   and retention purge endpoints are admin-only. Normal users receive scoped
   usage and key data.

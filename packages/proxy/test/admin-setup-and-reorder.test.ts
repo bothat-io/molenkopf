@@ -6,6 +6,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
+import { auth, issueKey } from "./proxy-auth-utils.ts";
 
 async function listenOn(server: Server): Promise<number> {
   server.listen(0, "127.0.0.1");
@@ -86,6 +87,7 @@ test("stale core plugin settings are ignored while core redaction stays active",
     proxy = await startProxy({ port: 0, target: `http://127.0.0.1:${port}/v1`, dataDir });
     const base = `http://127.0.0.1:${proxy.port}`;
     const admin = cookieOf(await post(base, "/__molenkopf/setup-admin", { username: "admin", password: "admin-secret" }));
+    const key = await issueKey(base, admin, "core-plugin-settings");
     const plugins = await fetch(`${base}/__molenkopf/plugins`, { headers: { cookie: admin } }).then((r) => r.json());
     assert.equal(plugins.items.some((p: any) => p.id === "core-redaction"), false);
     assert.equal(plugins.items.find((p: any) => p.id === "context-compressor-plugin").enabled, true);
@@ -95,7 +97,7 @@ test("stale core plugin settings are ignored while core redaction stays active",
     assert.equal(coreToggleBody.error, "unknown_plugin");
 
     const longLog = Array.from({ length: 260 }, (_, i) => `line ${i} token=persisted-raw-secret`).join("\n");
-    const sent = await fetch(`${base}/v1/messages`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ input: longLog }) });
+    const sent = await fetch(`${base}/v1/messages`, { method: "POST", headers: auth(key, { "content-type": "application/json" }), body: JSON.stringify({ input: longLog }) });
     assert.equal(sent.status, 200);
     assert.doesNotMatch(captured, /persisted-raw-secret/);
   } finally {

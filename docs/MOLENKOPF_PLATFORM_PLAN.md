@@ -2,7 +2,7 @@
 
 Date: 2026-06-18
 
-Status: historical target architecture. Use `NEXT.md` for current release work.
+Status: historical target architecture. Use `ROADMAP.md` for current release work.
 
 This is the product and architecture plan for turning Molenkopf into a team
 gateway for providers, plugins, compression, memory, and employee access.
@@ -36,8 +36,8 @@ employee / CI / local agent / CLI runtime
   manual/distributed routing exist.
 - Agent rows are routing metadata; employee/user auth and API keys are backed by
   the local identity store.
-- `__molenkopf/*` local APIs are protected once an admin exists; public bind
-  requires admin auth and proxy-key enforcement.
+- `__molenkopf/*` local APIs are protected once an admin exists; non-loopback
+  source binds require an explicit public-bind opt-in.
 - Selected provider profiles inject server-side credentials at the forwarding
   boundary; local/no-auth profiles strip incoming client credentials.
 - Plugin toggles exist for optional plugins; safety, storage, and routing
@@ -179,7 +179,7 @@ Molenkopf interprets the token. Upstream provider credentials stay server-side.
 ## Do Not Build First
 
 - No remote plugin marketplace.
-- No public bind without auth.
+- No accidental public bind without explicit opt-in.
 - No raw Obsidian writes without dry-run.
 - No response-body storage until a separate safe response contract exists.
 - No generic plugin framework before built-in descriptors and tests exist.

@@ -47,3 +47,41 @@ test("EventBus stores immutable redacted event snapshots", () => {
   bus.subscribe((item) => replayed.push(item));
   assert.deepEqual(replayed, [event]);
 });
+
+test("EventBus redacts values under sensitive keys", () => {
+  const bus = new EventBus();
+  const event = bus.emit("plugin_event", {
+    data: {
+      apiKey: "plain-api-secret",
+      nested: { password: "plain-password" },
+      list: [{ credential: { token: "object-token" } }]
+    }
+  });
+  const encoded = JSON.stringify(event);
+  assert.doesNotMatch(encoded, /plain-api-secret|plain-password|object-token/);
+  assert.match(encoded, /REDACTED_SECRET:event_apikey/);
+  assert.match(encoded, /REDACTED_SECRET:event_password/);
+  assert.match(encoded, /REDACTED_SECRET:event_credential/);
+  const replayed: unknown[] = [];
+  bus.subscribe((item) => replayed.push(item));
+  assert.doesNotMatch(JSON.stringify(replayed), /plain-api-secret|plain-password|object-token/);
+});
+
+test("EventBus redacts circular values under sensitive keys without throwing", () => {
+  const bus = new EventBus();
+  const secret: Record<string, unknown> = { token: "raw-token" };
+  secret.self = secret;
+  const data: Record<string, unknown> = { secret, nested: { credential: secret }, list: [{ apiKey: secret }] };
+  data.self = data;
+  let event: ReturnType<EventBus["emit"]> | undefined;
+  assert.doesNotThrow(() => {
+    event = bus.emit("plugin_event", { data });
+  });
+  if (!event) assert.fail("expected event");
+  const encoded = JSON.stringify(event);
+  assert.doesNotMatch(encoded, /raw-token/);
+  assert.match(encoded, /\[circular\]/);
+  assert.match(encoded, /REDACTED_SECRET:event_secret/);
+  assert.match(encoded, /REDACTED_SECRET:event_credential/);
+  assert.match(encoded, /REDACTED_SECRET:event_apikey/);
+});

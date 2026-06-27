@@ -104,8 +104,7 @@ export function DashboardApp() {
     providerMessages,
     onProviderTest: testProvider,
     onProviderWeight: setProviderShare,
-    onPluginToggle: (id: string, enabled: boolean) => mutate("/__molenkopf/plugins/toggle", { id, enabled }),
-    onPluginMove: (id: string, direction: "up" | "down") => mutate("/__molenkopf/plugins/reorder", { id, direction })
+    onPluginToggle: (id: string, enabled: boolean) => mutate("/__molenkopf/plugins/toggle", { id, enabled })
   };
 
   async function mutate(path: string, body: unknown, okMessage = "", options?: { rethrow?: boolean }) {
@@ -182,11 +181,15 @@ export function DashboardApp() {
     const teamIds = (user.teamIds || []).filter((id) => id !== teamId);
     await mutate("/__molenkopf/identity/users", { id: user.id, displayName: user.displayName, role: user.role, disabled: user.disabled, loginDisabled: user.loginDisabled, keyPermissions: user.keyPermissions, budget: user.budget, teamIds });
   }
-
+  async function logout() {
+    loadSeq.current += 1; loadAbort.current?.abort();
+    try { await postJson("/__molenkopf/logout", {}); }
+    finally { clearSessionState(); setNeedsSetup(false); setUser(undefined); setRefresh({ loading: false }); openOverview(); }
+  }
   if (!sessionChecked && refresh.loading) return <AuthLoadingView />;
   if (needsSetup && !user) return <SetupView onDone={(next) => { setUser(next); setNeedsSetup(false); openOverview(); reload(); }} />;
   if (!user) return <LoginView onDone={(next) => { setUser(next); openOverview(); reload(); }} />;
-  return <Shell user={user} canManage={canManage} activeTab={tab} connection={connectionStatus(refresh)} onTab={setTab} onLogout={async () => { await postJson("/__molenkopf/logout", {}); clearSessionState(); setUser(undefined); }}>
+  return <Shell user={user} canManage={canManage} activeTab={tab} connection={connectionStatus(refresh)} onTab={setTab} onLogout={logout}>
     {message ? <DashboardNotice tone={noticeTone(message)} onDismiss={() => setMessage("")}>{message}</DashboardNotice> : null}
     {tab === "overview" ? <OverviewTab usage={data.usage} currentUser={user} keys={data.keys.items || []} config={data.config} selectedSecret={selectedSecret} onNewKey={() => setModal({ kind: "key" })} onRevoke={(id) => { if (confirmDestructive("revoke-key", id)) mutate("/__molenkopf/keys/revoke", { id }); }} /> : null}
     {tab === "admin" && canManage ? <AdminTab {...adminProps} /> : null}

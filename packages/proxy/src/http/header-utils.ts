@@ -2,7 +2,6 @@ import type { ProviderConfig } from "../../../core/src/providers/provider-catalo
 
 const hopByHop = new Set(["connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade", "host"]);
 const sensitive = new Set(["authorization", "cookie", "set-cookie", "x-api-key"]);
-const localOnly = new Set(["x-molenkopf-user", "x-molenkopf-agent", "x-molenkopf-token"]);
 const providerAuth = new Set(["authorization", "x-api-key"]);
 const blockedRequest = new Set(["set-cookie", "forwarded", "proxy-connection", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto"]);
 
@@ -14,7 +13,7 @@ export function buildForwardHeaders(headers: Headers, provider?: ProviderConfig,
   headers.forEach((value, key) => {
     const lower = key.toLowerCase();
     if (blockedRequest.has(lower)) return;
-    if (hopByHop.has(lower) || localOnly.has(lower)) return;
+    if (hopByHop.has(lower) || lower.startsWith("x-molenkopf-")) return;
     if (lower === "cookie") return;
     if (providerAuth.has(lower) && usesProviderCredential) return;
     if (providerAuth.has(lower) && stripsClientAuth(provider) && !provider?.allowClientCredentialForwarding) return;

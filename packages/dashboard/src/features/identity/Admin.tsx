@@ -28,7 +28,6 @@ export function AdminTab(props: {
   onProviderTest: (id: string) => void;
   onProviderWeight: (id: string, share: number) => void;
   onPluginToggle: (id: string, enabled: boolean) => void;
-  onPluginMove: (id: string, direction: "up" | "down") => void;
 }) {
   const users = mergeUsers(props.data.identity?.users || [], props.data.usage.users || []);
   const teams = mergeTeams(props.data.identity?.teams || [], props.data.usage.teams || []);
@@ -41,7 +40,7 @@ export function AdminTab(props: {
     <ProviderSection providers={providers} teams={teams} testMessages={props.providerMessages} onNew={props.onNewProvider} onWeight={props.onProviderWeight} onRemove={props.onProviderRemove} onOptions={props.onProviderOptions} onTest={props.onProviderTest} />
     <TeamMemberTree teams={teams} users={users} keys={props.data.usage.keys || []} onNewTeam={props.onNewTeam} onEditTeam={props.onEditTeam} onTeamKey={props.onTeamKey} onRemoveTeam={props.onRemoveTeam} onAssignUserToTeam={props.onAssignUserToTeam} onRemoveUserFromTeam={props.onRemoveUserFromTeam} />
     <UsersTable users={users} onNew={props.onNewUser} onEdit={props.onEditUser} onKey={props.onUserKey} onRemove={props.onRemoveUser} />
-    <PluginSections plugins={props.data.plugins} summary={props.data.summary} onToggle={props.onPluginToggle} onMove={props.onPluginMove} />
+    <PluginSections plugins={props.data.plugins} summary={props.data.summary} onToggle={props.onPluginToggle} />
   </>;
 }
 

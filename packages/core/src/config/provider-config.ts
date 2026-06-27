@@ -36,8 +36,8 @@ function apiProvider(item: JsonRecord, index: number, id: string): ProviderConfi
     credentialEnv,
     credentialRef,
     credentialValue,
-    authScheme: authSchemeValue(auth.scheme, target, credentialEnv || credentialValue),
-    protocol: protocolValue(item.protocol, item.kind, kind, target),
+    authScheme: authSchemeValue(auth.scheme, target, credentialEnv || credentialValue, `$.providers[${index}].auth.scheme`),
+    protocol: protocolValue(item.protocol, item.kind, kind, target, `$.providers[${index}].protocol`),
     enabled: item.enabled === undefined ? true : boolean(item.enabled, `$.providers[${index}].enabled`)
   };
 }
@@ -75,8 +75,9 @@ function credentialEnvFromRef(ref: string, id: string): string | undefined {
   return match[1];
 }
 
-function authSchemeValue(value: unknown, target: string, credential?: string): ProviderConfig["authScheme"] {
+function authSchemeValue(value: unknown, target: string, credential: string | undefined, path: string): ProviderConfig["authScheme"] {
   if (value === "bearer" || value === "x-api-key" || value === "none") return value;
+  if (value !== undefined) throw new Error(`invalid provider auth.scheme: ${path}`);
   if (!credential) return "none";
   return target.includes("anthropic") ? "x-api-key" : "bearer";
 }
@@ -91,8 +92,9 @@ function defaultTarget(value: unknown): string | undefined {
   return value === "ollama" ? "http://127.0.0.1:11434/v1" : undefined;
 }
 
-function protocolValue(value: unknown, rawKind: unknown, kind: ProviderConfig["kind"], target: string): ProviderConfig["protocol"] {
+function protocolValue(value: unknown, rawKind: unknown, kind: ProviderConfig["kind"], target: string, path: string): ProviderConfig["protocol"] {
   if (value === "openai-responses" || value === "anthropic-messages" || value === "openai-chat" || value === "ollama-tags") return value;
+  if (value !== undefined) throw new Error(`invalid provider protocol: ${path}`);
   if (rawKind === "ollama" || target.includes("11434")) return "ollama-tags";
   if (kind === "local") return "openai-chat";
   return target.includes("anthropic") || rawKind === "anthropic" ? "anthropic-messages" : "openai-responses";

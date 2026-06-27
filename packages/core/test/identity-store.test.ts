@@ -47,6 +47,7 @@ test("removing a user removes their keys; removing a team detaches members", asy
   assert.equal(await s.removeTeam("alpha"), true);
   assert.deepEqual(s.getUser("carol")?.teamIds, [], "team membership detached");
   assert.equal(s.data.keys["key_2"].disabled, true, "team-bound key disabled with team removal");
+  assert.equal(s.data.keys["key_2"].teamId, undefined, "team-bound key detached from removed team");
 });
 
 test("identity mutations roll back when persistence fails and closed stores reject writes", async () => {
@@ -61,6 +62,27 @@ test("identity mutations roll back when persistence fails and closed stores reje
   s.save = originalSave;
   s.close();
   await assert.rejects(s.putTeam(team("beta")), /identity_store_closed/);
+  await rm(root, { recursive: true, force: true });
+});
+
+test("identity mutations validate candidate references before persistence", async () => {
+  const root = await tempRoot();
+  const s = new IdentityStore(root);
+  await s.load();
+  await s.putUser(user("manager"));
+
+  await assert.rejects(s.putTeam(team("broken", { managerIds: ["missing-manager"] })), /references missing manager/);
+  assert.equal(s.getTeam("broken"), undefined);
+
+  s.data.keys["bad_key"] = { id: "bad_key", hash: "h", prefix: "mk_bad", ownerUserId: "missing", createdAt: "x" };
+  await assert.rejects(s.save(), /references missing owner/);
+  s.close();
+
+  const fresh = new IdentityStore(root);
+  await fresh.load();
+  assert.deepEqual(fresh.listTeams().map((item) => item.id), []);
+  assert.deepEqual(fresh.listUsers().map((item) => item.id), ["manager"]);
+  fresh.close();
   await rm(root, { recursive: true, force: true });
 });
 

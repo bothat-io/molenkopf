@@ -2,7 +2,7 @@
 
 Date: 2026-06-18
 
-Status: historical execution plan continuation. Use `NEXT.md` for current
+Status: historical execution plan continuation. Use `ROADMAP.md` for current
 release work.
 
 Continuation of [MOLENKOPF_EXECUTION_PACKAGES.md](MOLENKOPF_EXECUTION_PACKAGES.md).

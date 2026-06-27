@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
 import { installFakeClaude, installFakeCodex, postJson, runtimeProof, setupAdmin, withPath } from "./runtime-auth-test-utils.ts";
+import { auth, issueKey } from "./proxy-auth-utils.ts";
 
 test("imports a supplied runtime auth JSON without exposing the secret", async () => {
   const dir = await mkdtemp(join(tmpdir(), "molenkopf-runtime-auth-"));
@@ -33,7 +34,7 @@ test("imports a supplied runtime auth JSON without exposing the secret", async (
     assert.equal(importedJson.imported.id, "codex-work");
     assert.equal(importedJson.imported.runtime, "codex");
     assert.equal(importedJson.imported.authRef, undefined);
-    assert.deepEqual(importedJson.imported.profile.summary, ["sandbox workspace-write", "approval never", "1 add dirs"]);
+    assert.deepEqual(importedJson.imported.profile.summary, ["Codex config", "sandbox workspace-write", "approval never", "1 add dirs"]);
     assert.doesNotMatch(JSON.stringify(importedJson), /codex-session-secret/);
     assert.doesNotMatch(JSON.stringify(importedJson), /runtime-auth:codex-work|cliArgs|example-secret-dir/);
 
@@ -46,13 +47,14 @@ test("imports a supplied runtime auth JSON without exposing the secret", async (
     assert.equal(provider.runtimeAuthDir, undefined);
     assert.equal(provider.authRef, undefined);
     assert.equal(provider.cliArgs, undefined);
-    assert.deepEqual(provider.runtimeProfile.summary, ["sandbox workspace-write", "approval never", "1 add dirs"]);
+    assert.deepEqual(provider.runtimeProfile.summary, ["Codex config", "sandbox workspace-write", "approval never", "1 add dirs"]);
     assert.doesNotMatch(JSON.stringify(providers), /codex-session-secret/);
     assert.doesNotMatch(JSON.stringify(providers), /runtime-auth:codex-work|example-secret-dir/);
 
     const stored = await readFile(join(dir, "runtime-auth", "codex-work", "auth.json"), "utf8");
     assert.match(stored, /codex-session-secret/);
-    await assert.rejects(readFile(join(dir, "runtime-auth", "codex-work", "config.toml"), "utf8"), /ENOENT/);
+    const storedConfig = await readFile(join(dir, "runtime-auth", "codex-work", "config.toml"), "utf8");
+    assert.equal(storedConfig, 'sandbox_mode = "workspace-write"\napproval_policy = "never"');
   } finally {
     if (proxy) await proxy.close();
     restorePath();
@@ -129,10 +131,11 @@ test("pasted auth JSON creates, selects, and tests an imported account without a
     assert.equal(importedJson.providers.activeProvider.id, importedJson.imported.id);
     assert.equal(importedJson.providers.activeProvider.runtimeAuthConfigured, true);
     assert.doesNotMatch(JSON.stringify(importedJson), /colleague-secret/);
+    const key = await issueKey(base, admin, "runtime-import");
 
     const response = await fetch(`${base}/v1/responses`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: auth(key, { "content-type": "application/json" }),
       body: JSON.stringify({ input: "test imported account" })
     });
     assert.equal(response.status, 200);

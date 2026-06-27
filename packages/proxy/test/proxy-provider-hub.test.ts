@@ -5,6 +5,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
+import { auth, issueKey } from "./proxy-auth-utils.ts";
 
 test("provider hub lists providers and switches the active upstream", async () => {
   let primaryHits = 0;
@@ -29,6 +30,7 @@ test("provider hub lists providers and switches the active upstream", async () =
     });
     const base = `http://127.0.0.1:${proxy.port}`;
     const admin = await setupAdmin(base);
+    const key = await issueKey(base, admin, "provider-hub");
 
     const providers = await fetch(`${base}/__molenkopf/providers`, { headers: { cookie: admin } }).then((r) => r.json());
     assert.equal(providers.activeProviderId, "default");
@@ -37,7 +39,7 @@ test("provider hub lists providers and switches the active upstream", async () =
 
     const selected = await postJson(`${base}/__molenkopf/providers/select`, { id: "backup" }, admin);
     assert.equal(selected.activeProviderId, "backup");
-    await fetch(`${base}/v1/responses`, { method: "POST", body: "{}" });
+    await fetch(`${base}/v1/responses`, { method: "POST", headers: auth(key), body: "{}" });
     assert.equal(primaryHits, 0);
     assert.equal(backupHits, 1);
 
@@ -50,6 +52,7 @@ test("provider hub lists providers and switches the active upstream", async () =
     });
     const restoredBase = `http://127.0.0.1:${proxy.port}`;
     const restoredAdmin = await loginAdmin(restoredBase);
+    const restoredKey = await issueKey(restoredBase, restoredAdmin, "provider-hub-restored");
     const restored = await fetch(`${restoredBase}/__molenkopf/providers`, { headers: { cookie: restoredAdmin } }).then((r) => r.json());
     assert.equal(restored.activeProviderId, "backup");
 
@@ -65,7 +68,7 @@ test("provider hub lists providers and switches the active upstream", async () =
 
     const disabled = await postJson(`${restoredBase}/__molenkopf/providers/update`, { id: "backup", enabled: false }, restoredAdmin);
     assert.equal(disabled.activeProviderId, "default");
-    await fetch(`${restoredBase}/v1/responses`, { method: "POST", body: "{}" });
+    await fetch(`${restoredBase}/v1/responses`, { method: "POST", headers: auth(restoredKey), body: "{}" });
     assert.equal(primaryHits, 1);
     assert.equal(backupHits, 1);
   } finally {

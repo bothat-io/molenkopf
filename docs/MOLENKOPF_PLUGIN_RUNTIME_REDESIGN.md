@@ -141,8 +141,8 @@ request token / identity
   -> plugin policy
 ```
 
-Attribution headers such as `x-molenkopf-user` and `x-molenkopf-agent` must not
-select providers. They are accounting labels only.
+Local routing headers such as `x-molenkopf-agent` must not bypass provider
+policy. Authentication and account ownership come from the Molenkopf API key.
 
 ## Safety Gates
 

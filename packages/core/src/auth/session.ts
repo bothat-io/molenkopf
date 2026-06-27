@@ -1,8 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
-// Stateless signed session tokens: base64(userId.expiry).hmac. No DB needed; the
-// server secret is generated at startup (or supplied via env) and the token is
-// carried in an httpOnly cookie.
+// Stateless signed session tokens: base64(userId.expiry).hmac. Runtime servers
+// must supply a stable secret; newSessionSecret is for tests and utilities.
 
 const DEFAULT_TTL_MS = 12 * 60 * 60 * 1000;
 export type SessionPayload = { userId: string; sessionVersion: number };
@@ -22,7 +21,9 @@ export function verifySession(token: string | undefined, secret: string, now = D
 
 export function verifySessionPayload(token: string | undefined, secret: string, now = Date.now()): SessionPayload | undefined {
   if (!token || !token.includes(".")) return undefined;
-  const [body, sig] = token.split(".");
+  const parts = token.split(".");
+  if (parts.length !== 2) return undefined;
+  const [body, sig] = parts;
   if (!body || !sig || !equals(sig, hmac(body, secret))) return undefined;
   const decoded = Buffer.from(body, "base64url").toString("utf8");
   const payload = parsePayload(decoded);

@@ -9,6 +9,8 @@ import { startProxy } from "../src/http/server.ts";
 import { createRuntimeState } from "../src/http/runtime-state.ts";
 import { setConsumerBudget } from "../src/http/local-api-consumer-actions.ts";
 import { saveAgentDraft } from "../src/http/local-api-agent-actions.ts";
+import { selectProvider, setProviderWeight, setProviderWeights, setRoutingMode } from "../src/http/local-api-provider-actions.ts";
+import { togglePlugin } from "../src/http/local-api-plugin-actions.ts";
 
 async function listenOn(server: Server): Promise<number> {
   server.listen(0, "127.0.0.1");
@@ -63,6 +65,22 @@ test("runtime setting write failures roll back successful-looking mutations", as
   const draft = await call((req, res) => saveAgentDraft(req, res, state), { id: "ci", providerId: "default" });
   assert.equal(draft.status, 500);
   assert.equal(state.agentDrafts.length, 0);
+
+  const routed = createRuntimeState({ target: "http://127.0.0.1:9/v1", dataDir: badDataDir, providers: [{ id: "backup", name: "Backup", kind: "local", target: "http://127.0.0.1:11434/v1", allowDistribution: true }] }, "127.0.0.1");
+  assert.equal((await call((req, res) => selectProvider(req, res, routed), { id: "backup" })).status, 500);
+  assert.equal(routed.activeProviderId, "default");
+  assert.equal((await call((req, res) => setProviderWeight(req, res, routed), { id: "backup", weight: 5 })).status, 500);
+  assert.equal(routed.providerWeights.backup, 1);
+  assert.equal((await call((req, res) => setProviderWeights(req, res, routed), { weights: { backup: 6 }, mode: "distribute" })).status, 500);
+  assert.equal(routed.routingMode, "manual");
+  assert.equal(routed.providerWeights.backup, 1);
+  assert.equal((await call((req, res) => setRoutingMode(req, res, routed), { mode: "distribute" })).status, 500);
+  assert.equal(routed.routingMode, "manual");
+
+  const previousEnabled = state.pluginEnabled["context-compressor-plugin"];
+  const plugin = await call((req, res) => togglePlugin(req, res, state), { id: "context-compressor-plugin", enabled: !previousEnabled });
+  assert.equal(plugin.status, 500);
+  assert.equal(state.pluginEnabled["context-compressor-plugin"], previousEnabled);
   await rm(dir, { recursive: true, force: true });
 });
 

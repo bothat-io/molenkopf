@@ -6,6 +6,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
+import { providerHttpTest } from "../src/http/provider-http-test.ts";
 
 type Hit = { method?: string; url?: string; auth?: string; apiKey?: string; cookie?: string; body: string };
 
@@ -107,6 +108,20 @@ test("provider test does not fetch when required credentials are missing", async
     await proxy.close();
     upstream.close();
     await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("providerHttpTest uses pinned Node HTTP instead of global fetch", async () => {
+  const upstream = createServer((_req, res) => { res.writeHead(200, { "content-type": "application/json" }); res.end("{}"); });
+  const port = await listen(upstream);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => { throw new Error("global fetch must not be used"); }) as typeof fetch;
+  try {
+    const result = await providerHttpTest({ id: "pinned", name: "Pinned", kind: "local", target: `http://127.0.0.1:${port}/v1`, authScheme: "none", protocol: "openai-chat" });
+    assert.equal(result.model.status, "ok");
+  } finally {
+    globalThis.fetch = originalFetch;
+    upstream.close();
   }
 });
 

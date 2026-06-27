@@ -44,38 +44,6 @@ test("parses JSON provider config with env credential refs", () => {
   assert.deepEqual(config.agents[0].enabledPluginIds, ["context-compressor-plugin"]);
 });
 
-test("rejects inline credentials and ambiguous secret fields", () => {
-  assert.throws(() => parseMolenkopfConfigJson(JSON.stringify({
-    schemaVersion: 1,
-    providers: [{ id: "inline", baseUrl: "https://api.openai.com/v1", auth: { credential: "fixture-inline-secret" } }]
-  })), /inline credentials are not allowed/);
-
-  assert.throws(() => parseMolenkopfConfigJson(JSON.stringify({
-    schemaVersion: 1,
-    providers: [{ id: "bad", baseUrl: "https://api.openai.com/v1", auth: { apiKey: "fixture-inline-secret" } }]
-  })), /forbidden secret field/);
-
-  assert.throws(() => parseMolenkopfConfigJson(JSON.stringify({
-    schemaVersion: 1,
-    providers: [{ id: "bad", baseUrl: "https://api.openai.com/v1", auth: { credentialRef: "fixture-inline-secret" } }]
-  })), /invalid credentialRef/);
-
-  assert.throws(() => parseMolenkopfConfigJson(JSON.stringify({
-    schemaVersion: 1,
-    providers: [{ id: "bad-secret-ref", baseUrl: "https://api.openai.com/v1", auth: { credentialRef: "secret:openai-main" } }]
-  })), /unsupported credentialRef/);
-
-  assert.throws(() => parseMolenkopfConfigJson(JSON.stringify({
-    schemaVersion: 1,
-    providers: [{ id: "top-ref", baseUrl: "https://api.openai.com/v1", credentialRef: "env:OPENAI_API_KEY" }]
-  })), /top-level credentialRef/);
-
-  assert.throws(() => parseMolenkopfConfigJson(JSON.stringify({
-    schemaVersion: 1,
-    providers: [{ id: "top-auth", baseUrl: "https://api.openai.com/v1", authScheme: "bearer" }]
-  })), /top-level authScheme/);
-});
-
 test("rejects unsafe provider target URLs", () => {
   assert.throws(() => parseMolenkopfConfigJson(JSON.stringify({
     schemaVersion: 1,

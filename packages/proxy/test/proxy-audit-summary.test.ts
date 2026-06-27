@@ -5,11 +5,10 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
+import { issueKey, localAuth } from "./proxy-auth-utils.ts";
 
 test("audit summary reports token savings by user bucket without leaking credentials", async () => {
   const dir = await mkdtemp(join(tmpdir(), "molenkopf-summary-"));
-  const previousRequireKey = process.env.MOLENKOPF_REQUIRE_KEY;
-  delete process.env.MOLENKOPF_REQUIRE_KEY;
   const upstream = createServer((req, res) => { req.resume(); res.writeHead(200, { "content-type": "application/json" }); res.end("{}"); });
   let proxy: Awaited<ReturnType<typeof startProxy>> | undefined;
   try {
@@ -21,23 +20,23 @@ test("audit summary reports token savings by user bucket without leaking credent
     });
     const base = `http://127.0.0.1:${proxy.port}`;
     const admin = await setupAdmin(base);
+    const key = await issueKey(base, admin, "audit-summary");
     // Compression is opt-in (transparent by default); enable it to assert savings.
     const toggle = await fetch(`${base}/__molenkopf/plugins/toggle`, { method: "POST", headers: { "content-type": "application/json", cookie: admin }, body: JSON.stringify({ id: "context-compressor-plugin", enabled: true }) });
     assert.equal(toggle.status, 200);
     const longLog = Array.from({ length: 260 }, (_, i) => `line ${i}`).join("\n") + "\nERROR done";
     const sent = await fetch(`http://127.0.0.1:${proxy.port}/v1/responses`, {
       method: "POST",
-      headers: { "content-type": "application/json", "x-molenkopf-user": "Operator", authorization: "Bearer sk-secret" },
+      headers: localAuth(key, { "content-type": "application/json", authorization: "Bearer sk-secret" }),
       body: JSON.stringify({ input: longLog })
     });
     assert.equal(sent.status, 200);
     const summary = await waitForSummary(proxy.port, admin);
     assert.equal(summary.requests, 1);
-    assert.equal(summary.buckets[0].id, "user:operator");
+    assert.match(summary.buckets[0].id, /^key:key_[a-f0-9]+:project:audit-summary$/);
     assert.ok(summary.savedTokens > 0);
     assert.doesNotMatch(JSON.stringify(summary), /sk-secret|Bearer/);
   } finally {
-    if (previousRequireKey === undefined) delete process.env.MOLENKOPF_REQUIRE_KEY; else process.env.MOLENKOPF_REQUIRE_KEY = previousRequireKey;
     if (proxy) await proxy.close();
     await new Promise<void>((resolve, reject) => upstream.close((error) => error ? reject(error) : resolve()));
     await rm(dir, { recursive: true, force: true });

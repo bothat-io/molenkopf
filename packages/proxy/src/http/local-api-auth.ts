@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { verifyPasswordAsync, hashPasswordAsync, passwordTooLong } from "../../../core/src/auth/password.ts";
 import { signSession } from "../../../core/src/auth/session.ts";
-import { viewUser, type KeyPermissions, type Role, type User } from "../../../core/src/identity/types.ts";
+import type { User } from "../../../core/src/identity/types.ts";
 import { authRequired, canManage, currentUser } from "./auth-state.ts";
 import { type RuntimeState } from "./runtime-state.ts";
 import { jsonHeaders, readJson, writeJson } from "./local-api-io.ts";
@@ -68,11 +68,11 @@ export async function setupAdmin(req: IncomingMessage, res: ServerResponse, stat
     return writeJson(res, 400, { error: "weak_password" });
   }
   if (passwordTooLong(password)) return writeJson(res, 400, { error: "password_too_long" });
-  if (!state.identity.getTeam("everyone")) {
-    await state.identity.putTeam({ id: "everyone", name: "Everyone", allowedProviders: "*", managerIds: [id], createdAt: new Date().toISOString() });
-  }
+  const createdEveryone = !state.identity.getTeam("everyone");
+  if (createdEveryone) await state.identity.putTeam({ id: "everyone", name: "Everyone", allowedProviders: "*", managerIds: [], createdAt: new Date().toISOString() });
   const user: User = { id, displayName: typeof body.displayName === "string" && body.displayName.trim() ? body.displayName.trim() : id, role: "admin", password: await hashPasswordAsync(password), teamIds: ["everyone"], sessionVersion: 0, createdAt: new Date().toISOString() };
   await state.identity.putUser(user);
+  if (createdEveryone) await state.identity.putTeam({ ...state.identity.getTeam("everyone")!, managerIds: [id] });
   clearFailures(state, setupAttempt);
   const token = signSession(user.id, state.sessionSecret, undefined, undefined, user.sessionVersion ?? 0);
   res.writeHead(200, authHeaders(req, `${COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=43200`));
@@ -81,25 +81,6 @@ export async function setupAdmin(req: IncomingMessage, res: ServerResponse, stat
     release();
     state.bootstrapSetup = undefined;
   }
-}
-
-export function listUsers(_req: IncomingMessage, res: ServerResponse, state: RuntimeState) {
-  writeJson(res, 200, { items: (state.identity?.listUsers() ?? []).map(viewUser) });
-}
-
-export async function createUser(req: IncomingMessage, res: ServerResponse, state: RuntimeState) {
-  if (!state.identity) return writeJson(res, 400, { error: "identity_unavailable" });
-  const body = await readJson(req);
-  const id = typeof body.id === "string" ? body.id.trim() : "";
-  if (!isValidUserId(id)) return writeJson(res, 400, { error: "invalid_user_id" });
-  const password = typeof body.password === "string" ? body.password : "";
-  if (password.length < MIN_PASSWORD_LENGTH) return writeJson(res, 400, { error: "weak_password" });
-  if (passwordTooLong(password)) return writeJson(res, 400, { error: "password_too_long" });
-  const role: Role = body.role === "admin" ? "admin" : body.role === "manager" ? "manager" : "member";
-  const teamIds = (Array.isArray(body.teamIds) ? body.teamIds : []).filter((t: unknown): t is string => typeof t === "string" && Boolean(state.identity!.getTeam(t)));
-  const user: User = { id, displayName: typeof body.displayName === "string" && body.displayName.trim() ? body.displayName.trim() : id, role, password: await hashPasswordAsync(password), teamIds, keyPermissions: parseKeyPermissions(body.keyPermissions), sessionVersion: 0, createdAt: new Date().toISOString() };
-  await state.identity.putUser(user);
-  writeJson(res, 200, { items: state.identity.listUsers().map(viewUser) });
 }
 
 function attemptKey(kind: string, req: IncomingMessage, userId: string): string {
@@ -128,12 +109,6 @@ function clearFailures(state: RuntimeState, key: string): void {
 
 function meView(state: RuntimeState, user: User) {
   return { id: user.id, displayName: user.displayName, role: user.role, teamIds: user.teamIds, keyPermissions: user.keyPermissions, canManage: canManage(state, user) };
-}
-
-function parseKeyPermissions(value: unknown): KeyPermissions | undefined {
-  if (!value || typeof value !== "object") return undefined;
-  const permissions = value as Record<string, unknown>;
-  return { create: permissions.create !== false, revoke: permissions.revoke !== false };
 }
 
 function authHeaders(req: IncomingMessage, cookie: string): Record<string, string> {

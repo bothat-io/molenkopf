@@ -33,7 +33,6 @@ test("password hashing and session signing round-trip", () => {
 test("login gates control APIs; roles gate management", async () => {
   const upstream = createServer((req, res) => { req.resume(); res.writeHead(200, {}); res.end("{}"); });
   const port = await listenOn(upstream);
-  process.env.MOLENKOPF_ADMIN_PASSWORD = "admin-secret";
   const dataDir = await mkdtemp(join(tmpdir(), "molenkopf-authtest-"));
   let proxy;
   try {
@@ -41,8 +40,10 @@ test("login gates control APIs; roles gate management", async () => {
     const base = `http://127.0.0.1:${proxy.port}`;
 
     assert.equal((await fetch(`${base}/__molenkopf/providers`)).status, 401, "no session -> 401");
-    assert.equal((await fetch(`${base}/__molenkopf/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: "nope" }) })).status, 401);
+    const setup = await fetch(`${base}/__molenkopf/setup-admin`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: "admin-secret" }) });
+    assert.equal(setup.status, 200);
 
+    assert.equal((await fetch(`${base}/__molenkopf/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: "nope" }) })).status, 401);
     const ok = await fetch(`${base}/__molenkopf/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: "admin-secret" }) });
     assert.equal(ok.status, 200);
     const admin = cookieFrom(ok);
@@ -53,9 +54,8 @@ test("login gates control APIs; roles gate management", async () => {
     assert.equal(meRes.user.canManage, true);
 
     // admin creates a normal member; member can read but not manage
-    const legacyCreate = await fetch(`${base}/__molenkopf/users`, { method: "POST", headers: { "content-type": "application/json", cookie: admin }, body: JSON.stringify({ id: "bob", password: "bob-secret", role: "member", teamIds: ["everyone"] }) });
-    assert.equal(legacyCreate.headers.get("deprecation"), "true");
-    assert.match(legacyCreate.headers.get("link") ?? "", /\/__molenkopf\/identity/);
+    const createMember = await fetch(`${base}/__molenkopf/identity/users`, { method: "POST", headers: { "content-type": "application/json", cookie: admin }, body: JSON.stringify({ id: "bob", password: "bob-secret", role: "member", teamIds: ["everyone"] }) });
+    assert.equal(createMember.status, 200);
     const bobLogin = await fetch(`${base}/__molenkopf/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "bob", password: "bob-secret" }) });
     const bob = cookieFrom(bobLogin);
     const memberConfig = await fetch(`${base}/__molenkopf/config`, { headers: { cookie: bob } }).then((r) => r.json());
@@ -67,33 +67,28 @@ test("login gates control APIs; roles gate management", async () => {
     const manage = await fetch(`${base}/__molenkopf/routing/mode`, { method: "POST", headers: { "content-type": "application/json", cookie: bob }, body: JSON.stringify({ mode: "distribute" }) });
     assert.equal(manage.status, 403, "member cannot manage");
   } finally {
-    delete process.env.MOLENKOPF_ADMIN_PASSWORD;
     if (proxy) await proxy.close();
     upstream.close();
   }
 });
 
-test("public bind requires admin auth and proxy key enforcement", async () => {
+test("public bind requires explicit opt-in and keeps first-run available", async () => {
   await assert.rejects(
     startProxy({ port: 0, host: "0.0.0.0", target: "http://127.0.0.1:9/v1", dataDir: await freshDataDir("public-flag") }),
     /--allow-public-bind/
   );
-  await withEnv({ MOLENKOPF_ADMIN_PASSWORD: undefined, MOLENKOPF_REQUIRE_KEY: undefined }, async () => {
-    await assert.rejects(startProxy({ port: 0, host: "0.0.0.0", allowPublicBind: true, target: "http://127.0.0.1:9/v1", dataDir: await freshDataDir("public-auth") }), /configured admin auth/);
-  });
-  await withEnv({ MOLENKOPF_ADMIN_PASSWORD: "admin-secret", MOLENKOPF_REQUIRE_KEY: undefined }, async () => {
-    await assert.rejects(startProxy({ port: 0, host: "0.0.0.0", allowPublicBind: true, target: "http://127.0.0.1:9/v1", dataDir: await freshDataDir("public-key") }), /MOLENKOPF_REQUIRE_KEY=1/);
-  });
-  await withEnv({ MOLENKOPF_ADMIN_PASSWORD: undefined, MOLENKOPF_REQUIRE_KEY: "1" }, async () => {
-    await assert.rejects(startProxy({ port: 0, host: "0.0.0.0", allowPublicBind: true, target: "http://127.0.0.1:9/v1", dataDir: await freshDataDir("public-missing-admin") }), /configured admin auth/);
-  });
-  await withEnv({ MOLENKOPF_ADMIN_PASSWORD: "admin-secret", MOLENKOPF_REQUIRE_KEY: "1", MOLENKOPF_SESSION_SECRET: undefined }, async () => {
-    await assert.rejects(startProxy({ port: 0, host: "0.0.0.0", allowPublicBind: true, target: "http://127.0.0.1:9/v1", dataDir: await freshDataDir("public-secret") }), /MOLENKOPF_SESSION_SECRET/);
-  });
-  await withEnv({ MOLENKOPF_ADMIN_PASSWORD: "admin-secret", MOLENKOPF_REQUIRE_KEY: "1", MOLENKOPF_SESSION_SECRET: "x".repeat(32) }, async () => {
-    const proxy = await startProxy({ port: 0, host: "0.0.0.0", allowPublicBind: true, target: "http://127.0.0.1:9/v1", dataDir: await freshDataDir("public-ok") });
+  const proxy = await startProxy({ port: 0, host: "0.0.0.0", allowPublicBind: true, target: "http://127.0.0.1:9/v1", dataDir: await freshDataDir("public-ok") });
+  const base = `http://127.0.0.1:${proxy.port}`;
+  try {
+    const before = await fetch(`${base}/__molenkopf/me`).then((r) => r.json());
+    assert.equal(before.needsSetup, true);
+    const setup = await fetch(`${base}/__molenkopf/setup-admin`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: JSON.stringify({ username: "admin", password: "admin-secret" }) });
+    assert.equal(setup.status, 200);
+    const second = await fetch(`${base}/__molenkopf/setup-admin`, { method: "POST", headers: { "content-type": "application/json", origin: base }, body: JSON.stringify({ username: "root", password: "admin-secret" }) });
+    assert.equal(second.status, 403);
+  } finally {
     await proxy.close();
-  });
+  }
 });
 
 test("control plane writes require JSON and same-origin or absent origin", async () => {
@@ -160,32 +155,19 @@ test("control plane writes allow the configured dashboard dev origin", async () 
 test("a malformed session cookie does not crash auth", async () => {
   const upstream = createServer((req, res) => { req.resume(); res.writeHead(200, {}); res.end("{}"); });
   const port = await listenOn(upstream);
-  process.env.MOLENKOPF_ADMIN_PASSWORD = "admin-secret";
   let proxy;
   try {
     proxy = await startProxy({ port: 0, target: `http://127.0.0.1:${port}/v1`, dataDir: await freshDataDir("bad-cookie") });
-    const res = await fetch(`http://127.0.0.1:${proxy.port}/__molenkopf/providers`, { headers: { cookie: "molenkopf_session=%E0%A4%A" } });
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const setup = await fetch(`${base}/__molenkopf/setup-admin`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: "admin-secret" }) });
+    assert.equal(setup.status, 200);
+    const res = await fetch(`${base}/__molenkopf/providers`, { headers: { cookie: "molenkopf_session=%E0%A4%A" } });
     assert.equal(res.status, 401, "malformed cookie -> 401, not 500");
   } finally {
-    delete process.env.MOLENKOPF_ADMIN_PASSWORD;
     if (proxy) await proxy.close();
     upstream.close();
   }
 });
-
-async function withEnv(vars: Record<string, string | undefined>, run: () => Promise<void>): Promise<void> {
-  const previous = Object.fromEntries(Object.keys(vars).map((key) => [key, process.env[key]]));
-  try {
-    for (const [key, value] of Object.entries(vars)) {
-      if (value === undefined) delete process.env[key]; else process.env[key] = value;
-    }
-    await run();
-  } finally {
-    for (const [key, value] of Object.entries(previous)) {
-      if (value === undefined) delete process.env[key]; else process.env[key] = value;
-    }
-  }
-}
 
 function freshDataDir(name: string): Promise<string> {
   return mkdtemp(join(tmpdir(), `molenkopf-${name}-`));

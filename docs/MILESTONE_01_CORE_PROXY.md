@@ -1,7 +1,7 @@
 # Molenkopf Roadmap Completion
 
 Status: historical completion note for the early core/proxy milestone. Use
-`README.md`, `ROADMAP.md`, and `NEXT.md` for current release state.
+`README.md` and `ROADMAP.md` for current release state.
 
 The repository implements the core proxy and later roadmap primitives, excluding remote issue-tracker integration.
 

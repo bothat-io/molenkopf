@@ -27,7 +27,8 @@ rights are explicit plugin descriptor fields and are enforced by the proxy.
 ## UI Rules
 
 - Empty state must say no payloads observed yet. It must not show fake token pressure.
-- No `anonymous traffic` graph as a product target. If attribution is unknown, show it only as a routing/accounting warning.
+- No unauthenticated proxy traffic graph as a product target. If attribution is
+  unknown, show it only as a routing/accounting warning.
 - Compression views must answer: what text entered, what was removed or represented by ID, what was sent, and how many tokens were saved.
 - Graph views must answer: what concepts/entities/threads were learned from transferred text and how they relate.
 - HTTP metadata graphs are diagnostics only, not the Obsidian workspace goal.

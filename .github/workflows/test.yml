@@ -51,6 +51,20 @@ jobs:
       - name: E2E
         run: npm run e2e
 
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Docker smoke
+        run: npm run smoke:docker
+
   windows-launcher:
     runs-on: windows-latest
     steps:

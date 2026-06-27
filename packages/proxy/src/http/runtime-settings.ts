@@ -2,6 +2,7 @@ import { existsSync, readFileSync, renameSync } from "node:fs";
 import { rename } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
+import { validateProviderTarget } from "../../../core/src/security/target-policy.ts";
 import { defaultDataDir } from "../../../core/src/storage/local-paths.ts";
 import { ensurePrivateDir, writePrivateFile } from "../../../core/src/storage/private-state.ts";
 import { CONTROL_PLANE_LIMITS, type AgentDraftMetadata, type RoutingMode, type RuntimeState } from "./runtime-state.ts";
@@ -17,8 +18,7 @@ export type RuntimeSettings = {
   agentDrafts?: AgentDraftMetadata[];
 };
 export type RuntimeSettingsLoad = { settings: RuntimeSettings; warning?: string };
-type PersistedProvider = Pick<ProviderConfig, "id" | "name" | "kind" | "target" | "credentialEnv" | "credentialRef" | "authScheme" | "protocol" | "enabled" | "allowDistribution">;
-
+type PersistedProvider = Pick<ProviderConfig, "id" | "name" | "kind" | "target" | "credentialEnv" | "credentialRef" | "authScheme" | "protocol" | "enabled" | "allowDistribution" | "runtime" | "cliCommand" | "cliArgs" | "cliInputMode" | "cliTimeoutMs">;
 const BUILT_IN_IDS = new Set(["default", "openai-env", "anthropic-env", "ollama-local", "lmstudio-local"]);
 
 const FILE = "runtime-settings.json";
@@ -26,7 +26,11 @@ const FILE = "runtime-settings.json";
 export function loadRuntimeSettings(dataDir: string | undefined): RuntimeSettingsLoad {
   const file = settingsFile(dataDir);
   if (!existsSync(file)) return { settings: {} };
-  try { return { settings: cleanSettings(JSON.parse(readFileSync(file, "utf8"))) }; } catch {
+  try {
+    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    const settings = cleanSettings(parsed);
+    return { settings, warning: cleanWarning(parsed, settings) };
+  } catch {
     const corrupt = `${file}.corrupt.${Date.now()}`;
     try { renameSync(file, corrupt); } catch { /* best effort */ }
     return { settings: {}, warning: `runtime settings were corrupt and quarantined as ${corrupt}` };
@@ -60,14 +64,29 @@ function persistableProvider(provider: ProviderConfig): boolean {
 }
 
 function persistedProvider(provider: ProviderConfig): PersistedProvider {
-  const { id, name, kind, target, credentialEnv, credentialRef, authScheme, protocol, enabled, allowDistribution } = provider;
-  return { id, name, kind, target, credentialEnv, credentialRef, authScheme, protocol, enabled, allowDistribution };
+  const { id, name, kind, target, credentialEnv, credentialRef, authScheme, protocol, enabled, allowDistribution, runtime, cliCommand, cliArgs, cliInputMode, cliTimeoutMs } = provider;
+  return { id, name, kind, target, credentialEnv, credentialRef, authScheme, protocol, enabled, allowDistribution, runtime, cliCommand, cliArgs, cliInputMode, cliTimeoutMs };
 }
 
 function cleanSettings(value: unknown): RuntimeSettings {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const input = value as RuntimeSettings;
-  return { ...input, consumerBudgets: cleanBudgets(input.consumerBudgets), agentDrafts: cleanDrafts(input.agentDrafts) };
+  return {
+    activeProviderId: idOk(input.activeProviderId) ? input.activeProviderId : undefined,
+    routingMode: input.routingMode === "manual" || input.routingMode === "distribute" ? input.routingMode : undefined,
+    pluginEnabled: cleanBooleanMap(input.pluginEnabled),
+    pluginOrder: cleanIdArray(input.pluginOrder),
+    providerWeights: cleanWeights(input.providerWeights),
+    providers: cleanProviders(input.providers),
+    consumerBudgets: cleanBudgets(input.consumerBudgets),
+    agentDrafts: cleanDrafts(input.agentDrafts)
+  };
+}
+
+function cleanWarning(value: unknown, settings: RuntimeSettings): string | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const providers = (value as RuntimeSettings).providers;
+  return Array.isArray(providers) && providers.length !== (settings.providers?.length ?? 0) ? "runtime settings contained invalid provider records that were ignored" : undefined;
 }
 
 function cleanBudgets(value: unknown): Record<string, number> | undefined {
@@ -82,6 +101,85 @@ function cleanBudgets(value: unknown): Record<string, number> | undefined {
 function cleanDrafts(value: unknown): AgentDraftMetadata[] | undefined {
   if (!Array.isArray(value)) return undefined;
   return value.slice(0, CONTROL_PLANE_LIMITS.agentDrafts).filter(isDraft).map(persistedDraft);
+}
+
+function cleanProviders(value: unknown): PersistedProvider[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const seen = new Set<string>(), out: PersistedProvider[] = [];
+  for (const item of value) {
+    const provider = cleanProvider(item);
+    if (provider && !seen.has(provider.id)) { seen.add(provider.id); out.push(provider); }
+  }
+  return out.length ? out : undefined;
+}
+
+function cleanProvider(value: unknown): PersistedProvider | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const item = value as Record<string, unknown>;
+  const id = typeof item.id === "string" && idOk(item.id) && !BUILT_IN_IDS.has(item.id) ? item.id : "";
+  const kind = item.kind === "api" || item.kind === "local" || item.kind === "cli" ? item.kind : undefined;
+  const target = typeof item.target === "string" ? item.target : "";
+  if (!id || !kind || item.credentialValue !== undefined || item.credential !== undefined) return undefined;
+  if (kind === "cli") return cleanCliProvider(id, item);
+  try { validateProviderTarget(target, { path: "runtime provider target", allowPrivate: kind === "local" }); } catch { return undefined; }
+  const credentialEnv = cleanEnv(item.credentialEnv);
+  const credentialRef = credentialEnv ? `env:${credentialEnv}` : "none";
+  return cleanBaseProvider(id, item, kind, target, { credentialEnv, credentialRef, authScheme: cleanAuth(item.authScheme, target, credentialEnv), protocol: cleanProtocol(item.protocol) });
+}
+
+function cleanCliProvider(id: string, item: Record<string, unknown>): PersistedProvider | undefined {
+  const runtime = item.runtime === "claude" || item.runtime === "codex" ? item.runtime : undefined;
+  const target = typeof item.target === "string" && item.target === `cli://${id}` ? item.target : "";
+  if (!runtime || !target) return undefined;
+  const cliArgs = Array.isArray(item.cliArgs) && item.cliArgs.every((arg) => typeof arg === "string") ? item.cliArgs.slice(0, 20) as string[] : undefined;
+  const cliTimeoutMs = typeof item.cliTimeoutMs === "number" && Number.isInteger(item.cliTimeoutMs) && item.cliTimeoutMs > 0 && item.cliTimeoutMs <= 600000 ? item.cliTimeoutMs : undefined;
+  return cleanBaseProvider(id, item, "cli", target, {
+    runtime,
+    cliCommand: typeof item.cliCommand === "string" && item.cliCommand.trim() ? item.cliCommand.trim().slice(0, 80) : runtime,
+    cliArgs,
+    cliInputMode: item.cliInputMode === "argument" ? "argument" : "stdin",
+    cliTimeoutMs,
+    authScheme: "none",
+    credentialRef: "none"
+  });
+}
+
+function cleanBaseProvider(id: string, item: Record<string, unknown>, kind: ProviderConfig["kind"], target: string, extra: Partial<PersistedProvider>): PersistedProvider {
+  return { id, name: typeof item.name === "string" && item.name.trim() ? item.name.trim().slice(0, 80) : id, kind, target, enabled: item.enabled !== false, allowDistribution: typeof item.allowDistribution === "boolean" ? item.allowDistribution : undefined, ...extra };
+}
+
+function cleanBooleanMap(value: unknown): Record<string, boolean> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const out: Record<string, boolean> = {};
+  for (const [id, enabled] of Object.entries(value)) if (idOk(id) && typeof enabled === "boolean") out[id] = enabled;
+  return Object.keys(out).length ? out : undefined;
+}
+
+function cleanWeights(value: unknown): Record<string, number> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const out: Record<string, number> = {};
+  for (const [id, weight] of Object.entries(value)) if (idOk(id) && typeof weight === "number" && Number.isFinite(weight) && weight >= 0 && weight <= 1000) out[id] = weight;
+  return Object.keys(out).length ? out : undefined;
+}
+
+function cleanIdArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out = value.filter((id): id is string => idOk(id)).slice(0, 100);
+  return out.length ? [...new Set(out)] : undefined;
+}
+
+function cleanEnv(value: unknown): string | undefined {
+  return typeof value === "string" && /^[A-Z_][A-Z0-9_]*$/i.test(value) ? value : undefined;
+}
+
+function cleanAuth(value: unknown, target: string, credentialEnv?: string): ProviderConfig["authScheme"] {
+  if (value === "bearer" || value === "x-api-key" || value === "none") return value;
+  if (!credentialEnv) return "none";
+  return target.includes("anthropic") ? "x-api-key" : "bearer";
+}
+
+function cleanProtocol(value: unknown): ProviderConfig["protocol"] | undefined {
+  return value === "openai-responses" || value === "anthropic-messages" || value === "openai-chat" || value === "ollama-tags" ? value : undefined;
 }
 
 function isDraft(value: unknown): value is AgentDraftMetadata {

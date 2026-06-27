@@ -7,6 +7,8 @@ const dockerfile = read("Dockerfile");
 const dockerignore = read(".dockerignore");
 const release = read(".github/workflows/release.yml");
 const testWorkflow = read(".github/workflows/test.yml");
+const pkg = read("package.json");
+const dockerSmoke = read("scripts/smoke-docker.js");
 
 const requiredDockerfile = [
   /COPY packages\/core\/src packages\/core\/src/,
@@ -15,7 +17,7 @@ const requiredDockerfile = [
   /COPY packages\/plugins packages\/plugins/,
   /COPY --from=dashboard-build .*packages\/dashboard\/dist packages\/dashboard\/dist/,
   /HEALTHCHECK .*__molenkopf\/health/,
-  /CMD \["node".*"proxy".*"--host","127\.0\.0\.1".*"--port","8787".*"--data-dir","\/data"\]/
+  /CMD \["node".*"proxy".*"--host","0\.0\.0\.0".*"--allow-public-bind".*"--port","8787".*"--data-dir","\/data"\]/
 ];
 
 const requiredRelease = [
@@ -30,8 +32,8 @@ const requiredRelease = [
   /npm publish "\$tarball"/,
   /molenkopf" --help/,
   /molenkopf" self-test/,
-  /docker build --pull -t molenkopf:ci \./,
-  /docker run -d --name molenkopf-ci molenkopf:ci/,
+  /npm run smoke:docker/,
+  /MOLENKOPF_DOCKER_IMAGE:\s*molenkopf:ci/,
   /docker save molenkopf:ci \| gzip/,
   /molenkopf-docker-image/,
   /gunzip -c molenkopf-image\.tar\.gz \| docker load/,
@@ -39,8 +41,6 @@ const requiredRelease = [
   /type=semver,pattern=\{\{version\}\}/,
   /type=raw,value=latest,enable=\$\{\{ startsWith\(github\.ref, 'refs\/tags\/v'\) \}\}/,
   /docker push "\$tag"/,
-  /__molenkopf\/health/,
-  /__molenkopf\/setup-admin/,
   /startsWith\(github\.ref, 'refs\/tags\/'\)[\s\S]*github\.event_name == 'push'/,
   /github\.event_name == 'workflow_dispatch'[\s\S]*github\.event\.inputs\.dry_run == 'false'/,
   /actions\/checkout@v4[\s\S]*docker\/login-action@v3/,
@@ -48,10 +48,25 @@ const requiredRelease = [
 ];
 
 const requiredTest = [
-  /name: E2E[\s\S]*npm run e2e/
+  /name: E2E[\s\S]*npm run e2e/,
+  /name: Docker smoke[\s\S]*npm run smoke:docker/
+];
+
+const requiredDockerSmoke = [
+  /run\(\["build", "--pull"/,
+  /--env-file/,
+  /MOLENKOPF_SESSION_SECRET=test-only-session-secret-please-change-123456/,
+  /assertFailsWithoutSecret/,
+  /__molenkopf\/health/,
+  /__molenkopf\/dashboard/,
+  /__molenkopf\/setup-admin/,
+  /__molenkopf\/plugins/,
+  /volume/
 ];
 
 const failures = [
+  ...missing("package.json", pkg, [/smoke:docker/, /check:source-completeness/, /release:verify[\s\S]*smoke:docker/]),
+  ...missing("smoke-docker.js", dockerSmoke, requiredDockerSmoke),
   ...missing("Dockerfile", dockerfile, requiredDockerfile),
   ...missing(".dockerignore", dockerignore, [/!LICENSE/, /!packages\/dashboard\/public\//]),
   ...missing("release.yml", release, requiredRelease),

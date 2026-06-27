@@ -4,8 +4,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
-
-const cookieOf = (res: Response) => (res.headers.get("set-cookie") ?? "").split(";")[0];
+import { auth, cookieOf, issueKey } from "./proxy-auth-utils.ts";
 
 test("Claude CLI providers answer Anthropic messages with Anthropic JSON", async () => {
   const dir = await mkdtemp(join(tmpdir(), "molenkopf-cli-anthropic-"));
@@ -38,9 +37,10 @@ test("Claude CLI providers answer Anthropic messages with Anthropic JSON", async
 
     const base = `http://127.0.0.1:${proxy.port}`;
     const admin = cookieOf(await fetch(`${base}/__molenkopf/setup-admin`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: "admin-secret" }) }));
-    const response = await fetch(`http://127.0.0.1:${proxy.port}/v1/messages`, {
+    const key = await issueKey(base, admin, "cli-anthropic");
+    const response = await fetch(`${base}/v1/messages`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: auth(key, { "content-type": "application/json" }),
       body: JSON.stringify({ model: "claude-client-model", messages: [{ role: "user", content: [{ type: "text", text: "hello claude" }] }] })
     });
     assert.equal(response.status, 200);
@@ -53,9 +53,9 @@ test("Claude CLI providers answer Anthropic messages with Anthropic JSON", async
     assert.ok(json.usage.input_tokens > 0);
     assert.ok(json.usage.output_tokens > 0);
 
-    const stream = await fetch(`http://127.0.0.1:${proxy.port}/v1/messages`, {
+    const stream = await fetch(`${base}/v1/messages`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: auth(key, { "content-type": "application/json" }),
       body: JSON.stringify({ stream: true, model: "claude-stream-model", messages: [{ role: "user", content: "hello stream" }] })
     });
     assert.equal(stream.headers.get("content-type"), "text/event-stream");

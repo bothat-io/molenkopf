@@ -15,8 +15,15 @@ export type NormalizedMolenkopfConfig = {
 
 type JsonRecord = Record<string, unknown>;
 
-const FORBIDDEN_KEYS = new Set(["apikey", "token", "secret", "authorization", "cookie", "password"]);
-const ALLOWED_SECRET_KEYS = new Set(["credentialref"]);
+const FORBIDDEN_KEYS = new Set([
+  "apikey", "xapikey", "authorization", "cookie", "password", "credential", "credentials",
+  "credentialenv", "accesscredential", "clientcredentials", "token", "accesstoken",
+  "refreshtoken", "bearertoken", "sessiontoken", "secret", "clientsecret"
+]);
+const SAFE_ACCOUNTING_KEYS = new Set([
+  "tokenlimit", "tokensperday", "inputtokens", "outputtokens",
+  "estimatedoriginaltokens", "estimatedcompressedtokens", "estimatedsavedtokens"
+]);
 
 export function parseMolenkopfConfigJson(text: string, source = "molenkopf.config.json"): NormalizedMolenkopfConfig {
   let parsed: unknown;
@@ -65,9 +72,24 @@ function assertNoForbiddenKeys(value: unknown, path = "$") {
   if (Array.isArray(value)) return value.forEach((item, index) => assertNoForbiddenKeys(item, `${path}[${index}]`));
   Object.entries(value as JsonRecord).forEach(([key, child]) => {
     const normalized = key.toLowerCase().replace(/[-_]/g, "");
-    if (FORBIDDEN_KEYS.has(normalized) && !ALLOWED_SECRET_KEYS.has(normalized)) throw new Error(`forbidden secret field in config: ${path}.${key}`);
+    if (isForbiddenSecretKey(normalized) && !isAllowedCredentialRef(path, normalized)) throw new Error(`forbidden secret field in config: ${path}.${key}`);
     assertNoForbiddenKeys(child, `${path}.${key}`);
   });
+}
+
+function isForbiddenSecretKey(normalized: string): boolean {
+  if (SAFE_ACCOUNTING_KEYS.has(normalized)) return false;
+  return FORBIDDEN_KEYS.has(normalized)
+    || normalized.endsWith("apikey")
+    || normalized.endsWith("token")
+    || normalized.endsWith("secret")
+    || normalized.endsWith("credential")
+    || normalized.endsWith("credentials")
+    || normalized.endsWith("password");
+}
+
+function isAllowedCredentialRef(path: string, normalized: string): boolean {
+  return normalized === "credentialref" && /^\$\.providers\[\d+\]\.auth$/.test(path);
 }
 
 function validateTarget(value: string, path: string, providers: ProviderConfig[]) {
