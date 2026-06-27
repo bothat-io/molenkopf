@@ -6,6 +6,7 @@ import { RetrievalStore } from "../../core/src/store/retrieval-store.ts";
 import { createPluginHost } from "../src/http/plugin-host.ts";
 import { pluginView } from "../src/http/local-api-state.ts";
 import { createRuntimeState } from "../src/http/runtime-state.ts";
+import { buildManifest, finishRequest } from "../src/http/request-finish.ts";
 
 test("plugin host runs lifecycle, event, audit, and data hooks", async () => {
   const calls: string[] = [];
@@ -81,3 +82,44 @@ test("plugin host records sanitized lifecycle failures and serializes event hook
   assert.doesNotMatch(JSON.stringify(warnings), /sk-secret|raw prompt/);
   assert.deepEqual(order, ["start:1", "end:1", "start:2", "end:2"]);
 });
+
+test("request plugin policy gates event audit and graph observation", async () => {
+  const calls: string[] = [];
+  const state = createRuntimeState({ target: "http://127.0.0.1:1/v1" }, "127.0.0.1");
+  const events = new EventBus();
+  const host = createPluginHost(state, { store: new RetrievalStore(), events }, {
+    "obsidian-graph-plugin": {
+      onEvent: (ctx) => { calls.push(`event:${ctx.event}`); },
+      onAudit: (ctx) => { calls.push(`audit:${ctx.requestId}`); }
+    }
+  });
+  await host.start(8787);
+  host.setRequestPlugins("blocked", []);
+  events.emit("request_started", { requestId: "blocked", data: { path: "/v1/responses" } });
+  await host.audit(manifest("blocked"), []);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(calls, []);
+  await finishRequest(manifest("blocked-graph"), fakeAuditStore(), events, state, host, []);
+  assert.equal(state.communicationGraph.nodes.length, 0);
+
+  host.setRequestPlugins("allowed", ["obsidian-graph-plugin"]);
+  events.emit("request_started", { requestId: "allowed", data: { path: "/v1/responses" } });
+  await host.audit(manifest("allowed"), ["obsidian-graph-plugin"]);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await finishRequest(manifest("allowed-graph"), fakeAuditStore(), events, state, host, ["obsidian-graph-plugin"]);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.ok(calls.includes("event:request_started"));
+  assert.ok(calls.includes("audit:allowed"));
+  assert.ok(calls.includes("audit:allowed-graph"));
+  assert.ok(calls.includes("event:request_finished"));
+  assert.ok(state.communicationGraph.nodes.length > 0);
+  await host.stop();
+});
+
+function manifest(requestId: string) {
+  return buildManifest(requestId, "POST", "/v1/responses", "http://127.0.0.1:1/v1", "default", 200, 1, { id: "key:test", label: "key:test", source: "api_key" });
+}
+
+function fakeAuditStore() {
+  return { write: async () => {} } as any;
+}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminTab } from "../features/identity/Admin";
-import { loadDashboardData, loadSession, postJson } from "./api";
+import { loadDashboardData, loadSession, postJson, putJson } from "./api";
 import { AuthLoadingView, LoginView, SetupView } from "../features/auth/AuthViews";
 import { DashboardNotice } from "../components/feedback/DashboardNotice";
 import { Dialogs, type ModalState } from "../features/identity/Dialogs";
@@ -10,10 +10,10 @@ import { Shell } from "./Shell";
 import { noticeTone, providerTestFailure } from "./messages";
 import { beginRefresh, connectionStatus, shouldPollDashboard, type RefreshState } from "./refresh";
 import { confirmDestructive } from "./destructiveActions";
+import { buildGlobalPluginPolicyRequest, buildResetTeamPluginPolicyRequest, buildTeamPluginPolicyRequest, type TeamPluginDraft } from "./pluginPolicyMutations";
+import { buildAssignUserToTeamBody, buildRemoveUserFromTeamBody } from "./teamMembershipMutations";
 import type { DashboardData, TeamView, UserView } from "./types";
-
 const emptyData: DashboardData = { usage: {}, keys: { items: [] }, config: {}, providers: {}, summary: {}, plugins: {} };
-
 export function DashboardApp() {
   const [user, setUser] = useState<UserView | undefined>();
   const [needsSetup, setNeedsSetup] = useState(false);
@@ -28,12 +28,10 @@ export function DashboardApp() {
   const loadSeq = useRef(0);
   const loadAbort = useRef<AbortController | undefined>(undefined);
   useDevRevisionReload(Boolean(user));
-
   const clearSessionState = useCallback(() => {
     setSelectedSecret(""); setModal({ kind: null }); setMessage(""); setProviderMessages({});
     setData(emptyData);
   }, []);
-
   const canManage = Boolean(user?.canManage || needsSetup);
   const reload = useCallback(async (options?: { quiet?: boolean }) => {
     const seq = loadSeq.current + 1;
@@ -64,7 +62,6 @@ export function DashboardApp() {
       setMessage(text);
     }
   }, [clearSessionState, user?.id]);
-
   useEffect(() => { reload(); }, [reload]);
   useEffect(() => () => loadAbort.current?.abort(), []);
   useEffect(() => {
@@ -78,7 +75,6 @@ export function DashboardApp() {
   useEffect(() => {
     if (user && tab === "admin" && !canManage) openOverview();
   }, [canManage, tab, user]);
-
   const setTab = (next: DashboardTab) => {
     const safe = next === "admin" && !canManage ? "overview" : next;
     setTabState(safe);
@@ -104,9 +100,11 @@ export function DashboardApp() {
     providerMessages,
     onProviderTest: testProvider,
     onProviderWeight: setProviderShare,
-    onPluginToggle: (id: string, enabled: boolean) => mutate("/__molenkopf/plugins/toggle", { id, enabled })
+    onPluginToggle: (id: string, enabled: boolean) => mutate("/__molenkopf/plugins/toggle", { id, enabled }),
+    onSaveGlobalPluginPolicy: saveGlobalPluginPolicy,
+    onSaveTeamPluginPolicy: saveTeamPluginPolicy,
+    onResetTeamPluginPolicy: resetTeamPluginPolicy
   };
-
   async function mutate(path: string, body: unknown, okMessage = "", options?: { rethrow?: boolean }) {
     try {
       await postJson(path, body);
@@ -117,7 +115,17 @@ export function DashboardApp() {
       if (options?.rethrow) throw err;
     }
   }
-
+  async function saveGlobalPluginPolicy(pluginId: string, value: { enabled: boolean; maxRisk: "green" | "yellow" | "orange" | "red" }) { await persistPluginPolicy(buildGlobalPluginPolicyRequest(data, pluginId, value)); }
+  async function saveTeamPluginPolicy(teamId: string, pluginId: string, value: TeamPluginDraft) { await persistPluginPolicy(buildTeamPluginPolicyRequest(data, teamId, pluginId, value)); }
+  async function resetTeamPluginPolicy(teamId: string, pluginId: string) { await persistPluginPolicy(buildResetTeamPluginPolicyRequest(data, teamId, pluginId)); }
+  async function persistPluginPolicy(request: { path: string; body: unknown }) {
+    try {
+      await putJson(request.path, request.body);
+      await reload();
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : String(err));
+    }
+  }
   async function saveProviderWeights(weights: Record<string, number>) {
     try {
       const current = new Map(providers.map((item) => [item.id, Math.round(Number(item.weight ?? 1))]));
@@ -130,7 +138,6 @@ export function DashboardApp() {
       throw err;
     }
   }
-
   async function setProviderShare(id: string, share: number) {
     const items = providers.filter((item) => item.id !== "default" && item.enabled !== false);
     const other = items.filter((item) => item.id !== id);
@@ -146,7 +153,6 @@ export function DashboardApp() {
     if (other[0] && drift) weights[other[0].id] += drift;
     await saveProviderWeights(weights);
   }
-
   async function testProvider(id: string) {
     setProviderMessages((prev) => ({ ...prev, [id]: "Testing provider..." }));
     try {
@@ -163,23 +169,14 @@ export function DashboardApp() {
       setMessage(text);
     }
   }
-
   async function testRuntimeProvider(body?: string | Record<string, unknown>) { return postJson<Record<string, unknown>>("/__molenkopf/providers/test-runtime", typeof body === "string" ? { id: body } : body || {}); }
-
   async function assignUserToTeam(userId: string, teamId: string) {
-    const users = data.identity?.users || data.usage.users || [];
-    const user = users.find((item) => item.id === userId);
-    if (!user || teamId === "_unassigned") return;
-    const teamIds = [...new Set([...(user.teamIds || []), teamId])];
-    await mutate("/__molenkopf/identity/users", { id: user.id, displayName: user.displayName, role: user.role, disabled: user.disabled, loginDisabled: user.loginDisabled, keyPermissions: user.keyPermissions, budget: user.budget, teamIds });
+    const body = buildAssignUserToTeamBody(data, userId, teamId);
+    if (body) await mutate("/__molenkopf/identity/users", body);
   }
-
   async function removeUserFromTeam(userId: string, teamId: string) {
-    const users = data.identity?.users || data.usage.users || [];
-    const user = users.find((item) => item.id === userId);
-    if (!user || teamId === "everyone") return;
-    const teamIds = (user.teamIds || []).filter((id) => id !== teamId);
-    await mutate("/__molenkopf/identity/users", { id: user.id, displayName: user.displayName, role: user.role, disabled: user.disabled, loginDisabled: user.loginDisabled, keyPermissions: user.keyPermissions, budget: user.budget, teamIds });
+    const body = buildRemoveUserFromTeamBody(data, userId, teamId);
+    if (body) await mutate("/__molenkopf/identity/users", body);
   }
   async function logout() {
     loadSeq.current += 1; loadAbort.current?.abort();

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, getJson, loadDashboardData, loadSession, postJson } from "./api";
+import { ApiError, getJson, loadDashboardData, loadSession, postJson, putJson } from "./api";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -17,6 +17,13 @@ describe("api helpers", () => {
     vi.stubGlobal("fetch", fetchMock);
     await expect(postJson("/save", { a: 1 })).resolves.toEqual({ ok: true });
     expect(fetchMock).toHaveBeenCalledWith("/save", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ a: 1 }) });
+  });
+
+  it("puts JSON bodies", async () => {
+    const fetchMock = vi.fn(async (_path: string, _init?: RequestInit) => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(putJson("/save", { a: 1 })).resolves.toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledWith("/save", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ a: 1 }) });
   });
 
   it("passes abort signals to requests", async () => {
@@ -76,9 +83,10 @@ describe("api helpers", () => {
       config: {},
       providers: {},
       summary: {},
-      plugins: {}
+      plugins: {},
+      tokenOptimizer: undefined
     });
-    expect(calls).toEqual(["/__molenkopf/usage", "/__molenkopf/keys"]);
+    expect(calls).toEqual(["/__molenkopf/usage", "/__molenkopf/keys", "/__molenkopf/plugins/token-optimizer-plugin/data"]);
   });
 
   it("loads full dashboard data for admins", async () => {
@@ -90,7 +98,9 @@ describe("api helpers", () => {
       "/__molenkopf/providers": { items: [] },
       "/__molenkopf/audit/summary": { requests: 0 },
       "/__molenkopf/plugins": { items: [] },
-      "/__molenkopf/identity": { users: [], teams: [] }
+      "/__molenkopf/identity": { users: [], teams: [] },
+      "/__molenkopf/plugin-policies/global": { globalPluginPolicy: {} },
+      "/__molenkopf/plugins/token-optimizer-plugin/data": { recommendations: [] }
     };
     vi.stubGlobal("fetch", vi.fn(async (path: RequestInfo | URL) => {
       const key = String(path);
@@ -102,7 +112,8 @@ describe("api helpers", () => {
       providers: { items: [] },
       summary: { requests: 0 },
       plugins: { items: [] },
-      identity: { users: [], teams: [] }
+      identity: { users: [], teams: [] },
+      tokenOptimizer: { recommendations: [] }
     });
     expect(calls).toEqual(Object.keys(payloads));
   });

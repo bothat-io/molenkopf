@@ -122,7 +122,7 @@ test("unknown plugin data routes return not found", async () => {
     const cookie = await setupAdmin(base);
     const response = await fetch(`${base}/__molenkopf/plugins/missing/data`, { headers: { cookie } });
     assert.equal(response.status, 404);
-    assert.deepEqual(await response.json(), { error: "unknown_plugin" });
+    assert.deepEqual(await response.json(), { error: "plugin_not_found" });
   } finally {
     if (proxy) await proxy.close();
     await close(upstream);

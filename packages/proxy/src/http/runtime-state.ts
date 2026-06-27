@@ -12,6 +12,7 @@ import { restoreRuntimeAuthProviders } from "./runtime-auth-registry.ts";
 import { loadRuntimeSettings } from "./runtime-settings.ts";
 import type { RuntimeAuthProofStore } from "./runtime-auth-proof.ts";
 import { requireSessionSecret } from "./session-secret.ts";
+import { buildRuntimePluginPolicyState, type PluginPolicyStore, resolveRequestPluginIds as resolvePolicyPluginIds } from "./runtime-plugin-policy.ts";
 
 export type { ResolvedAgent };
 export type RuntimeOptions = {
@@ -90,6 +91,7 @@ export type RuntimeState = {
   bootstrapSetup?: Promise<void>;
   settingsLoadWarning?: string;
   configSource: { kind: "env" | "file"; path?: string };
+  pluginPolicyState: PluginPolicyStore;
   identity?: IdentityStore;
   usageSnapshot?: UsageSnapshotStore;
 };
@@ -105,6 +107,9 @@ export function createRuntimeState(options: RuntimeOptions, host: string): Runti
   const providers = buildProviderCatalog(options.target, [...(options.providers ?? []), ...persistedProviders, ...restored.providers], process.env, { includeBuiltIns: !explicit, includeEnvProviders: !explicit });
   const weights = Object.fromEntries(providers.map((provider) => [provider.id, 1]));
   const requestedActive = options.activeProviderId ?? settings.activeProviderId ?? restored.activeProviderId ?? (explicit ? providers[0]?.id : "default") ?? "default";
+  const builtPolicy = buildRuntimePluginPolicyState(settings.pluginPolicy);
+  const settingWarnings = [...(loadedSettings.warning ? [loadedSettings.warning] : []), ...builtPolicy.warnings];
+  const settingsLoadWarning = settingWarnings.length ? settingWarnings.join("; ") : undefined;
   return {
     requests: 0,
     compressedItems: 0,
@@ -133,7 +138,8 @@ export function createRuntimeState(options: RuntimeOptions, host: string): Runti
     sessionSecret: requireSessionSecret(),
     authAttempts: {},
     runtimeAuthProofs: {},
-    settingsLoadWarning: loadedSettings.warning,
+    settingsLoadWarning,
+    pluginPolicyState: builtPolicy.state,
     configSource: options.configSource ?? { kind: "env" }
   };
 }
@@ -155,13 +161,8 @@ export function distributionEligible(provider: ProviderConfig): boolean {
   return provider.kind !== "cli" || provider.allowDistribution === true || Boolean(provider.runtimeAuthDir);
 }
 
-export function isPluginEnabled(state: RuntimeState, id: string): boolean {
-  const plugin = pluginCatalog.find((item) => item.id === id);
-  return plugin ? state.pluginEnabled[id] ?? plugin.enabledByDefault : false;
-}
-
-export function enabledPluginIds(state: RuntimeState): string[] {
-  return pluginCatalog.filter((plugin) => isPluginEnabled(state, plugin.id)).map((plugin) => plugin.id);
+export function resolveRequestPluginIds(state: RuntimeState, teamIds?: readonly string[]): string[] {
+  return resolvePolicyPluginIds(state, teamIds);
 }
 
 export function emptyUsage(): UsageTotals {
@@ -194,5 +195,5 @@ export function providerWeight(state: RuntimeState, id: string): number {
   const weight = state.providerWeights[id];
   return typeof weight === "number" ? weight : 1;
 }
-
+export { enabledPluginIds, isPluginEnabled, isPluginEnabledForRequest, isPluginAllowedForRequest, resolveEffectivePluginPolicy } from "./runtime-plugin-policy.ts";
 export { agentTokensUsed, keyCostUsed, keyTokensUsed, orgCostUsed, orgTokensUsed, recordUsage, teamCostUsed, teamTokensUsed, usageForPeriod, userCostUsed, userTokensUsed, userUsageKey } from "./usage-accounting.ts";

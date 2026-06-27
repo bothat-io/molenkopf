@@ -33,5 +33,8 @@ molenkopf.config.json
 .claude/cache/
 .claude/logs/
 .codex/
+
 NEXT.MD
 FIXME.md
+bothat-io-molenkopf-*
+WORK.md

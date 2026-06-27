@@ -25,6 +25,17 @@ flags first.
   UI-entered provider credentials. File config rejects inline raw credentials.
 - Read Docker and deployment settings before exposing a container port.
 
+## Plugin Boundaries
+
+- Plugin-originated structured output must pass `safePluginOutput(...)` before
+  it reaches Local API, dashboard responses, events, logs, or export.
+- Plugin storage writes must pass `safePluginStorageInput(...)` before
+  persistence.
+- Plugin storage must not contain raw prompts, raw responses, Authorization,
+  Cookie, `mk_` tokens, or provider credentials.
+- Team plugin policy may restrict Global policy only.
+- Key- and agent-scoped plugin policy does not exist in the MVP.
+
 ## Reports
 
 When the repository is hosted on GitHub, prefer GitHub private vulnerability

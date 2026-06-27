@@ -12,7 +12,7 @@ import { recordConcepts } from "../../../core/src/memory/memory-graph.ts";
 import { RetrievalStore } from "../../../core/src/store/retrieval-store.ts";
 import { buildForwardHeaders, missingProviderCredential } from "./header-utils.ts";
 import { handleLocalRequest } from "./local-api.ts";
-import { createRuntimeState, emptyUsage, isPluginEnabled, type RuntimeState } from "./runtime-state.ts";
+import { createRuntimeState, emptyUsage, resolveRequestPluginIds, type RuntimeState } from "./runtime-state.ts";
 import { resolveRouting } from "./agent-router.ts";
 import { buildManifest, finishRequest } from "./request-finish.ts";
 import { resolveClientIdentity, stripMolenkopfAuthHeaders } from "./proxy-identity.ts";
@@ -31,7 +31,7 @@ import { providerAllowedForClient } from "./provider-access.ts";
 import { restoreUsage } from "./usage-restore.ts";
 import { handleDashboardRequest, isDashboardRequest } from "./dashboard-assets.ts";
 import { createPluginHost, type PluginHost } from "./plugin-host.ts";
-import { effectiveRequestPolicy, enforceModelPolicy, pluginAllowedByPolicy } from "./request-policy.ts";
+import { effectiveRequestPolicy, enforceModelPolicy } from "./request-policy.ts";
 import type { ProxyOptions, RunningProxy } from "./server-types.ts";
 export async function startProxy(options: ProxyOptions): Promise<RunningProxy> {
   const host = options.host ?? "127.0.0.1";
@@ -91,6 +91,9 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
     return writeJson(res, 401, { error: "invalid_api_key" });
   }
   const client = resolved.client;
+  const policy = effectiveRequestPolicy(state, inbound, client);
+  const requestPluginIds = resolveRequestPluginIds(state, client.teamIds);
+  pluginHost?.setRequestPlugins(requestId, requestPluginIds);
   stripMolenkopfAuthHeaders(inbound);
   const budget = checkBudgets(state, client);
   if (budget.ok === false) return rejectBudget(res, events, requestId, budget);
@@ -104,13 +107,13 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
   events.emit("request_started", { requestId, data: { method: req.method, path } });
   const originalBody = await readBody(req);
   const jsonRequest = (inbound.get("content-type") ?? "").includes("application/json");
-  const policy = effectiveRequestPolicy(state, inbound, client);
-  const pluginActive = (id: string) => isPluginEnabled(state, id) && pluginAllowedByPolicy(policy, id);
   if (jsonRequest && originalBody) {
     const modelPolicy = enforceModelPolicy(policy, originalBody);
     if (modelPolicy.ok === false) { events.emit("request_failed", { requestId, data: { error: modelPolicy.error } }); return writeJson(res, modelPolicy.status, { error: modelPolicy.error }); }
   }
-  if (pluginActive("obsidian-graph-plugin") && originalBody) recordConcepts(state.memoryGraph, extractConcepts(redactSecrets(originalBody).text), new Date().toISOString());
+  if (requestPluginIds.includes("obsidian-graph-plugin") && originalBody) {
+    recordConcepts(state.memoryGraph, extractConcepts(redactSecrets(originalBody).text), new Date().toISOString());
+  }
   let body = originalBody;
   let audit: RewriteAudit | undefined;
   if (jsonRequest && originalBody) {
@@ -121,7 +124,7 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
       note(message) { ctx.notes.push(message); }
     };
     const ordered = [...builtinMiddlewares].sort((a, b) => orderIndex(state, a.id) - orderIndex(state, b.id));
-    await runRequestPipeline(ctx, pluginActive, { store }, ordered);
+    await runRequestPipeline(ctx, (id) => requestPluginIds.includes(id), { store }, ordered);
     if (ctx.block) { events.emit("request_failed", { requestId, data: { error: ctx.block.error } }); return writeJson(res, ctx.block.status, { error: ctx.block.error }); }
     if (ctx.providerId !== provider.id) {
       const next = state.providers.find((item) => item.id === ctx.providerId && item.enabled !== false);
@@ -153,18 +156,18 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
     if (canStreamOpenAiCli(path, body)) {
       const cli = await streamOpenAiCliProvider(provider, body, requestId, res);
       const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, cli.status, Date.now() - started, client, audit, cli.usage);
-      await finishRequest(manifest, auditStore, events, state, pluginHost);
+      await finishRequest(manifest, auditStore, events, state, pluginHost, requestPluginIds);
       return;
     }
     try {
       const cli = await runCliProvider(provider, body, requestId, path);
       const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, cli.status, Date.now() - started, client, audit, cli.usage);
-      await finishRequest(manifest, auditStore, events, state, pluginHost);
+      await finishRequest(manifest, auditStore, events, state, pluginHost, requestPluginIds);
       res.writeHead(cli.status, cli.headers);
       return res.end(cli.body);
     } catch (error) {
       const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, 502, Date.now() - started, client, audit);
-      await finishRequest(manifest, auditStore, events, state, pluginHost);
+      await finishRequest(manifest, auditStore, events, state, pluginHost, requestPluginIds);
       return writeJson(res, 502, { error: "proxy_error", requestId });
     }
   }
@@ -179,12 +182,12 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
     statusCode = result.statusCode;
   } catch (error) {
     const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, 502, Date.now() - started, client, audit);
-    await finishRequest(manifest, auditStore, events, state, pluginHost);
+    await finishRequest(manifest, auditStore, events, state, pluginHost, requestPluginIds);
     if (!res.headersSent) return writeJson(res, 502, { error: "proxy_error", requestId });
     return res.end();
   }
 const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, statusCode, Date.now() - started, client, audit, await scanner.finish());
-  await finishRequest(manifest, auditStore, events, state, pluginHost);
+  await finishRequest(manifest, auditStore, events, state, pluginHost, requestPluginIds);
 }
 function rejectBudget(res: ServerResponse, events: EventBus, requestId: string, budget: Exclude<ReturnType<typeof checkBudgets>, { ok: true }>) { events.emit("request_failed", { requestId, data: { error: budget.error } }); res.writeHead(budget.status, { "content-type": "application/json", "retry-after": "60" }); return res.end(JSON.stringify({ error: budget.error, tier: budget.tier, scope: budget.scopeId, metric: budget.metric })); }
 const headerValue = (value: number | string | string[] | undefined) => Array.isArray(value) ? value[0] : typeof value === "string" ? value : undefined;

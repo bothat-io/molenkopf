@@ -2,10 +2,13 @@ import { spawn } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
 import { startProxy } from "../../proxy/src/http/server.ts";
 
 const host = "127.0.0.1";
+const dashboardRoot = fileURLToPath(new URL("..", import.meta.url));
+const cypressBin = join(dashboardRoot, "node_modules", "cypress", "bin", "cypress");
 const requestedPort = e2ePort(process.env.MOLENKOPF_DASHBOARD_E2E_PORT);
 let dataDir: string | undefined;
 let proxy: Awaited<ReturnType<typeof startProxy>> | undefined;
@@ -33,11 +36,11 @@ try {
 
 function runCypress(baseUrl: string): Promise<number> {
   const child = spawn(process.execPath, [
-    "node_modules/cypress/bin/cypress",
+    cypressBin,
     "run",
     "--config",
     `baseUrl=${baseUrl}`
-  ], { stdio: "inherit" });
+  ], { cwd: dashboardRoot, stdio: "inherit" });
   return new Promise((resolve, reject) => {
     let settled = false;
     child.on("error", (error) => {

@@ -2,6 +2,12 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { AdminTab } from "./Admin";
 
+const pluginPolicyHandlers = {
+  onSaveGlobalPluginPolicy: () => {},
+  onSaveTeamPluginPolicy: () => {},
+  onResetTeamPluginPolicy: () => {}
+};
+
 describe("AdminTab", () => {
   it("marks enabled users without passwords as not login-ready", () => {
     const html = renderToString(<AdminTab
@@ -31,6 +37,7 @@ describe("AdminTab", () => {
       onRemoveUserFromTeam={() => {}}
       onTeamKey={() => {}}
       onUserKey={() => {}}
+      {...pluginPolicyHandlers}
     />);
 
     expect(html).toContain("no password");
@@ -68,6 +75,7 @@ describe("AdminTab", () => {
       onRemoveUserFromTeam={() => {}}
       onTeamKey={() => {}}
       onUserKey={() => {}}
+      {...pluginPolicyHandlers}
     />);
 
     expect(html).toContain("account off");

@@ -3,6 +3,7 @@ describe("dashboard smoke", () => {
 
   it("renders first-run setup and creates the administrator", () => {
     cy.request("/__molenkopf/me").its("body.needsSetup").should("equal", true);
+    cy.intercept("POST", "/__molenkopf/setup-admin").as("setupAdmin");
     cy.visit("/__molenkopf/dashboard/");
     cy.contains("Molenkopf").should("be.visible");
     cy.contains("Create the first admin").should("be.visible");
@@ -10,7 +11,8 @@ describe("dashboard smoke", () => {
     cy.get('input[name="displayName"]').type(admin.displayName);
     cy.get('input[name="password"]').type(admin.password);
     cy.contains("button", "Create admin").click();
-    cy.contains("button", "Overview").should("have.attr", "aria-selected", "true");
+    cy.wait("@setupAdmin").its("response.statusCode").should("equal", 200);
+    cy.contains("button", "Overview", { timeout: 10000 }).should("have.attr", "aria-selected", "true");
     cy.contains("My project keys").should("be.visible");
   });
 
@@ -109,9 +111,10 @@ describe("dashboard smoke", () => {
       cy.contains("Status");
       cy.contains("Actions");
     });
-    cy.get(".plugin-table tbody tr").should("have.length", 2);
+    cy.get(".plugin-table tbody tr").should("have.length", 3);
     cy.contains(".plugin-table tbody tr", "context-compressor-plugin").should("be.visible");
     cy.contains(".plugin-table tbody tr", "obsidian-graph-plugin").should("be.visible");
+    cy.contains(".plugin-table tbody tr", "token-optimizer-plugin").should("be.visible");
   });
 });
 

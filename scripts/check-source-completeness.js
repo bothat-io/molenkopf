@@ -25,6 +25,10 @@ export function sourceCompletenessFailures(root = process.cwd()) {
 }
 
 function checkDockerfileCopies(root, failures) {
+  if (!exists(root, "Dockerfile")) {
+    failures.push("Dockerfile missing");
+    return;
+  }
   const text = read(root, "Dockerfile");
   for (const line of text.split(/\r?\n/)) {
     const trimmed = line.trim();

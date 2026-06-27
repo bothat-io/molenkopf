@@ -5,7 +5,6 @@ export type EffectiveRequestPolicy = {
   agentId?: string;
   allowedModels?: string[];
   defaultModel?: string;
-  enabledPluginIds?: string[];
 };
 
 export type ModelPolicyResult = { ok: true } | { ok: false; status: number; error: string };
@@ -18,13 +17,8 @@ export function effectiveRequestPolicy(state: RuntimeState, headers: Headers, cl
   return {
     agentId,
     allowedModels: configAgent?.allowedModels,
-    defaultModel: configAgent?.defaultModel,
-    enabledPluginIds: configAgent?.enabledPluginIds ?? draft?.enabledPluginIds
+    defaultModel: configAgent?.defaultModel
   };
-}
-
-export function pluginAllowedByPolicy(policy: EffectiveRequestPolicy, pluginId: string): boolean {
-  return policy.enabledPluginIds === undefined || policy.enabledPluginIds.includes(pluginId);
 }
 
 export function enforceModelPolicy(policy: EffectiveRequestPolicy, body: string): ModelPolicyResult {

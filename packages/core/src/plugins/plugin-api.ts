@@ -76,6 +76,14 @@ export type PluginDataContext = {
   memoryGraph?: MemoryGraph;
 };
 
+export type PluginActionContext = {
+  actionId: string;
+  input: PluginJson;
+  userId?: string;
+  teamIds: string[];
+  scope: string;
+};
+
 export type PluginRuntimeContext = {
   pluginId: string;
   dataDir?: string;
@@ -92,5 +100,6 @@ export type MolenkopfPluginModule = {
   onAudit?: (ctx: PluginAuditContext, runtime: PluginRuntimeContext) => void | Promise<void>;
   onEvent?: (ctx: PluginEventContext, runtime: PluginRuntimeContext) => void | Promise<void>;
   getData?: (ctx: PluginDataContext, runtime: PluginRuntimeContext) => PluginJson | Promise<PluginJson>;
+  executeAction?: (action: PluginActionContext, runtime: PluginRuntimeContext) => PluginJson | Promise<PluginJson>;
   onStop?: (ctx: PluginLifecycleContext, runtime: PluginRuntimeContext) => void | Promise<void>;
 };

@@ -37,7 +37,7 @@ test("container command reaches health setup and plugin pages", async () => {
     assert.equal(setup.status, 200);
     const cookie = (setup.headers.get("set-cookie") ?? "").split(";")[0];
     const plugins = await fetchJson(`${base}/__molenkopf/plugins`, { headers: { cookie } }) as { items: { id: string; pagePath?: string }[] };
-    assert.deepEqual(plugins.items.map((item) => item.id).sort(), ["context-compressor-plugin", "obsidian-graph-plugin"]);
+    assert.deepEqual(plugins.items.map((item) => item.id).sort(), ["context-compressor-plugin", "obsidian-graph-plugin", "token-optimizer-plugin"]);
     for (const plugin of plugins.items) {
       assert.equal((await fetch(`${base}${plugin.pagePath}`, { headers: { cookie } })).status, 200);
     }

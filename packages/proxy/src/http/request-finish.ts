@@ -7,15 +7,17 @@ import { recordCommunicationGraph } from "./communication-graph.ts";
 import { safeSubjectId, type ClientIdentity } from "./client-identity.ts";
 import type { PluginHost } from "./plugin-host.ts";
 
-export async function finishRequest(manifest: AuditManifest, auditStore: AuditStore, events: EventBus, state: RuntimeState, pluginHost?: PluginHost): Promise<void> {
+export async function finishRequest(manifest: AuditManifest, auditStore: AuditStore, events: EventBus, state: RuntimeState, pluginHost?: PluginHost, pluginIds?: readonly string[]): Promise<void> {
   const stored = auditSafeManifest(manifest);
   await auditStore.write(stored);
   state.requests++;
   state.compressedItems += manifest.compressedItems;
   recordUsage(state, manifest);
   state.latest = stored;
-  if (isPluginEnabled(state, "obsidian-graph-plugin")) recordCommunicationGraph(state.communicationGraph, stored);
-  await pluginHost?.audit(stored);
+  const pluginActive = (id: string) => pluginIds ? pluginIds.includes(id) : isPluginEnabled(state, id);
+  if (pluginActive("obsidian-graph-plugin")) recordCommunicationGraph(state.communicationGraph, stored);
+  if (pluginIds) pluginHost?.setRequestPlugins(manifest.requestId, pluginIds);
+  await pluginHost?.audit(stored, pluginIds);
   events.emit("request_finished", { requestId: manifest.requestId, data: { statusCode: manifest.statusCode, durationMs: manifest.durationMs } });
 }
 

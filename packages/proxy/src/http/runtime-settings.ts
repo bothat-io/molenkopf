@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, renameSync } from "node:fs";
+﻿import { existsSync, readFileSync, renameSync } from "node:fs";
 import { rename } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
@@ -6,11 +6,11 @@ import { validateProviderTarget } from "../../../core/src/security/target-policy
 import { defaultDataDir } from "../../../core/src/storage/local-paths.ts";
 import { ensurePrivateDir, writePrivateFile } from "../../../core/src/storage/private-state.ts";
 import { CONTROL_PLANE_LIMITS, type AgentDraftMetadata, type RoutingMode, type RuntimeState } from "./runtime-state.ts";
-
 export type RuntimeSettings = {
   activeProviderId?: string;
   routingMode?: RoutingMode;
   pluginEnabled?: Record<string, boolean>;
+  pluginPolicy?: unknown;
   pluginOrder?: string[];
   providerWeights?: Record<string, number>;
   providers?: PersistedProvider[];
@@ -20,7 +20,6 @@ export type RuntimeSettings = {
 export type RuntimeSettingsLoad = { settings: RuntimeSettings; warning?: string };
 type PersistedProvider = Pick<ProviderConfig, "id" | "name" | "kind" | "target" | "credentialEnv" | "credentialRef" | "authScheme" | "protocol" | "enabled" | "allowDistribution" | "runtime" | "cliCommand" | "cliArgs" | "cliInputMode" | "cliTimeoutMs">;
 const BUILT_IN_IDS = new Set(["default", "openai-env", "anthropic-env", "ollama-local", "lmstudio-local"]);
-
 const FILE = "runtime-settings.json";
 
 export function loadRuntimeSettings(dataDir: string | undefined): RuntimeSettingsLoad {
@@ -43,6 +42,7 @@ export async function persistRuntimeSettings(state: RuntimeState): Promise<void>
   const data: RuntimeSettings = {
     activeProviderId: state.activeProviderId,
     routingMode: state.routingMode,
+    pluginPolicy: state.pluginPolicyState,
     pluginEnabled: state.pluginEnabled,
     pluginOrder: state.pluginOrder,
     providerWeights: state.providerWeights,
@@ -74,6 +74,7 @@ function cleanSettings(value: unknown): RuntimeSettings {
   return {
     activeProviderId: idOk(input.activeProviderId) ? input.activeProviderId : undefined,
     routingMode: input.routingMode === "manual" || input.routingMode === "distribute" ? input.routingMode : undefined,
+    pluginPolicy: typeof input.pluginPolicy === "object" && input.pluginPolicy !== null ? input.pluginPolicy : undefined,
     pluginEnabled: cleanBooleanMap(input.pluginEnabled),
     pluginOrder: cleanIdArray(input.pluginOrder),
     providerWeights: cleanWeights(input.providerWeights),

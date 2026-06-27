@@ -5,7 +5,7 @@ export const descriptor: PluginDescriptor = {
   name: "context-compressor-plugin",
   type: "transformer",
   category: "compression",
-  description: "Compresses large safe context and keeps retrievable originals locally.",
+  description: "Compresses large safe context and keeps bounded redacted excerpts locally.",
   traffic: { reads: ["redacted-body", "audit"], mutates: ["transform"] },
   permissions: ["body:read", "body:write", "audit:read", "audit:write"],
   hooks: ["request:body:rewrite", "audit:manifest", "workspace:local-page"],

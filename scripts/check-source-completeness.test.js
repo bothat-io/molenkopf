@@ -23,9 +23,18 @@ test("source completeness still rejects missing non-generated package files", as
   }
 });
 
-async function fixtureRoot(files) {
+test("source completeness reports a missing Dockerfile without throwing", async () => {
+  const root = await fixtureRoot(["packages/dashboard/dist/", "bin/"], { dockerfile: false });
+  try {
+    assert.ok(sourceCompletenessFailures(root).includes("Dockerfile missing"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+async function fixtureRoot(files, options = { dockerfile: true }) {
   const root = await mkdtemp(join(tmpdir(), "molenkopf-source-check-"));
-  await writeFile(join(root, "Dockerfile"), "");
+  if (options.dockerfile) await writeFile(join(root, "Dockerfile"), "");
   await mkdir(join(root, "bin"), { recursive: true });
   await writeFile(join(root, "bin", "molenkopf.js"), "");
   await mkdir(join(root, "packages", "dashboard", "public"), { recursive: true });

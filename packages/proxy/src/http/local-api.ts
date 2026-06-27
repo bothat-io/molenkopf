@@ -20,16 +20,18 @@ import { listIdentity, putIdentityTeam, putIdentityUser, removeIdentityTeam, rem
 import { importProviderAuth } from "./local-api-runtime-auth.ts";
 import { testProvider, testRuntimeProvider } from "./provider-test.ts";
 import { checkControlPlaneWrite } from "./control-plane-guard.ts";
+import { getGlobalPluginPolicy, getPluginPolicyEffective, getPluginPolicyEffectiveForPlugin, getTeamPluginPolicy, putGlobalPluginPolicy, putTeamPluginPolicy } from "./local-api-plugin-policies.ts";
 import { auditFilterForUser } from "./local-api-scope.ts";
 import { purgeRetention } from "./local-api-retention.ts";
 import type { PluginHost } from "./plugin-host.ts";
+import { runPluginAction } from "./local-api-plugin-actions.ts";
 
 const DEV_REVISION_PATH = "/__molenkopf/dev/revision";
 const PUBLIC_PATHS = new Set(["/__molenkopf/health", "/__molenkopf/login", "/__molenkopf/logout", "/__molenkopf/me", "/__molenkopf/setup-admin", DEV_REVISION_PATH]);
 const BOOTSTRAP_PATHS = new Set(["/__molenkopf/health", "/__molenkopf/me", "/__molenkopf/setup-admin"]);
 const ADMIN_READ_PATHS = new Set(["/__molenkopf/status", "/__molenkopf/plugins", "/__molenkopf/providers", "/__molenkopf/agents", "/__molenkopf/stats", "/__molenkopf/events"]);
 const MANAGE_PATHS = new Set([
-  "/__molenkopf/plugins/toggle", "/__molenkopf/plugins/reorder", "/__molenkopf/providers/select", "/__molenkopf/providers/weight", "/__molenkopf/providers/weights",
+  "/__molenkopf/plugins/toggle", "/__molenkopf/plugins/reorder", "/__molenkopf/plugin-policies/global", "/__molenkopf/providers/select", "/__molenkopf/providers/weight", "/__molenkopf/providers/weights",
   "/__molenkopf/providers/add", "/__molenkopf/providers/import-auth", "/__molenkopf/providers/test", "/__molenkopf/providers/test-runtime", "/__molenkopf/providers/update", "/__molenkopf/providers/remove",
   "/__molenkopf/routing/mode", "/__molenkopf/consumers/budget", "/__molenkopf/agents/draft",
   "/__molenkopf/identity/users", "/__molenkopf/identity/users/remove",
@@ -46,12 +48,18 @@ export async function handleLocalRequest(req: IncomingMessage, res: ServerRespon
     const user = open ? undefined : currentUser(state, req.headers.cookie ?? null);
     if (open && !BOOTSTRAP_PATHS.has(path)) return writeJson(res, 401, { error: "setup_required" });
     if (!open && !PUBLIC_PATHS.has(path) && !user) return writeJson(res, 401, { error: "unauthorized" });
-    if (!open && MANAGE_PATHS.has(path) && !canManage(state, user)) return writeJson(res, 403, { error: "forbidden" });
+    if (!open && (MANAGE_PATHS.has(path) || isPluginPolicyAdminPath(path)) && !canManage(state, user)) return writeJson(res, 403, { error: "forbidden" });
     if (!open && ADMIN_READ_PATHS.has(path) && !canManage(state, user)) return writeJson(res, 403, { error: "forbidden" });
     if (!methodAllowed(req.method ?? "GET", path)) return writeJson(res, 405, { error: "method_not_allowed" });
     if (path === "/__molenkopf/login") return login(req, res, state);
     if (path === "/__molenkopf/setup-admin") return setupAdmin(req, res, state);
     if (path === "/__molenkopf/plugins/reorder") return reorderPlugin(req, res, state);
+    if (path === "/__molenkopf/plugin-policies/global" && req.method === "GET") return getGlobalPluginPolicy(req, res, state);
+    if (path === "/__molenkopf/plugin-policies/global" && req.method === "PUT") return putGlobalPluginPolicy(req, res, state);
+    const pluginPolicyEffective = path.match(/^\/__molenkopf\/plugin-policies\/effective\/[^/]+\/[^/]+$/);
+    if (pluginPolicyEffective && req.method === "GET") return getPluginPolicyEffectiveForPlugin(req, res, state);
+    const pluginPolicyTeamEffective = path.match(/^\/__molenkopf\/plugin-policies\/effective\/([^/]+)$/);
+    if (pluginPolicyTeamEffective && req.method === "GET") return getPluginPolicyEffective(req, res, state);
     if (path === "/__molenkopf/logout") return logout(req, res);
     if (path === "/__molenkopf/me") return me(req, res, state);
     if (path === "/__molenkopf/health") return writeJson(res, 200, { ok: true });
@@ -92,6 +100,12 @@ export async function handleLocalRequest(req: IncomingMessage, res: ServerRespon
     if (path === "/__molenkopf/keys") return req.method === "POST" ? issueKeyHandler(req, res, state, user) : listKeysHandler(req, res, state, user);
     if (path === "/__molenkopf/keys/update") return updateKeyHandler(req, res, state, user);
     if (path === "/__molenkopf/keys/revoke") return revokeKeyHandler(req, res, state, user);
+    const pluginTeamPolicy = path.match(/^\/__molenkopf\/plugin-policies\/teams\/([^/]+)$/);
+    if (pluginTeamPolicy) {
+      if (req.method === "GET") return getTeamPluginPolicy(req, res, state);
+      if (req.method === "PUT") return putTeamPluginPolicy(req, res, state);
+      return writeJson(res, 405, { error: "method_not_allowed" });
+    }
     if (path === "/__molenkopf/usage") return usageHandler(req, res, state, user);
     if (path === "/__molenkopf/identity") {
       if (!open && !canManage(state, user)) return writeJson(res, 403, { error: "forbidden" });
@@ -102,8 +116,9 @@ export async function handleLocalRequest(req: IncomingMessage, res: ServerRespon
     if (path === "/__molenkopf/identity/teams") return putIdentityTeam(req, res, state);
     if (path === "/__molenkopf/identity/teams/remove") return removeIdentityTeam(req, res, state);
     if (path === "/__molenkopf/retention/purge") return purgeRetention(req, res, audit, state);
+    const pluginAction = path.match(/^\/__molenkopf\/plugins\/([^/]+)\/actions\/([^/]+)$/);
+    if (pluginAction && req.method === "POST") return runPluginAction(req, res, state, user, pluginHost);
     const pluginData = path.match(/^\/__molenkopf\/plugins\/([^/]+)\/data$/);
-    if (pluginData && !canManage(state, user)) return writeJson(res, 403, { error: "forbidden" });
     if (pluginData) return writePluginData(res, pluginData[1], audit, state, user, pluginHost);
     const pluginPage = path.match(/^\/__molenkopf\/plugins\/([^/]+)\/page$/);
     if (pluginPage && !canManage(state, user)) return writeJson(res, 403, { error: "forbidden" });
@@ -132,10 +147,19 @@ const POST_ONLY = new Set([
 function methodAllowed(method: string, path: string): boolean {
   const upper = method.toUpperCase();
   if (path === "/__molenkopf/keys") return upper === "GET" || upper === "POST";
+  if (path === "/__molenkopf/plugin-policies/global") return upper === "GET" || upper === "PUT";
   if (GET_ONLY.has(path)) return upper === "GET";
   if (POST_ONLY.has(path)) return upper === "POST";
+  if (/^\/__molenkopf\/plugin-policies\/teams\/[^/]+$/.test(path)) return upper === "GET" || upper === "PUT";
+  if (/^\/__molenkopf\/plugins\/[^/]+\/actions\/[^/]+$/.test(path)) return upper === "POST";
+  if (/^\/__molenkopf\/plugin-policies\/effective\/[^/]+\/[^/]+$/.test(path)) return upper === "GET";
+  if (/^\/__molenkopf\/plugin-policies\/effective\/[^/]+$/.test(path)) return upper === "GET";
   if (/^\/__molenkopf\/plugins\/[^/]+\/(?:data|page)$/.test(path)) return upper === "GET";
   return true;
+}
+
+function isPluginPolicyAdminPath(path: string): boolean {
+  return path === "/__molenkopf/plugin-policies/global" || /^\/__molenkopf\/plugin-policies\/teams\/[^/]+$/.test(path);
 }
 
 function writeDevRevision(res: ServerResponse) {
