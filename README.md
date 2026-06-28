@@ -15,6 +15,41 @@ Molenkopf has a fixed core safety pipeline for secret redaction, content classif
 Product intent and non-negotiable plugin semantics live in
 `docs/PRODUCT_INTENT.md` and `docs/MOLENKOPF_PLUGIN_API.md`.
 
+## Quickstart
+
+Install from npm with Node.js 24 or newer:
+
+```bash
+npm install -g @bothat-io/molenkopf
+node -e "require('node:fs').writeFileSync('.env','MOLENKOPF_SESSION_SECRET='+require('node:crypto').randomBytes(32).toString('hex')+'\n')"
+molenkopf proxy
+```
+
+Open `http://127.0.0.1:8787/` and create the first admin user.
+
+Quick Docker start on the Docker host:
+
+```bash
+cp .env.example .env
+# Edit .env and set a unique MOLENKOPF_SESSION_SECRET.
+docker run --rm --env-file .env -p 127.0.0.1:8787:8787 -v molenkopf-data:/data ghcr.io/bothat-io/molenkopf:latest
+```
+
+For local development, use a source checkout:
+
+```bash
+npm run bootstrap
+cp .env.example .env
+# Edit .env and set a unique MOLENKOPF_SESSION_SECRET.
+npm run dev
+```
+
+Use `docs/DEPLOYMENT.md` when you need a different port or non-loopback access.
+
+## Screenshot
+
+![Molenkopf dashboard overview](docs/assets/dashboard-overview.png)
+
 ## Safety Notice
 
 Do not run Molenkopf blindly with real provider accounts, private repositories,
@@ -120,44 +155,6 @@ Agent drafts are stored as local proxy metadata through `/__molenkopf/agents/dra
 For a step-by-step local setup and test flow, read `docs/MOLENKOPF_USAGE.md`.
 
 Plugin pages open in standalone windows from `/__molenkopf/plugins/context-compressor-plugin/page`, `/__molenkopf/plugins/token-optimizer-plugin/page`, and `/__molenkopf/plugins/project-graph-plugin/page`. The `project-graph-plugin` workspace is derived from token usage and scoped audit metadata, not source scans or raw prompts. Plugin pages group by project/key where available and surface plugin-data failures explicitly.
-
-## Commands
-Install from npm with Node.js 24 or newer:
-
-```bash
-npm install -g @bothat-io/molenkopf
-node -e "require('node:fs').writeFileSync('.env','MOLENKOPF_SESSION_SECRET='+require('node:crypto').randomBytes(32).toString('hex')+'\n')"
-molenkopf proxy
-```
-
-Quick Docker start on the Docker host:
-
-```bash
-cp .env.example .env
-# Edit .env and set a unique MOLENKOPF_SESSION_SECRET.
-docker pull ghcr.io/bothat-io/molenkopf:latest
-docker run --rm \
-  --env-file .env \
-  -p 127.0.0.1:8787:8787 \
-  -v molenkopf-data:/data \
-  ghcr.io/bothat-io/molenkopf:latest
-```
-
-Open `http://127.0.0.1:8787/` and create the first admin user. The Docker
-quickstart binds Molenkopf to `127.0.0.1` on the host for local use; do not
-publish the port publicly before admin setup and deployment security are done.
-Docker requires `--env-file .env`; admin users are created only in the browser.
-
-Use `docs/DEPLOYMENT.md` when you need a different port or non-loopback access.
-
-For local development, use a source checkout:
-
-```bash
-npm run bootstrap
-cp .env.example .env
-# Edit .env and set a unique MOLENKOPF_SESSION_SECRET.
-npm run dev
-```
 
 ## Connect A Client
 

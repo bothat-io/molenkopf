@@ -48,7 +48,8 @@ function manifest() {
     "packages/dashboard/public/favicon.png", "docs/DEPLOYMENT.md",
     "docs/PLUGIN_DEVELOPMENT.md", "docs/PLUGIN_POLICY.md",
     "docs/MOLENKOPF_USAGE.md", "docs/MOLENKOPF_PLUGIN_API.md",
-    "docs/PRODUCT_INTENT.md", "docs/plugins/", "docs/THREAT_MODEL.md",
+    "docs/PRODUCT_INTENT.md", "docs/assets/",
+    "docs/plugins/", "docs/THREAT_MODEL.md",
     "molenkopf.config.example.json", "README.md", "LICENSE", "SECURITY.md"
   ] };
 }
@@ -77,7 +78,8 @@ function requiredPaths() {
     "packages/dashboard/public/favicon.png", "docs/DEPLOYMENT.md",
     "docs/PLUGIN_DEVELOPMENT.md", "docs/PLUGIN_POLICY.md",
     "docs/MOLENKOPF_USAGE.md", "docs/MOLENKOPF_PLUGIN_API.md",
-    "docs/PRODUCT_INTENT.md", "docs/plugins/context-compressor-plugin.md",
+    "docs/PRODUCT_INTENT.md", "docs/assets/dashboard-overview.png",
+    "docs/plugins/context-compressor-plugin.md",
     "docs/plugins/token-optimizer-plugin.md", "docs/THREAT_MODEL.md",
     "molenkopf.config.example.json", "README.md", "LICENSE", "SECURITY.md"
   ];

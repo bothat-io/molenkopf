@@ -22,6 +22,7 @@ const requiredFiles = [
   "docs/MOLENKOPF_USAGE.md",
   "docs/MOLENKOPF_PLUGIN_API.md",
   "docs/PRODUCT_INTENT.md",
+  "docs/assets/dashboard-overview.png",
   "docs/plugins/context-compressor-plugin.md",
   "docs/plugins/token-optimizer-plugin.md",
   "docs/THREAT_MODEL.md",
@@ -38,6 +39,7 @@ const approvedTarballPaths = [
   /^packages\/dashboard\/dist\/.+/,
   /^packages\/dashboard\/public\/molenkopf-logo\.png$/,
   /^packages\/dashboard\/public\/favicon\.png$/,
+  /^docs\/assets\/[^/]+\.png$/,
   /^docs\/[^/]+\.md$/,
   /^docs\/plugins\/[^/]+\.md$/
 ];

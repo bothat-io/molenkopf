@@ -48,6 +48,7 @@
     "docs/MOLENKOPF_USAGE.md",
     "docs/PRODUCT_INTENT.md",
     "docs/plugins/",
+    "docs/assets/",
     "docs/THREAT_MODEL.md",
     "molenkopf.config.example.json",
     "README.md",
