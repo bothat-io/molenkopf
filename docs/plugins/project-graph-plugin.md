@@ -7,14 +7,15 @@ configured project roots.
 
 - discovers files only under an admin-supplied root
 - stores structural graph metadata, not full source files
-- exposes graph summaries through the generic plugin data route
-- exposes scan and query actions through the generic plugin action route
+- stores graph metadata under plugin storage in the local Molenkopf data dir
+- exposes graph summaries, routes, symbols, storage facts, and event facts through the generic plugin data route
+- exposes scan, query, neighborhood, and delete actions through the generic plugin action route
 
 ## Descriptor v2
 
 - category: `storage`
 - risk: `orange`
-- MVP action: `scan.preview`
+- MVP actions: `scan.preview`, `scan.run`, `graph.query`, `graph.neighborhood`, `graph.delete`
 - workspace data scopes: `metrics`, `project-graph`, `routes`, `symbols`
 
 ## Non-goals
@@ -29,4 +30,6 @@ configured project roots.
 
 - project scanning uses explicit roots only
 - denied paths and sensitive file names are excluded
+- graph writes pass plugin storage safety before persistence
 - plugin output still passes platform `safePluginOutput(...)`
+- persisted graph data stores structural metadata and safe signatures only, not full source bodies

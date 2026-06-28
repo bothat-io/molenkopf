@@ -40,7 +40,7 @@ export const descriptorV2: PluginDescriptorV2 = {
       inputSchema: { type: "object", properties: { rootPath: { type: "string", maxLength: 500 }, mode: { type: "enum", values: ["manual"], default: "manual" } }, required: ["rootPath"] },
       outputSchema: { type: "object", properties: {}, additionalProperties: true },
       confirmation: "required",
-      sideEffects: ["none"],
+      sideEffects: ["storage"],
       auditEvent: true,
       outputSafety: "adminSafe"
     },
@@ -71,9 +71,23 @@ export const descriptorV2: PluginDescriptorV2 = {
       sideEffects: ["none"],
       auditEvent: false,
       outputSafety: "strict"
+    },
+    {
+      id: "graph.delete",
+      label: "Delete graph",
+      description: "Delete the stored project graph for a root id.",
+      requiredCapabilities: ["project:graph:write", "action:execute"],
+      requiredRole: "admin",
+      risk: "orange",
+      inputSchema: { type: "object", properties: { rootId: { type: "string", maxLength: 80 }, confirm: { type: "string", maxLength: 80 } }, required: ["rootId", "confirm"] },
+      outputSchema: { type: "object", properties: {}, additionalProperties: true },
+      confirmation: "typed",
+      sideEffects: ["storage"],
+      auditEvent: true,
+      outputSafety: "adminSafe"
     }
   ],
-  defaultPolicy: { enabled: true, maxRisk: "orange", capabilities, settings: projectGraphSettingsSchema, actions: ["scan.preview", "scan.run", "graph.query", "graph.neighborhood"] },
+  defaultPolicy: { enabled: true, maxRisk: "orange", capabilities, settings: projectGraphSettingsSchema, actions: ["scan.preview", "scan.run", "graph.query", "graph.neighborhood", "graph.delete"] },
   workspace: {
     pagePath: "/__molenkopf/plugins/project-graph-plugin/page",
     dataPath: "/__molenkopf/plugins/project-graph-plugin/data"

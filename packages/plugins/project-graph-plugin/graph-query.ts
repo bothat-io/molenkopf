@@ -5,6 +5,16 @@ export function searchSymbols(graph: ProjectGraph, query: string, options: { lim
   return graph.nodes.filter((node) => node.kind === "symbol" && node.label.toLowerCase().includes(needle)).slice(0, options.limit ?? 20);
 }
 
+export function searchGraph(graph: ProjectGraph, query: string, options: { kind?: ProjectGraphNode["kind"]; limit?: number } = {}): ProjectGraphNode[] {
+  const needle = query.toLowerCase();
+  return graph.nodes.filter((node) => {
+    if (options.kind && node.kind !== options.kind) return false;
+    return node.label.toLowerCase().includes(needle)
+      || node.path?.toLowerCase().includes(needle)
+      || node.symbolName?.toLowerCase().includes(needle);
+  }).slice(0, options.limit ?? 20);
+}
+
 export function findFile(graph: ProjectGraph, pathOrName: string): ProjectGraphNode | undefined {
   return graph.nodes.find((node) => node.kind === "file" && (node.path === pathOrName || node.label === pathOrName));
 }
@@ -33,4 +43,16 @@ export function getNeighborhood(graph: ProjectGraph, nodeId: string, depth = 1):
 
 export function listRoutes(graph: ProjectGraph): ProjectGraphNode[] {
   return graph.nodes.filter((node) => node.kind === "route");
+}
+
+export function listPluginFacts(graph: ProjectGraph): ProjectGraphNode[] {
+  return graph.nodes.filter((node) => node.kind === "pluginDescriptor" || node.kind === "pluginAction");
+}
+
+export function listStorageUsage(graph: ProjectGraph): ProjectGraphNode[] {
+  return graph.nodes.filter((node) => node.kind === "storageResource");
+}
+
+export function listEventUsage(graph: ProjectGraph): ProjectGraphNode[] {
+  return graph.nodes.filter((node) => node.kind === "event");
 }

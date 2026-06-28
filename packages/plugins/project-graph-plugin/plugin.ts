@@ -3,17 +3,22 @@ import { handleProjectGraphAction, projectGraphDataView } from "./actions.ts";
 export { descriptorV2 } from "./descriptor-v2.ts";
 
 export const plugin: MolenkopfPluginModule = {
-  getData(ctx) {
+  async getData(ctx, runtime) {
+    const graphData = await projectGraphDataView(runtime);
     return {
       plugin: ctx.plugin,
       scopes: ctx.scopes,
       settingsView: {},
-      ...projectGraphDataView(),
       latestScanStatus: "not_scanned",
       latestWarnings: [],
+      graphSummaries: [],
+      routes: [],
+      topFilesByDegree: [],
+      topSymbolsByDegree: [],
       pluginDescriptorFacts: [],
       storageUsageFacts: [],
       eventUsageFacts: [],
+      ...graphData,
       queryExamples: ["symbol:PluginDescriptor", "route:/__molenkopf", "tests:plugin"],
       safety: {
         storesFullSource: false,
