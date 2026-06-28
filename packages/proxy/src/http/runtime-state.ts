@@ -192,9 +192,6 @@ function cleanRoutingMode(value: unknown): RoutingMode | undefined {
   return value === "manual" || value === "distribute" ? value : undefined;
 }
 
-export function providerWeight(state: RuntimeState, id: string): number {
-  const weight = state.providerWeights[id];
-  return typeof weight === "number" ? weight : 1;
-}
+export function providerWeight(state: RuntimeState, id: string): number { return typeof state.providerWeights[id] === "number" ? state.providerWeights[id] : 1; }
 export { enabledPluginIds, isPluginEnabled, isPluginEnabledForRequest, isPluginAllowedForRequest, resolveEffectivePluginPolicy } from "./runtime-plugin-policy.ts";
 export { agentTokensUsed, keyCostUsed, keyTokensUsed, orgCostUsed, orgTokensUsed, recordUsage, teamCostUsed, teamTokensUsed, usageForPeriod, userCostUsed, userTokensUsed, userUsageKey } from "./usage-accounting.ts";

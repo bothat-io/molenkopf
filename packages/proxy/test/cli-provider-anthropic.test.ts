@@ -1,10 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
 import { auth, cookieOf, issueKey } from "./proxy-auth-utils.ts";
+import { waitForExit, waitForFile } from "./cli-process-utils.ts";
 
 test("Claude CLI providers answer Anthropic messages with Anthropic JSON", async () => {
   const dir = await mkdtemp(join(tmpdir(), "molenkopf-cli-anthropic-"));
@@ -183,25 +184,3 @@ test("aborted Anthropic message streams stop the local Claude child", async () =
     await rm(dir, { recursive: true, force: true });
   }
 });
-
-async function waitForFile(path: string): Promise<string> {
-  const deadline = Date.now() + 3000;
-  for (;;) {
-    try { return await readFile(path, "utf8"); } catch {}
-    if (Date.now() > deadline) throw new Error(`timed out waiting for ${path}`);
-    await delay(50);
-  }
-}
-
-async function waitForExit(pid: number): Promise<void> {
-  const deadline = Date.now() + 5000;
-  for (;;) {
-    try { process.kill(pid, 0); } catch { return; }
-    if (Date.now() > deadline) throw new Error(`process ${pid} did not exit`);
-    await delay(50);
-  }
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
