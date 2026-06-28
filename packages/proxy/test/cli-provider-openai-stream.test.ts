@@ -125,6 +125,64 @@ test("Codex CLI JSON events stream visible steps and text deltas", async () => {
   }
 });
 
+test("Codex CLI item events stream assistant text without raw JSONL", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "molenkopf-cli-openai-item-stream-"));
+  let proxy: Awaited<ReturnType<typeof startProxy>> | undefined;
+  try {
+    const script = join(dir, "fake-codex-items.cjs");
+    await writeFile(script, [
+      "process.stdin.resume();",
+      "process.stdin.on('end', () => {",
+      "  console.log(JSON.stringify({ type: 'thread.started', thread_id: 'thread-1' }));",
+      "  console.log(JSON.stringify({ type: 'turn.started' }));",
+      "  console.log(JSON.stringify({ type: 'item.completed', item: { id: 'item_0', type: 'agent_message', text: 'visible assistant text' } }));",
+      "  console.log(JSON.stringify({ type: 'item.started', item: { id: 'item_1', type: 'command_execution', command: 'Get-Secret sk-test-secret', status: 'in_progress' } }));",
+      "  console.log(JSON.stringify({ type: 'item.completed', item: { id: 'item_1', type: 'command_execution', command: 'Get-Secret sk-test-secret', aggregated_output: 'secret output', exit_code: 0, status: 'completed' } }));",
+      "  console.log(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 10, output_tokens: 2 } }));",
+      "});"
+    ].join("\n"));
+    proxy = await startProxy({
+      port: 0,
+      target: "cli://codex-local",
+      providers: [{
+        id: "codex-local",
+        name: "Codex Local",
+        kind: "cli",
+        target: "cli://codex-local",
+        runtime: "codex",
+        cliCommand: process.execPath,
+        cliArgs: [script],
+        cliInputMode: "stdin"
+      }],
+      activeProviderId: "codex-local",
+      providerCatalogMode: "explicit",
+      dataDir: dir
+    });
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const admin = cookieOf(await fetch(`${base}/__molenkopf/setup-admin`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: "admin-secret" }) }));
+    const key = await issueKey(base, admin, "cli-openai-item-stream");
+
+    const response = await fetch(`${base}/v1/responses`, {
+      method: "POST",
+      headers: auth(key, { "content-type": "application/json" }),
+      body: JSON.stringify({ stream: true, model: "codex-client-model", input: "hello stream" })
+    });
+
+    assert.equal(response.status, 200);
+    const text = await response.text();
+    assert.match(text, /visible assistant text/);
+    assert.match(text, /event: response\.completed/);
+    assert.doesNotMatch(text, /thread\.started/);
+    assert.doesNotMatch(text, /item\.completed/);
+    assert.doesNotMatch(text, /Get-Secret/);
+    assert.doesNotMatch(text, /sk-test-secret/);
+    assert.doesNotMatch(text, /secret output/);
+  } finally {
+    if (proxy) await proxy.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("failed Codex CLI streams still complete the OpenAI Responses stream", async () => {
   const dir = await mkdtemp(join(tmpdir(), "molenkopf-cli-openai-failed-stream-"));
   let proxy: Awaited<ReturnType<typeof startProxy>> | undefined;

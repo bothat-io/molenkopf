@@ -7,7 +7,7 @@ export type CliOutputEvent =
 export type CliOutputCollector = ReturnType<typeof createCliOutputCollector>;
 
 export function createCliOutputCollector(onEvent?: (event: CliOutputEvent) => void) {
-  let pending = "", jsonSeen = false, streamedText = "", finalText = "";
+  let pending = "", jsonSeen = false, eventJsonSeen = false, streamedText = "", finalText = "";
   return {
     feed(chunk: Buffer) {
       pending += chunk.toString("utf8");
@@ -19,7 +19,7 @@ export function createCliOutputCollector(onEvent?: (event: CliOutputEvent) => vo
       if (pending.trim()) handleLine(pending);
       pending = "";
       if (!jsonSeen) return rawText;
-      return (streamedText || finalText || rawText).trim();
+      return (streamedText || finalText || (eventJsonSeen ? "" : rawText)).trim();
     },
     get streamedText() { return streamedText; }
   };
@@ -30,6 +30,7 @@ export function createCliOutputCollector(onEvent?: (event: CliOutputEvent) => vo
     const event = parseJson(trimmed);
     if (!event) return;
     jsonSeen = true;
+    if (isEventJson(event)) eventJsonSeen = true;
     const final = finalOutputText(event);
     if (final) {
       finalText = final;
@@ -64,6 +65,7 @@ function finalOutputText(event: Record<string, unknown>): string {
 function deltaText(event: Record<string, unknown>): string {
   const type = text(event.type ?? event.event).toLowerCase();
   return firstText(
+    codexAgentMessageText(event),
     nested(event, "delta", "text"),
     event.delta,
     type.includes("message") || type.includes("text") ? event.text : undefined,
@@ -76,10 +78,24 @@ function deltaText(event: Record<string, unknown>): string {
 function stepLabel(event: Record<string, unknown>): string {
   const raw = text(event.type ?? event.event);
   const type = raw.toLowerCase();
+  const itemType = text(nested(event, "item", "type"));
+  if (type.startsWith("item.") && itemType && itemType !== "agent_message") {
+    return safeLabel([itemType, text(nested(event, "item", "status"))].filter(Boolean).join(" "));
+  }
   if (!raw || /(?:delta|message|text|result|completed|complete|created|progress)/.test(type)) return "";
   if (!/(?:tool|exec|command|patch|mcp|task|plan|step|turn|action)/.test(type)) return "";
   const name = firstText(event.name, event.tool_name, event.toolName, nested(event, "tool", "name"), nested(event, "item", "name"));
   return safeLabel(name ? `${raw}: ${name}` : raw);
+}
+
+function isEventJson(event: Record<string, unknown>): boolean {
+  return typeof event.type === "string" || typeof event.event === "string" || Boolean(nested(event, "item", "type"));
+}
+
+function codexAgentMessageText(event: Record<string, unknown>): string {
+  if (text(event.type ?? event.event) !== "item.completed") return "";
+  if (text(nested(event, "item", "type")) !== "agent_message") return "";
+  return firstText(nested(event, "item", "text"), contentText(nested(event, "item", "content")));
 }
 
 function contentText(value: unknown): string {
