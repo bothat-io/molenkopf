@@ -9,6 +9,10 @@ Routes, flags, and environment variables use Molenkopf names.
   - Binds `127.0.0.1:8787`
   - Uses `.molenkopf/dev`
   - Starts the Vite dashboard unless `MOLENKOPF_DASHBOARD_DEV=0`
+  - Restarts the proxy on Core/Proxy source changes
+- Stable development: `npm run dev:ignorechanges`
+  - Uses the same dev port, data dir, and Vite dashboard
+  - Does not restart Molenkopf when Core/Proxy source files change
 - Test server: `npm run serve:test`
   - Binds `127.0.0.1:8798`
   - Uses `.molenkopf/test`

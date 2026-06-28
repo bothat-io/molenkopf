@@ -49,6 +49,15 @@ test("serves a plugin's own page from its plugin folder", async () => {
     assert.match(graphHtml, /Plugin data unavailable/);
     assert.doesNotMatch(graphHtml, /catch\(\(\) => \(\{\}\)\)/);
     assert.doesNotMatch(graphHtml, /setInterval/);
+    const optimizer = await pluginFetch(base, "token-optimizer-plugin", cookie);
+    assert.equal(optimizer.status, 200);
+    const optimizerHtml = await optimizer.text();
+    assert.match(optimizerHtml, /Token optimizer/);
+    assert.match(optimizerHtml, /Cache metrics are not reported yet/);
+    assert.match(optimizerHtml, /Pricing is not configured/);
+    assert.match(optimizerHtml, /No plugin budget limit configured/);
+    assert.match(optimizerHtml, /No compression savings recorded/);
+    assert.match(optimizerHtml, /Review this finding before changing routing/);
     const missing = await pluginFetch(base, "does-not-exist", cookie);
     assert.equal(missing.status, 404);
   } finally {

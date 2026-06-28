@@ -8,6 +8,7 @@ export type TokenOptimizerRecommendation = {
   kind: "repeated_context" | "high_prompt_volume" | "budget_warning";
   severity: "green" | "yellow";
   summary: string;
+  action: string;
 };
 
 export function buildRecommendations(
@@ -22,7 +23,8 @@ export function buildRecommendations(
       id: "repeated-context",
       kind: "repeated_context",
       severity: "yellow",
-      summary: `Repeated context detected in ${repeated[0].endpoint}`
+      summary: `Repeated context detected in ${repeated[0].endpoint}`,
+      action: "Move stable instructions into a shared system prompt, profile, or retrieval note."
     });
   }
   if (buckets[0] && buckets[0].inputTokens >= 500) {
@@ -30,7 +32,8 @@ export function buildRecommendations(
       id: "high-prompt-volume",
       kind: "high_prompt_volume",
       severity: "yellow",
-      summary: `High prompt volume observed for ${buckets[0].label}`
+      summary: `High prompt volume observed for ${buckets[0].label}`,
+      action: "Inspect this route for repeated boilerplate, oversized tool context, or unused history."
     });
   }
   if (budgets.pressure !== "low" && observations.requests > 0) {
@@ -38,7 +41,8 @@ export function buildRecommendations(
       id: "budget-warning",
       kind: "budget_warning",
       severity: "yellow",
-      summary: `Budget pressure is ${budgets.pressure}`
+      summary: `Budget pressure is ${budgets.pressure}`,
+      action: "Set a project budget limit and review high-volume buckets before changing routing."
     });
   }
   return recommendations;

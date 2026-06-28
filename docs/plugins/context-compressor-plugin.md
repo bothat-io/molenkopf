@@ -9,6 +9,13 @@ The Context Compressor plugin is responsible for request-body compression.
 - writes bounded audit metadata
 - exposes local plugin data for compression summaries
 
+## Descriptor v2
+
+- category: `compression`
+- risk: `green`
+- executable actions: none in MVP
+- workspace data scopes: `metrics`, `audit-summary`, `requests`
+
 ## Non-goals
 
 - no token-budget policy ownership

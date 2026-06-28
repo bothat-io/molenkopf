@@ -17,4 +17,5 @@ test("token optimizer creates recommendation summaries from repeated context and
   assert.equal(recommendations.length >= 2, true);
   assert.equal(recommendations.some((item) => item.kind === "repeated_context"), true);
   assert.equal(recommendations.some((item) => item.kind === "budget_warning"), true);
+  assert.equal(recommendations.every((item) => item.action.length > 0), true);
 });

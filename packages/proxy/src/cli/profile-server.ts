@@ -47,6 +47,10 @@ export function devWatchEnabled(profile: Profile, env: Record<string, string | u
   return profile.name === "dev" && env.MOLENKOPF_DEV_WATCH !== "0";
 }
 
+export function cliDevWatchEnabled(profile: Profile, argv: readonly string[] = process.argv, env: Record<string, string | undefined> = process.env) {
+  return devWatchEnabled(profile, env) && !argv.includes("--no-watch");
+}
+
 function spawnProxy(profile: Profile, revision?: string) {
   const env: NodeJS.ProcessEnv = { ...process.env, MOLENKOPF_PROFILE: profile.name };
   if (revision) env.MOLENKOPF_DEV_REVISION = revision;
@@ -60,9 +64,20 @@ function run() {
   ensurePrivateDirSync(profile.dataDir);
   console.log(`Molenkopf ${profile.name}: http://${profile.host}:${profile.port}`);
   console.log(`data-dir: ${profile.dataDir}`);
-  if (devWatchEnabled(profile)) return runWatched(profile);
+  if (cliDevWatchEnabled(profile)) return runWatched(profile);
+  const dashboard = profile.name === "dev" && dashboardDevEnabled() ? spawnDashboardDev() : undefined;
   const child = spawnProxy(profile);
-  child.on("exit", (code, signal) => process.exit(code ?? (signal ? 1 : 0)));
+  const stop = (code: number) => {
+    child.kill();
+    dashboard?.kill();
+    process.exit(code);
+  };
+  child.on("exit", (code, signal) => {
+    dashboard?.kill();
+    process.exit(code ?? (signal ? 1 : 0));
+  });
+  process.on("SIGINT", () => stop(130));
+  process.on("SIGTERM", () => stop(143));
 }
 
 function runWatched(profile: Profile) {

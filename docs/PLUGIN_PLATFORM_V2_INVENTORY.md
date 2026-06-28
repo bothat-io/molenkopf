@@ -1,16 +1,20 @@
-﻿# Plugin Platform v2 Inventory (Phase 0)
+﻿# Plugin Platform v2 Inventory
 
-This is the binding baseline inventory before runtime behavior changes are committed.
+This is the binding inventory for the current local built-in plugin platform.
 
 ## 1. Descriptor and registry state
 
-- Descriptor source: `packages/core/src/plugins/plugin-descriptor.ts`
-  - `PluginDescriptor`: legacy shape (`type`, `category`, `traffic`, `permissions`, `hooks`, `toggle`, `workspace`, `modulePath`)
+- Descriptor source: `packages/core/src/plugins/plugin-descriptor-v2.ts`
+  - `PluginDescriptorV2`: runtime policy shape (`risk`, `capabilities`,
+    `settingsSchema`, `actions`, `defaultPolicy`, `workspace`, `dataScopes`,
+    `modulePath`)
+- Legacy catalog adapter: `packages/core/src/plugins/plugin-descriptor.ts`
 - Derived catalog: `packages/core/src/plugins/plugin-catalog.ts`
 - Built-ins: `packages/core/src/plugins/builtin-plugin-descriptors.ts`
 - Built-in descriptors/modules:
-  - `context-compressor-plugin` → `packages/plugins/context-compressor-plugin/descriptor.ts`, `plugin.ts`, `page.html`
-  - `obsidian-graph-plugin` → `packages/plugins/obsidian-graph-plugin/descriptor.ts`, `plugin.ts`, `page.html`
+  - `context-compressor-plugin` -> `packages/plugins/context-compressor-plugin/descriptor-v2.ts`, `plugin.ts`, `page.html`
+  - `obsidian-graph-plugin` -> `packages/plugins/obsidian-graph-plugin/descriptor-v2.ts`, `plugin.ts`, `page.html`
+  - `token-optimizer-plugin` -> `packages/plugins/token-optimizer-plugin/descriptor-v2.ts`, `plugin.ts`, `page.html`
 
 ## 2. Hardcoded plugin routes and request decisions
 
@@ -25,6 +29,9 @@ This is the binding baseline inventory before runtime behavior changes are commi
   - Handler: `plugin-page-loader.ts`
 - `GET /__molenkopf/plugins/:id/data`
   - Handler: `buildPluginData()` in `plugin-data.ts`
+- `POST /__molenkopf/plugins/:id/actions/:actionId`
+  - Handler: `runPluginAction()` in `local-api-plugin-actions.ts`
+  - Requires descriptor action metadata and effective policy permission
 - `POST /__molenkopf/plugins/reorder`
   - Current UI-only pipeline reordering endpoint
 
@@ -73,6 +80,7 @@ This is the binding baseline inventory before runtime behavior changes are commi
 - Core
   - `packages/core/test/plugin-descriptor.test.ts`
 - Proxy
+  - `packages/proxy/test/plugin-action-router.test.ts`
   - `packages/proxy/test/plugin-host.test.ts`
   - `packages/proxy/test/plugin-folder-pages.test.ts`
   - `packages/proxy/test/proxy-plugin-data.test.ts`
@@ -80,7 +88,7 @@ This is the binding baseline inventory before runtime behavior changes are commi
   - `packages/proxy/test/container-command-smoke.test.ts`
   - `packages/proxy/test/proxy-e2e.test.ts`
 
-## 7. Phase 0 migration targets
+## 7. Remaining migration targets
 
 - Replace legacy helper usage with request-policy-aware checks (or explicit source-of-truth flags) in:
   - `server.ts` request plugin gate
@@ -89,7 +97,7 @@ This is the binding baseline inventory before runtime behavior changes are commi
 - Keep route shape (`/__molenkopf/plugins/:id/page`, `/__molenkopf/plugins/:id/data`) in phase 0
 - Keep behavior unchanged until phase 1 validation is complete, except for explicit preparatory cleanup already in place.
 
-## 8. Phase 0 done criteria
+## 8. Inventory done criteria
 
 - Inventory exists and is complete.
 - Migration target for each legacy route/helper is documented.

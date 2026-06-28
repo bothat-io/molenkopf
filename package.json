@@ -81,9 +81,11 @@
     "release:npm:publish": "node scripts/publish-npm-release.js",
     "release:verify": "npm run test:unit && npm run e2e && npm run smoke:installed && npm run smoke:docker",
     "serve:dev": "node --experimental-strip-types --experimental-sqlite --disable-warning=ExperimentalWarning packages/proxy/src/cli/profile-server.ts dev",
+    "serve:dev:ignorechanges": "node --experimental-strip-types --experimental-sqlite --disable-warning=ExperimentalWarning packages/proxy/src/cli/profile-server.ts dev --no-watch",
     "serve:test": "node --experimental-strip-types --experimental-sqlite --disable-warning=ExperimentalWarning packages/proxy/src/cli/profile-server.ts test",
     "serve:prod": "npm --prefix packages/dashboard run build && node --experimental-strip-types --experimental-sqlite --disable-warning=ExperimentalWarning packages/proxy/src/cli/profile-server.ts prod",
     "dev": "npm run serve:dev",
+    "dev:ignorechanges": "npm run serve:dev:ignorechanges",
     "prod": "npm run serve:prod"
   },
   "directories": {

@@ -15,6 +15,7 @@ export type PluginView = {
   status?: "enabled" | "disabled"; lifecycleStatus?: "enabled" | "disabled" | "booted" | "stopped" | "error"; lifecycleError?: string;
   permissions?: string[]; hooks?: string[]; traffic?: { reads?: string[]; mutates?: string[] };
   pipelineIndex?: number; order?: number; pagePath?: string; dataPath?: string; dataScopes?: string[]; description?: string;
+  actions?: { id: string; label: string; risk: string; requiredRole: string; sideEffects: string[] }[];
 };
 export type PluginPolicyOverride = { enabled?: boolean; maxRisk?: string; capabilities?: string[]; actions?: string[]; settings?: Record<string, unknown> };
 export type GlobalPluginPolicyView = {
@@ -47,7 +48,7 @@ export type TokenOptimizerData = {
   observations?: { requests?: number; inputTokens?: number; outputTokens?: number; savedTokens?: number };
   buckets?: { id: string; label: string; requests: number; inputTokens: number; outputTokens: number }[];
   repeatedContext?: { project: string; endpoint: string; requests: number; repeatedInputTokens: number }[];
-  recommendations?: { id: string; kind: string; severity: string; summary: string }[];
+  recommendations?: { id: string; kind: string; severity: string; summary: string; action: string }[];
   budgets?: { pressure?: string; warnings?: string[]; totalTokens?: { state: string; value?: number }; budgetLimit?: { state: string; reason?: string } };
   cacheSavings?: { state: string; value?: number; reason?: string };
   estimatedCostEur?: { state: string; value?: number; reason?: string };

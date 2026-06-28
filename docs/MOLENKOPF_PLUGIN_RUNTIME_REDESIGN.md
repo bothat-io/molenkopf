@@ -39,7 +39,7 @@ plugin workspace or to a clearly labelled audit view.
 | Plugin SDK | `packages/core/src/plugins/plugin-sdk.ts` | Local registry exists; remote plugins stay disabled. |
 | Static pipeline | `packages/core/src/plugins/static-pipeline.ts` | Names stages; generic hook runtime remains a target. |
 | Plugin pages | `packages/proxy/src/http/plugin-page-loader.ts` | Folder lookup serves `packages/plugins/<id>/page.html`. |
-| Plugin data | `packages/proxy/src/http/local-api.ts` | Pages receive broad audit-derived data by hard-coded plugin ID. |
+| Plugin data | `packages/proxy/src/http/plugin-data.ts` | Pages receive descriptor-scoped data through the plugin host and `safePluginOutput(...)`. |
 | Provider routing | `packages/proxy/src/http/runtime-state.ts` | One global `activeProviderId`; agent/profile config is not enforced. |
 | Dashboard top metrics | `packages/dashboard/src/app/Overview.tsx` | Shows signed-in user status and scoped usage surfaces. |
 | Dashboard plugin hub | `packages/dashboard/src/app/ProviderSections.tsx` | Shows optional plugin lifecycle, traffic mutations, and workspace links. |
@@ -107,7 +107,7 @@ GET  /__molenkopf/plugins
 POST /__molenkopf/plugins/toggle
 GET  /__molenkopf/plugins/:id/page
 GET  /__molenkopf/plugins/:id/data
-POST /__molenkopf/plugins/:id/trigger
+POST /__molenkopf/plugins/:id/actions/:actionId
 ```
 
 Rules:
@@ -115,7 +115,7 @@ Rules:
 - `/plugins` returns descriptors without hook code and without raw secrets.
 - `/plugins/:id/data` returns only declared `dataScopes`.
 - `/plugins/:id/page` renders or serves the plugin workspace.
-- `/plugins/:id/trigger` is opt-in and permission-gated.
+- `/plugins/:id/actions/:actionId` is opt-in and permission-gated.
 - A toggle is visible only when it gates real optional plugin behavior.
 - Required safety behavior belongs in Core instead of the plugin catalog.
 
@@ -168,8 +168,8 @@ policy. Authentication and account ownership come from the Molenkopf API key.
    - Test uniqueness, toggle policy, permissions, and workspace metadata.
 
 3. Scoped plugin workspace data
-   - Add `/__molenkopf/plugins/:id/data`.
-   - Move hard-coded audit access behind descriptor data scopes.
+   - Keep `/__molenkopf/plugins/:id/data`.
+   - Keep audit access behind descriptor data scopes.
    - Test compressor page cannot read provider/admin fields.
 
 4. Hook runner slice
