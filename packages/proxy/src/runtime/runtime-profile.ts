@@ -1,6 +1,7 @@
 import { join, normalize, posix, win32 } from "node:path";
 import type { RuntimeProfileConfig } from "../../../core/src/providers/provider-catalog.ts";
 import { ensurePrivateDir, writePrivateFile } from "../../../core/src/storage/private-state.ts";
+import { safeClaudeSettingsJson } from "./claude-settings.ts";
 import { codexConfigSummary } from "./codex-runtime-config.ts";
 
 type Runtime = "claude" | "codex";
@@ -17,7 +18,7 @@ export function runtimeProfileFromImport(body: Body, runtime: Runtime): RuntimeP
   const profile = profileFields(body, runtime);
   if (runtime === "claude") {
     const settingsSource = text(body.settingsJson) || profileText;
-    const settingsJson = settingsSource ? jsonText(settingsSource) : undefined;
+    const settingsJson = settingsSource ? safeClaudeSettingsJson(settingsSource) : undefined;
     if (settingsSource && !settingsJson) throw new Error("invalid_profile_json");
     const derived = settingsJson ? claudeSettingsSummary(settingsJson) : {};
     return mergeProfile(profile, derived, settingsJson ? { settingsRef: "settings.json" } : {}, { settingsJson });
@@ -163,11 +164,6 @@ function record(value: unknown): Body | undefined {
 
 function parseJson(value: string): unknown {
   try { return JSON.parse(value); } catch { return undefined; }
-}
-
-function jsonText(value: string): string | undefined {
-  const parsed = parseJson(value);
-  return record(parsed) ? `${JSON.stringify(parsed, null, 2)}\n` : undefined;
 }
 
 function field(source: Body, ...names: string[]): unknown {

@@ -57,6 +57,20 @@ test("invalid imported runtime profile enums fail loudly", () => {
   }, "codex"), /invalid_approval/);
 });
 
+test("Claude profile import drops invalid Git Bash path settings", () => {
+  const imported = runtimeProfileFromImport({
+    profileText: JSON.stringify({
+      permissionMode: "auto",
+      env: { CLAUDE_CODE_GIT_BASH_PATH: "C:\\missing-msys64\\usr\\bin\\bash.exe", KEEP_ME: "1" }
+    })
+  }, "claude");
+  const settings = JSON.parse(imported.settingsJson ?? "{}");
+
+  assert.equal(settings.permissionMode, "auto");
+  assert.equal(settings.env.KEEP_ME, "1");
+  assert.equal(settings.env.CLAUDE_CODE_GIT_BASH_PATH, undefined);
+});
+
 test("Codex profile import accepts current config field names", () => {
   const configToml = 'sandbox_mode = "workspace_write"\napproval_policy = "on_request"\n';
   const imported = runtimeProfileFromImport({
