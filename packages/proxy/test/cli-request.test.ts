@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { join } from "node:path";
-import { cliArgs, cliRequest } from "../src/runtime/cli-request.ts";
+import { join, resolve } from "node:path";
+import { cliArgs, cliRequest, runtimeProviderCwd } from "../src/runtime/cli-request.ts";
 import type { ProviderConfig } from "../../core/src/providers/provider-catalog.ts";
 
 const claudeProvider: ProviderConfig = {
@@ -88,11 +88,14 @@ test("imported Codex providers run in an isolated read-only workspace", () => {
 });
 
 test("imported Codex providers respect explicit imported sandbox profiles", () => {
-  assert.deepEqual(cliArgs({
+  const provider = {
     ...codexProvider,
     runtimeAuthDir: "runtime-auth/codex-work",
     runtimeProfile: { sandbox: "danger-full-access", approval: "never" },
     cliArgs: ["exec", "--sandbox", "danger-full-access", "-c", 'approval_policy="never"']
+  };
+  assert.deepEqual(cliArgs({
+    ...provider
   }), [
     "exec",
     "-c",
@@ -105,6 +108,7 @@ test("imported Codex providers respect explicit imported sandbox profiles", () =
     "--sandbox",
     "danger-full-access",
     "--cd",
-    join("runtime-auth", "codex-work", "workspace")
+    resolve(".")
   ]);
+  assert.equal(runtimeProviderCwd(provider), resolve("."));
 });

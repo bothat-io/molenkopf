@@ -51,6 +51,56 @@ test("Codex CLI providers receive the imported auth directory as CODEX_HOME", as
   }
 });
 
+test("trusted Codex CLI providers run from the server workspace", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "molenkopf-codex-trusted-cwd-"));
+  let proxy: Awaited<ReturnType<typeof startProxy>> | undefined;
+  try {
+    const authDir = join(dir, "runtime-auth", "codex-work");
+    await mkdir(authDir, { recursive: true });
+    await writeFile(join(authDir, "auth.json"), JSON.stringify({ account: "work" }));
+    const script = join(dir, "fake-codex.cjs");
+    await writeFile(script, [
+      "process.stdin.resume();",
+      "process.stdin.on('end', () => {",
+      "  process.stdout.write('trusted cwd=' + (process.cwd() === process.argv[2]));",
+      "});"
+    ].join("\n"));
+    proxy = await startProxy({
+      port: 0,
+      target: "cli://codex-work",
+      providers: [{
+        id: "codex-work",
+        name: "Codex Work",
+        kind: "cli",
+        target: "cli://codex-work",
+        runtime: "codex",
+        cliCommand: process.execPath,
+        cliArgs: [script, process.cwd()],
+        cliInputMode: "stdin",
+        runtimeAuthDir: authDir,
+        runtimeProfile: { sandbox: "danger-full-access", approval: "never" }
+      }],
+      activeProviderId: "codex-work",
+      providerCatalogMode: "explicit",
+      dataDir: dir
+    });
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const key = await setupKey(base, "codex-trusted-cwd");
+
+    const response = await fetch(`${base}/v1/responses`, {
+      method: "POST",
+      headers: auth(key, { "content-type": "application/json" }),
+      body: JSON.stringify({ input: "hello imported session" })
+    });
+    assert.equal(response.status, 200);
+    const responseJson = await response.json() as { output_text: string };
+    assert.equal(responseJson.output_text, "trusted cwd=true");
+  } finally {
+    if (proxy) await proxy.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("Claude CLI providers receive imported auth and run in an isolated workspace", async () => {
   const dir = await mkdtemp(join(tmpdir(), "molenkopf-claude-auth-"));
   let proxy: Awaited<ReturnType<typeof startProxy>> | undefined;

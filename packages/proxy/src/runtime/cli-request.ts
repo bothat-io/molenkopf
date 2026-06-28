@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
 
 type ParsedRequest = Record<string, unknown> | undefined;
@@ -36,7 +36,7 @@ export function cliArgs(provider: ProviderConfig, runModel?: string): string[] {
       ensureFlag(args, "--ignore-rules");
       ensureFlag(args, "--skip-git-repo-check");
       setOptionValue(args, "--sandbox", provider.runtimeProfile?.sandbox ?? "read-only");
-      setOptionValue(args, "--cd", runtimeProviderWorkspace(provider));
+      setOptionValue(args, "--cd", runtimeProviderCwd(provider));
     }
     if (runModel && !hasModelFlag(args)) args.push("-m", runModel);
   }
@@ -45,6 +45,11 @@ export function cliArgs(provider: ProviderConfig, runModel?: string): string[] {
 
 export function runtimeProviderWorkspace(provider: ProviderConfig): string {
   return join(provider.runtimeAuthDir ?? ".", "workspace");
+}
+
+export function runtimeProviderCwd(provider: ProviderConfig): string {
+  if (provider.runtime === "codex" && provider.runtimeProfile?.sandbox === "danger-full-access") return resolve(".");
+  return runtimeProviderWorkspace(provider);
 }
 
 function hardenImportedClaudeArgs(args: string[]): void {

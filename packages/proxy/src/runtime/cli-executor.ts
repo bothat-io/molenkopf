@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { DEFAULT_CLI_PROVIDER_TIMEOUT_MS } from "../../../core/src/providers/provider-catalog.ts";
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
 import { createCliOutputCollector, type CliOutputEvent } from "./cli-output-events.ts";
-import { cliArgs, runtimeProviderWorkspace } from "./cli-request.ts";
+import { cliArgs, runtimeProviderCwd, runtimeProviderWorkspace } from "./cli-request.ts";
 import { cliEnv } from "./cli-env.ts";
 
 export type CliExecutionOptions = { signal?: AbortSignal; onEvent?: (event: CliOutputEvent) => void };
@@ -86,7 +86,7 @@ function cliCwd(provider: ProviderConfig): string | undefined {
   if (!provider.runtimeAuthDir) return undefined;
   const workspace = runtimeProviderWorkspace(provider);
   mkdirSync(workspace, { recursive: true });
-  return workspace;
+  return runtimeProviderCwd(provider);
 }
 
 function newLifecycle(provider: ProviderConfig) {
