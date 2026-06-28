@@ -59,6 +59,8 @@ function PluginRow(props: {
   const capabilities = effective?.policy.capabilities || globalPolicy.capabilities || plugin.permissions || [];
   const actions = team ? effective?.policy.actions || [] : pluginActionLabels(plugin);
   const blockedReasons = team ? effective?.policy.blockedReasons || [] : [];
+  const defaultMaxRisk = pluginDefaultMaxRisk(plugin);
+  const globalMaxRisk = riskValue(globalPolicy.maxRisk) || defaultMaxRisk;
   const sourceLabel = team ? (effective?.teamOverrideExists ? "Team override active" : "Inherited from global") : "Global default";
   return <CollapsibleGroup
     title={plugin.id}
@@ -95,7 +97,7 @@ function PluginRow(props: {
         />
         <PluginInfoCard
           title="Max risk"
-          value={team ? effective?.policy.maxRisk || "green" : globalPolicy.maxRisk || "green"}
+          value={team ? effective?.policy.maxRisk || globalMaxRisk : globalMaxRisk}
           note={team ? "Team can only stay within the global bound." : "Upper bound for all teams."}
         />
       </div>
@@ -137,13 +139,13 @@ function PluginRow(props: {
             enabledMode: teamPolicy.enabled === undefined ? "inherit" : "override",
             enabled: Boolean(teamPolicy.enabled ?? effective?.policy.enabled ?? true),
             maxRiskMode: teamPolicy.maxRisk === undefined ? "inherit" : "override",
-            maxRisk: (teamPolicy.maxRisk as Risk) || (effective?.policy.maxRisk as Risk) || "green"
+            maxRisk: riskValue(teamPolicy.maxRisk) || riskValue(effective?.policy.maxRisk) || globalMaxRisk
           }}
           onSave={(value) => props.onSaveTeamPluginPolicy(team.id, plugin.id, value)}
           onReset={() => props.onResetTeamPluginPolicy(team.id, plugin.id)}
         /> : <GlobalPluginSettingsForm
           enabled={Boolean(globalPolicy.enabled ?? enabled)}
-          maxRisk={(globalPolicy.maxRisk as Risk) || "green"}
+          maxRisk={globalMaxRisk}
           onSave={(value) => props.onSaveGlobalPluginPolicy(plugin.id, value)}
         />}
         <div className="plugin-inline-note">
@@ -154,6 +156,19 @@ function PluginRow(props: {
       </div>
     </div>
   </CollapsibleGroup>;
+}
+
+export function pluginDefaultMaxRisk(plugin: PluginView): Risk {
+  return riskValue(plugin.defaultMaxRisk) || maxActionRisk(plugin) || "green";
+}
+
+function riskValue(value: unknown): Risk | undefined { return value === "green" || value === "yellow" || value === "orange" || value === "red" ? value : undefined; }
+
+function maxActionRisk(plugin: PluginView): Risk | undefined {
+  const order: Risk[] = ["green", "yellow", "orange", "red"];
+  let max = -1;
+  for (const action of plugin.actions || []) max = Math.max(max, order.indexOf(action.risk as Risk));
+  return max >= 0 ? order[max] : undefined;
 }
 
 function PluginActions({ plugin, onToggle }: { plugin: PluginView; onToggle: (id: string, enabled: boolean) => void }) {

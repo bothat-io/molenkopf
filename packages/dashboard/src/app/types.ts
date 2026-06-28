@@ -16,6 +16,7 @@ export type PluginView = {
   status?: "enabled" | "disabled"; lifecycleStatus?: "enabled" | "disabled" | "booted" | "stopped" | "error"; lifecycleError?: string;
   permissions?: string[]; hooks?: string[]; traffic?: { reads?: string[]; mutates?: string[] };
   pipelineIndex?: number; order?: number; pagePath?: string; dataPath?: string; dataScopes?: string[]; description?: string;
+  defaultMaxRisk?: string;
   actions?: { id: string; label: string; risk: string; requiredRole: string; sideEffects: string[] }[];
 };
 export type PluginPolicyOverride = { enabled?: boolean; maxRisk?: string; capabilities?: string[]; actions?: string[]; settings?: Record<string, unknown> };

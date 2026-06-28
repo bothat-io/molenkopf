@@ -1,6 +1,6 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { PluginWorkspace } from "./PluginWorkspace";
+import { PluginWorkspace, pluginDefaultMaxRisk } from "./PluginWorkspace";
 import { pluginActionLabels } from "./PluginWorkspaceMeta";
 
 describe("PluginWorkspace", () => {
@@ -39,5 +39,15 @@ describe("PluginWorkspace", () => {
       name: "Project Graph",
       actions: [{ id: "graph.query", label: "Query graph", risk: "green", requiredRole: "member", sideEffects: ["none"] }]
     })).toEqual(["graph.query"]);
+  });
+
+  it("uses descriptor default risk before falling back to green", () => {
+    expect(pluginDefaultMaxRisk({
+      id: "project-graph-plugin",
+      name: "Project Graph",
+      defaultMaxRisk: "orange",
+      actions: [{ id: "graph.delete", label: "Delete graph", risk: "orange", requiredRole: "admin", sideEffects: ["storage"] }]
+    })).toBe("orange");
+    expect(pluginDefaultMaxRisk({ id: "unknown", name: "Unknown", actions: [] })).toBe("green");
   });
 });

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer, request } from "node:http";
-import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
@@ -44,6 +44,26 @@ test("dashboard production dist serves known assets without SPA fallback", async
     assert.equal(missing.status, 404);
     assert.equal(malformed.status, 400);
     assert.equal(traversal.status, 400);
+  } finally {
+    if (previous === undefined) delete process.env.MOLENKOPF_DASHBOARD_DIST;
+    else process.env.MOLENKOPF_DASHBOARD_DIST = previous;
+    if (proxy) await proxy.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("root favicon falls back to public asset without dashboard build", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "molenkopf-dashboard-nobuild-"));
+  const previous = process.env.MOLENKOPF_DASHBOARD_DIST;
+  let proxy: Awaited<ReturnType<typeof startProxy>> | undefined;
+  try {
+    process.env.MOLENKOPF_DASHBOARD_DIST = join(dir, "missing-dist");
+    proxy = await startProxy({ port: 0, target: "http://127.0.0.1:1/v1", dataDir: dir });
+    const response = await fetch(`http://127.0.0.1:${proxy.port}/favicon.ico?token=secret`);
+    const expected = await readFile(join(process.cwd(), "packages", "dashboard", "public", "favicon.ico"));
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("content-type"), "image/x-icon");
+    assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [...expected]);
   } finally {
     if (previous === undefined) delete process.env.MOLENKOPF_DASHBOARD_DIST;
     else process.env.MOLENKOPF_DASHBOARD_DIST = previous;

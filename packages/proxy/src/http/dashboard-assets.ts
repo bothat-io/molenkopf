@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const dashboardRoot = resolve(here, "..", "..", "..", "dashboard");
 const defaultDist = join(dashboardRoot, "dist");
+const publicDir = join(dashboardRoot, "public");
+const publicAssetNames = new Set(["favicon.ico", "favicon.png", "molenkopf-logo.png"]);
 const routePrefix = "/__molenkopf/dashboard";
 
 export function isDashboardRequest(url: string | undefined): boolean {
@@ -49,9 +51,8 @@ async function serveIndex(res: ServerResponse) {
 function serveDistPath(routePath: string, immutable: boolean, res: ServerResponse) {
   const safe = safeRelative(routePath);
   if (!safe) return writeText(res, 400, "bad request");
-  const file = normalize(join(distDir(), safe));
-  const root = distDir();
-  if (!(file.startsWith(`${root}${sep}`)) || !existsSync(file)) return writeText(res, 404, "not found");
+  const file = existingDistPath(safe) ?? existingPublicAsset(safe);
+  if (!file) return writeText(res, 404, "not found");
   res.writeHead(200, { "content-type": contentType(file), "cache-control": immutable ? "public, max-age=31536000, immutable" : "no-store" });
   createReadStream(file).pipe(res);
 }
@@ -100,6 +101,17 @@ function hasExtension(path: string): boolean {
 
 function distDir() {
   return process.env.MOLENKOPF_DASHBOARD_DIST || defaultDist;
+}
+
+function existingDistPath(safe: string): string | undefined {
+  const root = resolve(distDir());
+  const file = normalize(join(root, safe));
+  return file.startsWith(`${root}${sep}`) && existsSync(file) ? file : undefined;
+}
+
+function existingPublicAsset(safe: string): string | undefined {
+  const file = join(publicDir, safe);
+  return publicAssetNames.has(safe) && existsSync(file) ? file : undefined;
 }
 
 function contentType(file: string): string {
