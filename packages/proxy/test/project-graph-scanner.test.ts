@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { lstatSync, statSync } from "node:fs";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -31,4 +32,21 @@ test("project graph scanner extracts safe TS and JS structure", async () => {
   assert.ok(graph.nodes.some((node) => node.kind === "symbol" && node.label === "Server"));
   assert.ok(graph.nodes.some((node) => node.kind === "event" && node.label === "ready"));
   assert.equal(graph.nodes.some((node) => node.safeSignature?.includes("do-not-store")), false);
+});
+
+test("project graph scanner skips unreadable entries", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "project-graph-unreadable-"));
+  await writeFile(join(dir, "ok.ts"), "export const ok = true;\n");
+  await writeFile(join(dir, "locked.ts"), "export const locked = true;\n");
+  const discovery = discoverProjectFiles(normalizeProjectRoot(dir), defaultPolicy(), {
+    readDir: () => ["ok.ts", "locked.ts"],
+    lstat: (path: string) => {
+      if (String(path).endsWith("locked.ts")) throw new Error("denied");
+      return lstatSync(path);
+    },
+    stat: statSync
+  });
+  assert.deepEqual(discovery.files.map((file) => file.relativePath), ["ok.ts"]);
+  assert.equal(discovery.skipped, 1);
+  assert.deepEqual(discovery.warnings, [{ code: "lstat_failed", path: "locked.ts" }]);
 });

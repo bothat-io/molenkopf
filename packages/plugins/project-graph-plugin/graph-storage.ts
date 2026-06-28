@@ -1,4 +1,5 @@
 import { readdir, readFile, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { defaultDataDir } from "../../core/src/storage/local-paths.ts";
 import { ensurePrivateDir, writePrivateFile } from "../../core/src/storage/private-state.ts";
@@ -8,11 +9,63 @@ import type { ProjectGraph } from "./types.ts";
 const PLUGIN_ID = "project-graph-plugin";
 
 export async function saveProjectGraph(dataDir: string | undefined, graph: ProjectGraph): Promise<void> {
-  const safe = safePluginStorageInput(PLUGIN_ID, "global", graph);
+  const safe = safePluginStorageInput(PLUGIN_ID, "global", graphForStorage(graph));
   if (!safe.ok) throw new Error(`unsafe_project_graph_storage:${safe.errors.join(",")}`);
   const dir = await graphDir(dataDir);
   await writePrivateFile(graphPathIn(dir, graph.rootId), JSON.stringify(safe.value, null, 2));
   await saveLatestGraphRef(dataDir, graph.rootId, graph.projectId, graph.generatedAt);
+}
+
+function graphForStorage(graph: ProjectGraph): ProjectGraph {
+  const ids = new Map(graph.nodes.map((node) => [node.id, storageSafeString(node.id)]));
+  return {
+    ...graph,
+    projectId: storageSafeString(graph.projectId),
+    rootId: storageSafeString(graph.rootId),
+    generatedAt: storageSafeString(graph.generatedAt),
+    nodes: graph.nodes.map((node) => ({
+      ...node,
+      id: ids.get(node.id) ?? storageSafeString(node.id),
+      label: storageSafeString(node.label),
+      path: node.path ? storageSafeString(node.path) : undefined,
+      language: node.language ? storageSafeString(node.language) : undefined,
+      symbolName: node.symbolName ? storageSafeString(node.symbolName) : undefined,
+      safeSignature: node.safeSignature ? storageSafeString(node.safeSignature) : undefined,
+      metadata: node.metadata ? storageSafeMetadata(node.metadata) : undefined
+    })),
+    edges: graph.edges.map((edge) => ({
+      ...edge,
+      id: storageSafeString(edge.id),
+      from: ids.get(edge.from) ?? storageSafeString(edge.from),
+      to: ids.get(edge.to) ?? storageSafeString(edge.to),
+      evidence: edge.evidence ? {
+        ...edge.evidence,
+        path: edge.evidence.path ? storageSafeString(edge.evidence.path) : undefined,
+        extractor: storageSafeString(edge.evidence.extractor)
+      } : undefined
+    })),
+    warnings: graph.warnings.map((warning) => ({
+      code: storageSafeString(warning.code),
+      path: warning.path ? storageSafeString(warning.path) : undefined,
+      detail: warning.detail ? storageSafeString(warning.detail) : undefined
+    }))
+  };
+}
+
+function storageSafeMetadata(metadata: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(metadata).map(([key, value]) => [storageSafeString(key), storageSafeValue(value)]));
+}
+
+function storageSafeValue(value: unknown): unknown {
+  if (typeof value === "string") return storageSafeString(value);
+  if (Array.isArray(value)) return value.map(storageSafeValue);
+  if (value && typeof value === "object") return storageSafeMetadata(value as Record<string, unknown>);
+  return value;
+}
+
+function storageSafeString(value: string): string {
+  const next = value.replace(/\b(?:raw[_-]?(?:prompt|response)|full[_-]?(?:prompt|response)|authorization|cookie|mk_[a-z0-9_-]{12,})\b/gi, "redacted");
+  return next === value ? value : `${next}_${createHash("sha256").update(value).digest("hex").slice(0, 8)}`;
 }
 
 export async function loadProjectGraph(dataDir: string | undefined, rootId: string): Promise<ProjectGraph | undefined> {

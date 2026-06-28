@@ -2,10 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
 import { once } from "node:events";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
+import { loadPluginPageFromDir, pluginPageCacheEnabled } from "../src/http/plugin-page-loader.ts";
 
 async function listenOn(server: Server): Promise<number> {
   server.listen(0, "127.0.0.1");
@@ -58,12 +59,41 @@ test("serves a plugin's own page from its plugin folder", async () => {
     assert.match(optimizerHtml, /No plugin budget limit configured/);
     assert.match(optimizerHtml, /No compression savings recorded/);
     assert.match(optimizerHtml, /Review this finding before changing routing/);
+    const projectGraph = await pluginFetch(base, "project-graph-plugin", cookie);
+    assert.equal(projectGraph.status, 200);
+    const projectGraphHtml = await projectGraph.text();
+    assert.match(projectGraphHtml, /Scan root/);
+    assert.match(projectGraphHtml, /Run scan/);
+    assert.match(projectGraphHtml, /Scan is running/);
+    assert.match(projectGraphHtml, /Preview is running/);
+    assert.match(projectGraphHtml, /Query graph/);
+    assert.match(projectGraphHtml, /graph\.query/);
+    assert.match(projectGraphHtml, /Unexpected .* response/);
     const missing = await pluginFetch(base, "does-not-exist", cookie);
     assert.equal(missing.status, 404);
   } finally {
     await proxy.close();
     upstream.close();
     await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("plugin pages are not cached in the dev profile", () => {
+  assert.equal(pluginPageCacheEnabled({ MOLENKOPF_PROFILE: "dev" }), false);
+  assert.equal(pluginPageCacheEnabled({ MOLENKOPF_PROFILE: "test" }), true);
+});
+
+test("cached plugin pages refresh after their file changes", async () => {
+  const root = await mkdtemp(join(tmpdir(), "molenkopf-plugin-cache-"));
+  const pluginDir = join(root, "sample-plugin");
+  try {
+    await mkdir(pluginDir);
+    await writeFile(join(pluginDir, "page.html"), "first", "utf8");
+    assert.equal(loadPluginPageFromDir(root, "sample-plugin", true), "first");
+    await writeFile(join(pluginDir, "page.html"), "second version", "utf8");
+    assert.equal(loadPluginPageFromDir(root, "sample-plugin", true), "second version");
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });
 

@@ -18,6 +18,7 @@ export const plugin: MolenkopfPluginModule = {
       pluginDescriptorFacts: [],
       storageUsageFacts: [],
       eventUsageFacts: [],
+      suggestedRootPath: ctx.canManage ? process.cwd() : undefined,
       ...graphData,
       queryExamples: ["symbol:PluginDescriptor", "route:/__molenkopf", "tests:plugin"],
       safety: {

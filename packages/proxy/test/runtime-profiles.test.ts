@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveProfile, proxyArgs, devWatchEnabled, cliDevWatchEnabled } from "../src/cli/profile-server.ts";
+import { DEV_WATCH_DIRS, resolveProfile, proxyArgs, devWatchEnabled, cliDevWatchEnabled } from "../src/cli/profile-server.ts";
 
 test("runtime profiles keep dev, test, and prod isolated", () => {
   const dev = resolveProfile("dev", {});
@@ -18,6 +18,7 @@ test("runtime profiles keep dev, test, and prod isolated", () => {
   assert.equal(devWatchEnabled(testProfile, {}), false);
   assert.equal(devWatchEnabled(dev, { MOLENKOPF_DEV_WATCH: "0" }), false);
   assert.equal(cliDevWatchEnabled(dev, ["node", "profile-server.ts", "dev", "--no-watch"], {}), false);
+  assert.ok(DEV_WATCH_DIRS.includes("packages/plugins"));
 });
 
 test("runtime profiles reject invalid values before startup", () => {

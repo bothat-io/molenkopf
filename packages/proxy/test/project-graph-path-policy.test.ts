@@ -17,6 +17,12 @@ test("project graph root policy validates explicit roots and stable ids", async 
 test("project graph denylist blocks sensitive paths", () => {
   const policy = defaultPolicy();
   assert.equal(isDeniedPath(".git/config", policy), true);
+  assert.equal(isDeniedPath(".codex/auth.json", policy), true);
+  assert.equal(isDeniedPath(".docker/config.json", policy), true);
+  assert.equal(isDeniedPath(".ssh/config", policy), true);
+  assert.equal(isDeniedPath(".vscode/extensions/plugin/package.json", policy), true);
+  assert.equal(isDeniedPath("AppData/Local/tool/config.json", policy), true);
+  assert.equal(isDeniedPath(".claude/.credentials.json", policy), true);
   assert.equal(isDeniedPath("src/.env.local", policy), true);
   assert.equal(isDeniedPath("runtime-auth/auth.json", policy), true);
   assert.equal(isDeniedPath("src/index.ts", policy), false);

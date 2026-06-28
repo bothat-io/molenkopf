@@ -6,7 +6,7 @@ import { ensurePrivateDirSync } from "../../../core/src/storage/private-state.ts
 import { validateProviderTarget } from "../../../core/src/security/target-policy.ts";
 import { loadDefaultEnvFile } from "./env-file.ts";
 
-const WATCH_DIRS = ["packages/core/src", "packages/proxy/src"];
+export const DEV_WATCH_DIRS = ["packages/core/src", "packages/proxy/src", "packages/plugins"] as const;
 const RESTART_DEBOUNCE_MS = 250;
 const FORCE_KILL_MS = 1500;
 const DASHBOARD_DEV_PORT = 5173;
@@ -114,7 +114,7 @@ function runWatched(profile: Profile) {
   };
 
   startChild();
-  for (const dir of WATCH_DIRS) {
+  for (const dir of DEV_WATCH_DIRS) {
     try {
       const root = resolve(dir);
       watchers.push(watch(root, { recursive: true }, (_event, file) => scheduleRestart(file ? join(dir, String(file)) : dir)));

@@ -7,34 +7,118 @@
   <style>
     body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;margin:0;background:#f7f7f4;color:#1b1d1f}
     main{max-width:1120px;margin:0 auto;padding:28px}
-    h1{font-size:24px;margin:0 0 6px}
-    p{color:#5c6268}
-    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:20px 0}
-    .box{background:white;border:1px solid #deded8;border-radius:8px;padding:14px}
-    .value{font-size:24px;font-weight:700}
-    .empty{border:1px dashed #b8b8af;border-radius:8px;padding:24px;background:#fff}
-    .small{font-size:13px;color:#6a7076}
+    h1{font-size:24px;margin:0 0 6px} h2{font-size:16px;margin:0 0 12px}
+    p{color:#5c6268}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:20px 0}
+    .box,.panel{background:white;border:1px solid #deded8;border-radius:8px;padding:14px}.panel{margin:14px 0}
+    .value{font-size:24px;font-weight:700}.small{font-size:13px;color:#6a7076}
+    label{display:block;font-size:13px;font-weight:650;margin:0 0 6px}
+    input{box-sizing:border-box;width:100%;border:1px solid #c9cac3;border-radius:6px;padding:10px;font:inherit;background:#fff}
+    button{border:1px solid #1b1d1f;border-radius:6px;background:#1b1d1f;color:white;padding:9px 12px;font:inherit;cursor:pointer}
+    button.secondary{background:white;color:#1b1d1f}button:disabled{opacity:.55;cursor:not-allowed}
+    .controls{display:grid;grid-template-columns:minmax(240px,1fr) auto auto;gap:10px;align-items:end}
+    .query{display:grid;grid-template-columns:minmax(180px,1fr) auto;gap:10px;align-items:end}
+    .status{border:1px dashed #b8b8af;border-radius:8px;padding:14px;background:#fff;margin:14px 0}
+    .status.warn{border-color:#b7791f;background:#fff8e6}.status.ok{border-color:#2f855a;background:#effaf3}
+    .list{display:grid;gap:8px;margin:0;padding:0;list-style:none}.item{border-top:1px solid #ededE8;padding-top:8px}
+    .item:first-child{border-top:0;padding-top:0}.muted{color:#6a7076}.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px}
+    @media (max-width:760px){main{padding:18px}.controls,.query,.cols{grid-template-columns:1fr}button{width:100%}}
   </style>
 </head>
 <body>
   <main>
     <h1>Project Graph</h1>
-    <p>Local code-structure graph from explicitly configured project roots.</p>
+    <p>Scan an explicit local project root and inspect safe code-structure metadata.</p>
+    <p class="small">Page version: interactive scan controls.</p>
     <section class="grid">
       <div class="box"><div class="small">Graphs</div><div id="graphs" class="value">0</div></div>
       <div class="box"><div class="small">Routes</div><div id="routes" class="value">0</div></div>
       <div class="box"><div class="small">Warnings</div><div id="warnings" class="value">0</div></div>
     </section>
-    <section class="empty" id="state">No project graph scanned yet.</section>
-    <p class="small">Safety: graph storage is for structural metadata only, not full source files.</p>
+    <section class="panel">
+      <h2>Scan root</h2>
+      <div class="controls">
+        <div><label for="root">Local root path</label><input id="root" placeholder="Paste an absolute project path"></div>
+        <button class="secondary" id="preview">Preview</button>
+        <button id="scan">Run scan</button>
+      </div>
+      <div class="status" id="state">No project graph scanned yet.</div>
+      <ul class="list" id="previewList"></ul>
+    </section>
+    <section class="panel">
+      <h2>Query graph</h2>
+      <div class="query">
+        <div><label for="query">Symbol, route, test, or file text</label><input id="query" placeholder="PluginDescriptor"></div>
+        <button id="queryButton">Search</button>
+      </div>
+      <ul class="list" id="results"></ul>
+    </section>
+    <section class="cols">
+      <div class="panel"><h2>Routes</h2><ul class="list" id="routeList"></ul></div>
+      <div class="panel"><h2>Top symbols</h2><ul class="list" id="symbolList"></ul></div>
+    </section>
+    <p class="small">Safety: graph storage is structural metadata only, not full source files.</p>
   </main>
   <script>
-    fetch("/__molenkopf/plugins/project-graph-plugin/data").then(r=>r.json()).then(data=>{
-      document.getElementById("graphs").textContent=String(data.graphSummaries?.length||0);
-      document.getElementById("routes").textContent=String(data.routes?.length||0);
-      document.getElementById("warnings").textContent=String(data.latestWarnings?.length||0);
-      if(data.graphSummaries?.length) document.getElementById("state").textContent="Project graph data is available.";
-    }).catch(()=>{document.getElementById("state").textContent="Project graph data could not be loaded.";});
+    const $=id=>document.getElementById(id);
+    const text=(id,value)=>{$(id).textContent=String(value)};
+    const setBusy=busy=>["preview","scan","queryButton"].forEach(id=>$(id).disabled=busy);
+    const status=(message,type="")=>{$("state").className=`status ${type}`.trim();$("state").textContent=message};
+    const item=node=>`${node.label||node.symbolName||node.kind}${node.path?` - ${node.path}`:""}`;
+    const warningText=items=>(items||[]).map(w=>typeof w==="string"?w:w.code||"warning");
+    function renderList(id,items,empty){
+      const list=$(id); list.textContent="";
+      if(!items||!items.length){ const li=document.createElement("li"); li.className="muted"; li.textContent=empty; list.append(li); return; }
+      for(const entry of items.slice(0,10)){
+        const li=document.createElement("li"); li.className="item";
+        const main=document.createElement("div"); main.textContent=typeof entry==="string"?entry:item(entry);
+        const meta=document.createElement("code"); meta.textContent=entry.kind?entry.kind:"";
+        li.append(main,meta); list.append(li);
+      }
+    }
+    async function parseResponse(res){
+      const text=await res.text();
+      let data={};
+      try{ data=text?JSON.parse(text):{}; }catch{ throw new Error(`Unexpected ${res.status} response from ${res.url}`); }
+      if(!res.ok||data.error) throw new Error(data.error||`HTTP ${res.status}`);
+      return data;
+    }
+    async function loadData(){
+      const res=await fetch("/__molenkopf/plugins/project-graph-plugin/data");
+      const data=await parseResponse(res);
+      if(!$("root").value&&data.suggestedRootPath) $("root").value=data.suggestedRootPath;
+      text("graphs",data.graphSummaries?.length||0); text("routes",data.routes?.length||0); text("warnings",data.latestWarnings?.length||0);
+      status(data.latestScanStatus==="scanned"?"Project graph data is available.":"Ready. Run Preview first to verify the root path.",data.latestScanStatus==="scanned"?"ok":"");
+      renderList("routeList",data.routes,"No routes found yet.");
+      renderList("symbolList",data.topSymbolsByDegree,"No symbols found yet.");
+    }
+    async function action(actionId,input){
+      const res=await fetch(`/__molenkopf/plugins/project-graph-plugin/actions/${actionId}`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({input})});
+      return parseResponse(res);
+    }
+    async function run(kind){
+      const rootPath=$("root").value.trim(); if(!rootPath){$("state").textContent="Enter a local root path first."; return;}
+      setBusy(true);
+      status(kind==="scan.preview"?"Preview is running...":"Scan is running...");
+      try{
+        const input=kind==="scan.preview"?{rootPath,maxFiles:5000}:{rootPath,mode:"manual"};
+        const data=await action(kind,input);
+        const warnings=warningText(data.warnings);
+        const message=kind==="scan.preview"?`Preview found ${data.filesFound||0} files and skipped ${data.filesSkipped||0}.`:`Scan complete: ${data.stats?.nodes||0} nodes, ${data.stats?.edges||0} edges.`;
+        status(warnings.length?`${message} Warnings: ${warnings.join(", ")}.`:message,warnings.length?"warn":"ok");
+        renderList("previewList",[...(data.sampleFiles||[]).map(f=>`${f.path} (${f.bytes} bytes)`),...warnings.map(w=>`Warning: ${w}`)],"No preview details.");
+        await loadData();
+        status(warnings.length?`${message} Warnings: ${warnings.join(", ")}.`:message,warnings.length?"warn":"ok");
+      }catch(error){status(error.message,"warn");}finally{setBusy(false);}
+    }
+    $("preview").addEventListener("click",()=>run("scan.preview"));
+    $("scan").addEventListener("click",()=>run("scan.run"));
+    $("queryButton").addEventListener("click",async()=>{
+      setBusy(true);
+      try{ const data=await action("graph.query",{query:$("query").value.trim(),limit:20}); renderList("results",data.results,"No matching graph nodes."); }
+      catch(error){ renderList("results",[error.message],""); } finally{ setBusy(false); }
+    });
+    loadData().catch(error=>{$("state").textContent=error.message;});
   </script>
 </body>
 </html>

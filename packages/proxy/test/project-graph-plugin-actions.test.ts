@@ -38,6 +38,20 @@ test("project graph scan.run builds an in-memory queryable graph", async () => {
   assert.doesNotMatch(stored, /\{\s*return/);
 });
 
+test("project graph storage redacts sensitive structural names", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "project-graph-redact-"));
+  const dataDir = await mkdtemp(join(tmpdir(), "project-graph-redact-data-"));
+  await mkdir(join(dir, "src"));
+  await writeFile(join(dir, "src", "auth.ts"), "export const cookie = 'session';\n");
+  const runtime = { pluginId: "project-graph-plugin", dataDir, now: () => new Date() };
+  const scan = await handleProjectGraphAction({ actionId: "scan.run", input: { rootPath: dir, mode: "manual" }, scope: "local-api", teamIds: [] }, runtime);
+  assert.equal((scan.stats as Record<string, number>).symbols, 1);
+  const query = await handleProjectGraphAction({ actionId: "graph.query", input: { query: "cookie", limit: 5 }, scope: "local-api", teamIds: [] }, runtime);
+  assert.ok((query.results as unknown[]).length >= 1);
+  const stored = await readFile(join(dataDir, "plugins", "project-graph-plugin", "graphs", `${scan.rootId}.json`), "utf8");
+  assert.doesNotMatch(stored, /\bcookie\b/i);
+});
+
 test("project graph works through generic plugin action and data routes", async () => {
   const root = await mkdtemp(join(tmpdir(), "project-graph-route-root-"));
   const dataDir = await mkdtemp(join(tmpdir(), "project-graph-route-data-"));
