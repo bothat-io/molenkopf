@@ -1,113 +1,92 @@
 # Molenkopf Plugin API
 
-Molenkopf plugins are optional local extensions. Core safety, credential
-handling, routing enforcement, audit invariants, and request redaction are core
-responsibilities and are not exposed as plugins.
+Molenkopf plugins are local modules. There is no remote plugin download, no
+marketplace loader, and no runtime code fetch.
 
-Each plugin is a TypeScript module at
-`packages/plugins/<plugin-id>/plugin.ts`. It exports a static `descriptor` and
-an executable `plugin` module.
+## Files
 
-The TypeScript descriptor remains the source of truth for permissions,
-readable scopes, traffic mutations, workspace data, and default enabled state.
-Runtime hook results are accepted only when the descriptor allows the matching
-mutation.
-Built-in local plugin modules are imported by the proxy from a static module
-registry. Remote or downloaded plugin code is disabled.
+Each runtime plugin lives in `packages/plugins/<plugin-id>/` and uses:
 
-## Descriptor
+- `descriptor-v2.ts`
+- `plugin.ts`
+- optional `page.html`
+
+`descriptor-v2.ts` is the runtime contract. `plugin.ts` is the executable
+module. Optional plugin-local shaping helpers never replace platform safety.
+
+## Descriptor v2
 
 ```ts
-import type { PluginDescriptor } from "../../core/src/plugins/plugin-descriptor.ts";
-
-export const descriptor: PluginDescriptor = {
-  id: "context-compressor-plugin",
-  name: "context-compressor-plugin",
-  type: "transformer",
-  category: "compression",
-  description: "Compresses large safe context and keeps bounded redacted excerpts locally.",
-  traffic: { reads: ["redacted-body", "audit"], mutates: ["transform"] },
-  permissions: ["body:read", "body:write", "audit:read", "audit:write"],
-  hooks: ["request:body:rewrite", "audit:manifest", "workspace:local-page"],
-  toggle: { defaultEnabled: false, canDisable: true },
-  modulePath: "plugin.ts"
+export type PluginDescriptorV2 = {
+  descriptorVersion: 2;
+  id: string;
+  name: string;
+  category: PluginCategory;
+  risk: PluginRisk;
+  capabilities: readonly PluginCapability[];
+  actions: readonly PluginActionDescriptor[];
+  settingsSchema: PluginMiniSchema;
+  defaultPolicy: PluginDefaultPolicy;
+  workspace?: { pagePath?: string; dataPath?: string };
+  dataScopes?: readonly PluginDataScope[];
+  modulePath?: string;
 };
 ```
 
-`canDisable` is always `true` for visible plugins. If a feature is required for
-Molenkopf to run safely, it belongs in Core instead of the plugin catalog.
+Rules:
 
-## TypeScript Module
+- `descriptorVersion` must be `2`
+- mixed v1/v2 runtime is not allowed
+- `modulePath` is required for executing plugins
+- `dataScopes` live at descriptor root and are the source of truth
+- `defaultPolicy` seeds missing persisted Global policy only
 
-The public hook shape lives in `packages/core/src/plugins/plugin-api.ts`.
+## Actions
 
-```ts
-import type { MolenkopfPluginModule } from "../../core/src/plugins/plugin-api.ts";
+Actions are declarative and validated by the generic router.
 
-export const plugin: MolenkopfPluginModule = {
-  onBoot(ctx) {
-    ctx.note("plugin booted");
-  },
-  onStart(ctx) {
-    ctx.note("plugin started");
-  },
-  onRequest(ctx) {
-    return { body: ctx.body.toUpperCase(), notes: ["rewrote request"] };
-  },
-  getData(ctx) {
-    return { plugin: ctx.plugin, requests: ctx.manifests.length };
-  }
-};
-```
+Required fields:
 
-Available hooks:
+- `id`, `label`, `description`
+- `requiredCapabilities`
+- `requiredRole`
+- `risk`
+- `inputSchema`
+- `outputSchema`
+- `confirmation`
+- `sideEffects`
+- `auditEvent`
+- `outputSafety`
 
-| Hook | Purpose |
-| --- | --- |
-| `onBoot` | Prepare local plugin state before the proxy listens. |
-| `onStart` | Initialize enabled plugin work after the proxy listens. |
-| `onEnable` | React to an admin enabling the plugin. |
-| `onDisable` | React to an admin disabling the plugin. |
-| `onRequest` | Inspect or transform a redacted request. |
-| `onAudit` | Observe redacted audit manifests. |
-| `onEvent` | Observe or emit local lifecycle events. |
-| `getData` | Serve scoped workspace data. |
-| `onStop` | Flush local state before shutdown. |
+`outputSafety` may be `strict` or `adminSafe`. It never bypasses
+`safePluginOutput(...)`.
 
-`getData` receives already-scoped, already-redacted audit manifests plus safe
-workspace context such as the plugin view, declared scopes, and the memory graph
-when available. The central proxy does not contain plugin-specific metrics.
+## Schemas
 
-## Request Results
+`PluginMiniSchema` is the only supported schema system for settings and action
+payloads. It supports:
 
-`onRequest` returns a result object instead of mutating global state directly.
-The runner applies only the allowed fields:
+- `object`
+- `string`
+- `boolean`
+- `integer`
+- `number`
+- `enum`
+- `array`
 
-```ts
-type PluginRequestResult = {
-  body?: string;
-  providerId?: string;
-  block?: { status: number; error: string };
-  notes?: string[];
-  redactedSecrets?: number;
-  compressedItems?: number;
-  savedTokens?: number;
-  retrievalIds?: string[];
-  compressorsUsed?: string[];
-};
-```
+It does not support `$ref`, `oneOf`, or recursive free-form structures.
 
-If a plugin returns a body rewrite without `traffic.mutates` containing
-`transform`, `mask`, or `augment-context`, the runner restores the previous
-body and blocks with `plugin_capability_violation`.
+## Runtime hooks
 
-## Invariants
+The executable contract lives in `packages/core/src/plugins/plugin-api.ts`.
+Plugins may implement lifecycle, data, action, request, audit, and event hooks.
+Hook enablement is still controlled by descriptor capability and effective
+policy.
 
-- Remote plugin loading is disabled.
-- Core redaction runs before optional request plugins.
-- Full prompts, full responses, credential values, cookies, and authorization
-  headers must not appear in plugin data, audit data, dashboard data, events, or
-  logs.
-- Provider reroutes still pass provider, team, and key policy checks. Project is
-  key-level attribution, not a provider access layer.
-- A disabled plugin must leave Molenkopf usable.
+## Security invariants
+
+- plugin output always passes `safePluginOutput(...)`
+- plugin storage writes always pass `safePluginStorageInput(...)`
+- no raw prompts, responses, secrets, Authorization, Cookie, or `mk_` tokens
+- Token Optimizer MVP is observe/recommend only
+- no Key/Agent plugin policy scope in MVP

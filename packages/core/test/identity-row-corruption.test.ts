@@ -27,8 +27,14 @@ test("identity row corruption fails closed across users teams keys and meta", as
     ["invalid user json", (db) => db.prepare("UPDATE users SET json = ? WHERE id = 'admin'").run("{bad")],
     ["user id mismatch", (db) => db.prepare("UPDATE users SET json = ? WHERE id = 'admin'").run(JSON.stringify(user("root", { role: "admin" })))],
     ["missing user field", (db) => db.prepare("UPDATE users SET json = ? WHERE id = 'admin'").run(JSON.stringify({ id: "admin", role: "admin" }))],
+    ["invalid user disabled", (db) => db.prepare("UPDATE users SET json = ? WHERE id = 'admin'").run(JSON.stringify(user("admin", { disabled: "yes" as any })))],
+    ["invalid user key permissions", (db) => db.prepare("UPDATE users SET json = ? WHERE id = 'admin'").run(JSON.stringify(user("admin", { keyPermissions: { create: "yes" } as any })))],
+    ["invalid user creator", (db) => db.prepare("UPDATE users SET json = ? WHERE id = 'admin'").run(JSON.stringify(user("admin", { createdBy: "not an id!" })))],
     ["missing team manager", (db) => db.prepare("UPDATE teams SET json = ? WHERE id = 'everyone'").run(JSON.stringify(team("everyone", { managerIds: ["ghost"] })))],
     ["missing key owner", (db) => db.prepare("UPDATE api_keys SET json = ? WHERE id = 'key_1'").run(JSON.stringify(key("key_1", "ghost", "everyone")))],
+    ["invalid key hash", (db) => db.prepare("UPDATE api_keys SET json = ? WHERE id = 'key_1'").run(JSON.stringify({ ...key("key_1", "admin", "everyone"), hash: "abc" }))],
+    ["invalid key prefix", (db) => db.prepare("UPDATE api_keys SET json = ? WHERE id = 'key_1'").run(JSON.stringify({ ...key("key_1", "admin", "everyone"), prefix: "key_abc" }))],
+    ["invalid key optional field", (db) => db.prepare("UPDATE api_keys SET json = ? WHERE id = 'key_1'").run(JSON.stringify({ ...key("key_1", "admin", "everyone"), disabled: "no", lastUsedAt: "never" }))],
     ["invalid meta budget", (db) => db.prepare("UPDATE meta SET json = ? WHERE k = 'orgBudget'").run(JSON.stringify({ period: "hour", onExceed: "warn" }))]
   ];
   for (const [name, mutate] of cases) await assertFailsClosed(name, mutate);
@@ -92,5 +98,5 @@ function team(id: string, extra: Partial<Team> = {}): Team {
 }
 
 function key(id: string, ownerUserId: string, teamId: string): ApiKey {
-  return { id, hash: "h", prefix: "mk_x", ownerUserId, teamId, project: "p", createdAt: "2026-06-21T00:00:00.000Z" };
+  return { id, hash: "a".repeat(64), prefix: "mk_x", ownerUserId, teamId, project: "p", createdAt: "2026-06-21T00:00:00.000Z" };
 }

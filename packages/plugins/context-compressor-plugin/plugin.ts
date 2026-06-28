@@ -2,6 +2,7 @@ import type { MolenkopfPluginModule, PluginRuntimeContext } from "../../core/src
 import { compressJsonBody } from "../../core/src/pipeline/openai-request-rewriter.ts";
 import { summarizeRecentActivity } from "../../core/src/manifest/audit-activity.ts";
 import { summarizeAudit } from "../../core/src/manifest/audit-summary.ts";
+import type { AuditManifest } from "../../core/src/manifest/audit-store.ts";
 import type { RetrievalStore } from "../../core/src/store/retrieval-store.ts";
 import { projectMetrics } from "../shared/audit-projects.ts";
 export { descriptor } from "./descriptor.ts";
@@ -27,12 +28,16 @@ export const plugin: MolenkopfPluginModule = {
       plugin: ctx.plugin,
       scopes: ctx.scopes,
       metrics: { ...summary, projects },
-      latest: ctx.manifests.at(-1),
-      requests: ctx.manifests.slice(-25),
+      latest: cloneManifest(ctx.manifests.at(-1)),
+      requests: ctx.manifests.slice(-25).map(cloneManifest),
       requestGroups: summarizeRecentActivity(ctx.manifests)
     };
   }
 };
+
+function cloneManifest(manifest: AuditManifest | undefined): AuditManifest | undefined {
+  return manifest ? structuredClone(manifest) : undefined;
+}
 
 function retrievalStore(runtime: PluginRuntimeContext): RetrievalStore | undefined {
   const candidate = runtime.storage as Partial<RetrievalStore> | undefined;

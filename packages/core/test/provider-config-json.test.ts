@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { parseMolenkopfConfigJson } from "../src/config/molenkopf-config.ts";
+import { DEFAULT_CLI_PROVIDER_TIMEOUT_MS } from "../src/providers/provider-catalog.ts";
 
 test("parses JSON provider config with env credential refs", () => {
   const config = parseMolenkopfConfigJson(JSON.stringify({
@@ -100,6 +101,7 @@ test("parses local Codex CLI providers from JSON", () => {
   assert.equal(provider.runtime, "codex");
   assert.equal(provider.cliCommand, "codex");
   assert.deepEqual(provider.cliArgs, ["exec"]);
+  assert.equal(provider.cliTimeoutMs, DEFAULT_CLI_PROVIDER_TIMEOUT_MS);
   assert.equal(provider.credentialRef, "none");
 });
 

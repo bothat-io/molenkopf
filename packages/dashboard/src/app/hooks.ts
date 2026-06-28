@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 
 const DEV_REVISION_URL = "/__molenkopf/dev/revision";
+const DASHBOARD_EVENTS_URL = "/__molenkopf/events";
+export const DASHBOARD_REFRESH_EVENT = "request_finished";
 export const DEV_REVISION_INTERVAL_MS = 5000;
 
 export function useDevRevisionReload(active = true): void {
@@ -29,6 +31,22 @@ export function useDevRevisionReload(active = true): void {
     check();
     return () => window.clearInterval(timer);
   }, [active]);
+}
+
+export function useDashboardEventRefresh(onRefresh: () => void, active = true): void {
+  useEffect(() => {
+    if (!active || typeof EventSource === "undefined") return;
+    const source = new EventSource(DASHBOARD_EVENTS_URL);
+    const refresh = () => {
+      if (shouldRefreshDashboardOnEvent(document.visibilityState)) onRefresh();
+    };
+    source.addEventListener(DASHBOARD_REFRESH_EVENT, refresh);
+    return () => source.close();
+  }, [active, onRefresh]);
+}
+
+export function shouldRefreshDashboardOnEvent(visibilityState: DocumentVisibilityState): boolean {
+  return visibilityState !== "hidden";
 }
 
 export type DashboardTab = "overview" | "admin";

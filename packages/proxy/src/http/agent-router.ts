@@ -1,7 +1,9 @@
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
 import { chooseByDistribution } from "../../../core/src/routing/distribution.ts";
-import { activeProvider, agentTokensUsed, distributionEligible, providerWeight, type RuntimeState } from "./runtime-state.ts";
-import { clientIdForAgent, type ClientIdentity } from "./client-identity.ts";
+import { activeProvider, distributionEligible, providerWeight } from "./runtime-state.ts";
+import { agentTokensUsed } from "./usage-accounting.ts";
+import type { RuntimeState } from "./runtime-types.ts";
+import { clientIdForAgent, safeSubjectId, type ClientIdentity } from "./client-identity.ts";
 import { providerAllowedForClient } from "./provider-access.ts";
 
 export type RoutingResult = { ok: true; provider: ProviderConfig } | { ok: false; status: number; error: string };
@@ -9,7 +11,7 @@ export type RoutingResult = { ok: true; provider: ProviderConfig } | { ok: false
 // Resolves the upstream provider for a request and enforces agent access/budget.
 // Priority: explicit agent binding -> distribution mode -> global active provider.
 export function resolveRouting(state: RuntimeState, headers: Headers, client: ClientIdentity): RoutingResult {
-  const budget = state.consumerBudgets[client.id];
+  const budget = consumerBudget(state, client);
   if (budget && agentTokensUsed(state, client.id) >= budget) return { ok: false, status: 429, error: "consumer_budget" };
   const agentId = cleanAgentId(headers.get("x-molenkopf-agent"));
   if (agentId) {
@@ -35,6 +37,13 @@ export function resolveRouting(state: RuntimeState, headers: Headers, client: Cl
     return { ok: false, status: 409, error: "no_eligible_provider" };
   }
   return requireProviderAccess(client, activeProvider(state));
+}
+
+function consumerBudget(state: RuntimeState, client: ClientIdentity): number | undefined {
+  const current = state.consumerBudgets[client.id];
+  if (current) return current;
+  const legacyUserId = client.userId ? `user:${safeSubjectId(client.userId)}` : undefined;
+  return legacyUserId ? state.consumerBudgets[legacyUserId] : undefined;
 }
 
 function distribute(state: RuntimeState, client: ClientIdentity): ProviderConfig | undefined {

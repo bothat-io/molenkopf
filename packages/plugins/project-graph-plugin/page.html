@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>project-graph-plugin</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;margin:0;background:#f7f7f4;color:#1b1d1f}
+    main{max-width:1120px;margin:0 auto;padding:28px}
+    h1{font-size:24px;margin:0 0 6px} h2{font-size:16px;margin:0 0 12px}
+    p{color:#5c6268}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:20px 0}
+    .box,.panel{background:white;border:1px solid #deded8;border-radius:8px;padding:14px}.panel{margin:14px 0}
+    .value{font-size:24px;font-weight:700}.small{font-size:13px;color:#6a7076}
+    label{display:block;font-size:13px;font-weight:650;margin:0 0 6px}
+    input{box-sizing:border-box;width:100%;border:1px solid #c9cac3;border-radius:6px;padding:10px;font:inherit;background:#fff}
+    button{border:1px solid #1b1d1f;border-radius:6px;background:#1b1d1f;color:white;padding:9px 12px;font:inherit;cursor:pointer}
+    button.secondary{background:white;color:#1b1d1f}button:disabled{opacity:.55;cursor:not-allowed}
+    .query{display:grid;grid-template-columns:minmax(180px,1fr) auto auto;gap:10px;align-items:end}
+    .status{border:1px dashed #b8b8af;border-radius:8px;padding:14px;background:#fff;margin:14px 0}
+    .status.warn{border-color:#b7791f;background:#fff8e6}.status.ok{border-color:#2f855a;background:#effaf3}
+    .list{display:grid;gap:8px;margin:0;padding:0;list-style:none}.item{border-top:1px solid #ededE8;padding-top:8px}
+    .item:first-child{border-top:0;padding-top:0}.muted{color:#6a7076}.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px}
+    @media (max-width:760px){main{padding:18px}.query,.cols{grid-template-columns:1fr}button{width:100%}}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>project-graph-plugin</h1>
+    <p>Derives graph metadata from token usage and scoped audit metadata. It does not scan local source files.</p>
+    <p class="small">Page version: token-derived graph controls.</p>
+    <section class="grid">
+      <div class="box"><div class="small">Graphs</div><div id="graphs" class="value">0</div></div>
+      <div class="box"><div class="small">Routes</div><div id="routes" class="value">0</div></div>
+      <div class="box"><div class="small">Warnings</div><div id="warnings" class="value">0</div></div>
+      <div class="box"><div class="small">Requests</div><div id="requests" class="value">0</div></div>
+    </section>
+    <section class="panel">
+      <h2>graph.query</h2>
+      <div class="query">
+        <div><label for="query">Route, provider, client, or project text</label><input id="query" placeholder="provider:"></div>
+        <button class="secondary" id="reload">Reload</button>
+        <button id="queryButton">Search</button>
+      </div>
+      <div class="status" id="state">Loading token-derived graph metadata.</div>
+      <ul class="list" id="results"></ul>
+    </section>
+    <section class="cols">
+      <div class="panel"><h2>Routes</h2><ul class="list" id="routeList"></ul></div>
+      <div class="panel"><h2>Top token nodes</h2><ul class="list" id="symbolList"></ul></div>
+    </section>
+    <p class="small">Safety: storage is structural metadata only, not full prompts, responses, or source files.</p>
+  </main>
+  <script>
+    const $=id=>document.getElementById(id);
+    const text=(id,value)=>{$(id).textContent=String(value)};
+    const setBusy=busy=>["reload","queryButton"].forEach(id=>$(id).disabled=busy);
+    const status=(message,type="")=>{$("state").className=`status ${type}`.trim();$("state").textContent=message};
+    const item=node=>`${node.label||node.symbolName||node.kind}${node.path?` - ${node.path}`:""}`;
+    function renderList(id,items,empty){
+      const list=$(id); list.textContent="";
+      if(!items||!items.length){ const li=document.createElement("li"); li.className="muted"; li.textContent=empty; list.append(li); return; }
+      for(const entry of items.slice(0,10)){
+        const li=document.createElement("li"); li.className="item";
+        const main=document.createElement("div"); main.textContent=typeof entry==="string"?entry:item(entry);
+        const meta=document.createElement("code"); meta.textContent=entry.kind?entry.kind:"";
+        li.append(main,meta); list.append(li);
+      }
+    }
+    async function parseResponse(res){
+      const body=await res.text(); let data={};
+      try{ data=body?JSON.parse(body):{}; }catch{ throw new Error(`Unexpected ${res.status} response from ${res.url}`); }
+      if(!res.ok||data.error) throw new Error(data.error||`HTTP ${res.status}`);
+      return data;
+    }
+    async function loadData(){
+      const res=await fetch("/__molenkopf/plugins/project-graph-plugin/data");
+      const data=await parseResponse(res);
+      const stats=data.graphSummaries?.[0]?.stats||{};
+      text("graphs",data.graphSummaries?.length||0); text("routes",data.routes?.length||0);
+      text("warnings",data.latestWarnings?.length||0); text("requests",stats.requests||0);
+      const derived=data.latestDerivationStatus==="derived";
+      status(derived?"Token-derived project graph is available.":"No token metadata observed yet.",derived?"ok":"");
+      renderList("routeList",data.routes,"No routes derived yet.");
+      renderList("symbolList",data.topSymbolsByDegree,"No provider or client nodes derived yet.");
+    }
+    async function action(actionId,input){
+      const res=await fetch(`/__molenkopf/plugins/project-graph-plugin/actions/${actionId}`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({input})});
+      return parseResponse(res);
+    }
+    $("reload").addEventListener("click",async()=>{setBusy(true);try{await loadData();}catch(error){status(error.message,"warn");}finally{setBusy(false);}});
+    $("queryButton").addEventListener("click",async()=>{
+      setBusy(true);
+      try{ const data=await action("graph.query",{query:$("query").value.trim(),limit:20}); renderList("results",data.results,"No matching graph nodes."); }
+      catch(error){ renderList("results",[error.message],""); } finally{ setBusy(false); }
+    });
+    loadData().catch(error=>status(error.message,"warn"));
+  </script>
+</body>
+</html>

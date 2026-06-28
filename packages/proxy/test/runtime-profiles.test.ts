@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveProfile, proxyArgs, devWatchEnabled } from "../src/cli/profile-server.ts";
+import { DEV_WATCH_DIRS, resolveProfile, proxyArgs, devWatchEnabled, cliDevWatchEnabled } from "../src/cli/profile-server.ts";
 
 test("runtime profiles keep dev, test, and prod isolated", () => {
   const dev = resolveProfile("dev", {});
@@ -17,6 +17,8 @@ test("runtime profiles keep dev, test, and prod isolated", () => {
   assert.equal(devWatchEnabled(dev, {}), true);
   assert.equal(devWatchEnabled(testProfile, {}), false);
   assert.equal(devWatchEnabled(dev, { MOLENKOPF_DEV_WATCH: "0" }), false);
+  assert.equal(cliDevWatchEnabled(dev, ["node", "profile-server.ts", "dev", "--no-watch"], {}), false);
+  assert.ok(DEV_WATCH_DIRS.includes("packages/plugins"));
 });
 
 test("runtime profiles reject invalid values before startup", () => {
@@ -36,4 +38,14 @@ test("runtime profile env overrides are scoped by profile", () => {
   assert.equal(profile.port, 8899);
   assert.match(profile.dataDir, /custom-test$/);
   assert.equal(profile.target, "http://127.0.0.1:11434/v1");
+});
+
+test("runtime profiles pass public bind only with explicit env opt in", () => {
+  const closed = resolveProfile("prod", { MOLENKOPF_PROD_HOST: "0.0.0.0" });
+  const opened = resolveProfile("prod", { MOLENKOPF_PROD_HOST: "0.0.0.0", MOLENKOPF_PROD_ALLOW_PUBLIC_BIND: "1" });
+
+  assert.equal(closed.allowPublicBind, false);
+  assert.equal(opened.allowPublicBind, true);
+  assert.equal(proxyArgs(closed).includes("--allow-public-bind"), false);
+  assert.equal(proxyArgs(opened).includes("--allow-public-bind"), true);
 });

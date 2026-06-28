@@ -17,7 +17,7 @@ The repository implements the core proxy and later roadmap primitives, excluding
 - OpenAI-compatible local proxy.
 - Local health, status, plugin, provider, config, stats, request, latest request, and SSE event endpoints.
 - Dashboard served by the proxy with Overview and Admin surfaces, provider controls, plugin controls, and an isolated React/Vite dashboard package.
-- Local plugin pages for context compression and the Obsidian memory graph workspace.
+- Local plugin pages for context compression, token optimization, and project graph workspaces.
 - Anthropic base URL routing.
 - Profile routing for fixed, manual, and failover modes.
 - Local plugin SDK with explicit permissions and remote loading disabled.

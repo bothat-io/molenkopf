@@ -63,7 +63,8 @@ Expected result:
   authenticated admin session.
 - `Dashboard -> Overview` updates after refresh or polling.
 - `Context compression flow` increments request and token counters.
-- `Memory graph workspace` shows text-derived safe graph data after transferred text is observed.
+- `project-graph-plugin` derives graph metadata from observed token/audit
+  metadata without scanning local source files.
 
 ## Provider Setup
 
@@ -166,9 +167,10 @@ for request/audit/plugin details.
 ## Plugin Pages And Data
 
 Open plugin pages from the Admin plugin section. Context compression owns token
-pressure and savings views. The graph page is fed from redacted transferred text
-and safe request metadata; it does not read an Obsidian vault yet and does not
-render raw prompt or response content.
+pressure and savings views. Token optimizer owns recommendation summaries.
+`project-graph-plugin` owns token-derived graph metadata only; it does not scan source
+roots, read an Obsidian vault, or render raw source, prompt, or response
+content.
 
 ## Current Boundaries
 

@@ -10,8 +10,9 @@ endpoint and one local memory layer.
 - Let CLI agents run locally while their prompt/context stream is still observable through the gateway.
 - Reduce the real text/context that is sent upstream or into a CLI runtime.
 - Show live token savings only from real transferred payloads, not placeholder counters.
-- Store safe derived memory from transferred text so later turns can reuse it.
-- Build an Obsidian-style graph from the transferred text and derived memory, not from generic HTTP metadata.
+- Store safe derived metadata without full prompts, responses, credentials, or raw source persistence.
+- Build a project graph from token usage and scoped audit metadata, not source
+  scans, raw prompts, or raw responses.
 
 ## Plugin Meaning
 
@@ -20,7 +21,8 @@ Plugins are middleware, but not all middleware can mutate traffic. Mutation
 rights are explicit plugin descriptor fields and are enforced by the proxy.
 
 - Context compression plugin: owns token reduction, before/after accounting, saved-token totals, skip reasons, and retrieval IDs for real context chunks.
-- Memory/Obsidian plugin: owns the derived text memory graph, semantic nodes, links, and local store updates from real agent text.
+- `project-graph-plugin`: owns token-derived graph metadata, graph storage, and
+  safe graph query output.
 - Provider/runtime plugins: adapt OpenAI API, Anthropic API, Codex CLI, Claude CLI, and later MCP into the same run/event contract.
 - Core safety pipeline: redacts secrets and prevents raw credentials, full prompts, and full responses from leaking into UI/logs. This is not optional plugin behavior.
 
@@ -30,7 +32,8 @@ rights are explicit plugin descriptor fields and are enforced by the proxy.
 - No unauthenticated proxy traffic graph as a product target. If attribution is
   unknown, show it only as a routing/accounting warning.
 - Compression views must answer: what text entered, what was removed or represented by ID, what was sent, and how many tokens were saved.
-- Graph views must answer: what concepts/entities/threads were learned from transferred text and how they relate.
-- HTTP metadata graphs are diagnostics only, not the Obsidian workspace goal.
+- Graph views must answer: which projects, routes, providers, clients, and
+  token flows were observed and how they relate.
+- Source scanning is not a project graph goal.
 
 Molenkopf should adapt that pattern at the gateway/runtime boundary instead of pretending all agents are API-key-only HTTP clients.

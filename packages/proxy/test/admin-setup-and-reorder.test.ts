@@ -29,7 +29,7 @@ test("plugin API exposes only optional plugins", async () => {
     const admin = cookieOf(await post(base, "/__molenkopf/setup-admin", { username: "admin", password: "admin-secret" }));
 
     const plugins = await fetch(`${base}/__molenkopf/plugins`, { headers: { cookie: admin } }).then((r) => r.json());
-    assert.deepEqual(plugins.items.map((p: any) => p.id).sort(), ["context-compressor-plugin", "obsidian-graph-plugin"]);
+    assert.deepEqual(plugins.items.map((p: any) => p.id).sort(), ["context-compressor-plugin", "project-graph-plugin", "token-optimizer-plugin"]);
     assert.equal(plugins.items.every((p: any) => p.canToggle), true);
     assert.equal(plugins.items.some((p: any) => p.id === "core-redaction"), false);
   } finally {

@@ -9,6 +9,8 @@ import { startProxy } from "../src/http/server.ts";
 import { IdentityStore } from "../../core/src/identity/identity-store.ts";
 import { issueApiKey } from "../../core/src/identity/api-keys.ts";
 import { AuditStore } from "../../core/src/manifest/audit-store.ts";
+import { UsageSnapshotStore } from "../../core/src/identity/usage-snapshot.ts";
+import { seedUsageIdentity, writeUsageAudit } from "./usage-test-helpers.ts";
 
 async function listenOn(server: Server): Promise<number> {
   server.listen(0, "127.0.0.1");
@@ -80,7 +82,7 @@ test("missing usage snapshot rebuilds from audit manifests", async () => {
   await seed.load();
   await seed.putTeam({ id: "alpha", name: "Alpha", allowedProviders: "*", managerIds: [], createdAt: "x" });
   await seed.putUser({ id: "bob", displayName: "Bob", role: "member", teamIds: ["alpha"], createdAt: "x" });
-  seed.data.keys.key_a = { id: "key_a", hash: "h", prefix: "mk_fake", ownerUserId: "bob", teamId: "alpha", project: "project-alpha", createdAt: "x" };
+  seed.data.keys.key_a = { id: "key_a", hash: "a".repeat(64), prefix: "mk_fake", ownerUserId: "bob", teamId: "alpha", project: "project-alpha", createdAt: "x" };
   await seed.save();
   seed.close();
   await new AuditStore(dataDir).write({
@@ -88,6 +90,8 @@ test("missing usage snapshot rebuilds from audit manifests", async () => {
     client: { id: "user:bob", label: "Bob", source: "api_key", userId: "bob", teamIds: ["alpha"], keyId: "key_a", project: "project-alpha" },
     compressedItems: 1, estimatedOriginalTokens: 100, estimatedCompressedTokens: 25, estimatedSavedTokens: 0,
     redactedSecrets: 0, retrievalIds: [], compressorsUsed: [], warnings: [], statusCode: 200, durationMs: 1,
+    requestedModel: "claude-audit-model",
+    requestedReasoning: "extended",
     upstreamInputTokens: 5, upstreamOutputTokens: 7
   });
 
@@ -97,8 +101,69 @@ test("missing usage snapshot rebuilds from audit manifests", async () => {
     const admin = await setupAdmin(base);
     const usage = await fetch(`${base}/__molenkopf/usage`, { headers: { cookie: admin } }).then((r) => r.json());
     assert.equal(usage.users.find((x: any) => x.id === "bob").usage.inputTokens, 5);
+    assert.equal(usage.users.find((x: any) => x.id === "bob").usage.models["claude-audit-model"].requests, 1);
+    assert.equal(usage.users.find((x: any) => x.id === "bob").usage.models["claude-audit-model"].reasoning.extended.outputTokens, 7);
     assert.equal(usage.keys.find((x: any) => x.id === "key_a").usage.outputTokens, 7);
     assert.equal("savedTokens" in usage.teams.find((x: any) => x.id === "alpha").usage, false);
+  } finally {
+    await proxy.close();
+    upstream.close();
+  }
+});
+
+test("stale usage snapshot rebuilds from audit manifests", async () => {
+  const upstream = createServer((req, res) => { req.resume(); res.writeHead(200, {}); res.end("{}"); });
+  const upstreamPort = await listenOn(upstream);
+  const dataDir = await mkdtemp(join(tmpdir(), "molenkopf-usage-stale-"));
+  await seedUsageIdentity(dataDir);
+  await writeUsageAudit(dataDir, "stale-1", 9, 4);
+  const snapshots = new UsageSnapshotStore(dataDir);
+  await snapshots.save({
+    usageByAgent: {},
+    usageByProvider: {},
+    usageByKey: {},
+    usageByTeam: {},
+    usageByUser: { "user:bob": { requests: 1, inputTokens: 1, outputTokens: 1, costEur: 0 } },
+    usageSnapshotCursor: "old"
+  });
+  await snapshots.close();
+
+  const proxy = await startProxy({ port: 0, target: `http://127.0.0.1:${upstreamPort}/v1`, dataDir });
+  try {
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const admin = await setupAdmin(base);
+    const usage = await fetch(`${base}/__molenkopf/usage`, { headers: { cookie: admin } }).then((r) => r.json());
+    assert.equal(usage.users.find((x: any) => x.id === "bob").usage.inputTokens, 9);
+    assert.equal(usage.users.find((x: any) => x.id === "bob").usage.outputTokens, 4);
+  } finally {
+    await proxy.close();
+    upstream.close();
+  }
+});
+
+test("invalid usage snapshot rows rebuild from audit before accounting", async () => {
+  const upstream = createServer((req, res) => { req.resume(); res.writeHead(200, {}); res.end("{}"); });
+  const upstreamPort = await listenOn(upstream);
+  const dataDir = await mkdtemp(join(tmpdir(), "molenkopf-usage-invalid-"));
+  await seedUsageIdentity(dataDir);
+  await writeUsageAudit(dataDir, "invalid-1", 3, 8);
+  const snapshots = new UsageSnapshotStore(dataDir);
+  await snapshots.save({
+    usageByAgent: {},
+    usageByProvider: {},
+    usageByKey: {},
+    usageByTeam: {},
+    usageByUser: { "user:bob": { requests: "bad", inputTokens: 1, outputTokens: 1 } },
+    usageSnapshotCursor: "2026-06-23T00:00:00.000Z\u0000invalid-1"
+  } as any);
+  await snapshots.close();
+
+  const proxy = await startProxy({ port: 0, target: `http://127.0.0.1:${upstreamPort}/v1`, dataDir });
+  try {
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const admin = await setupAdmin(base);
+    const usage = await fetch(`${base}/__molenkopf/usage`, { headers: { cookie: admin } }).then((r) => r.json());
+    assert.equal(usage.users.find((x: any) => x.id === "bob").usage.outputTokens, 8);
   } finally {
     await proxy.close();
     upstream.close();

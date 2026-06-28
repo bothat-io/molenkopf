@@ -2,18 +2,59 @@
   <img src="packages/dashboard/public/molenkopf-logo.png" alt="Molenkopf logo" width="72">
 </p>
 
-# Molenkopf
+<h1 align="center">Molenkopf</h1>
 
-Molenkopf is a local gateway for API and CLI based coding agents. It is not
-only an OpenAI-compatible API proxy: it also supports Anthropic/Claude API
-traffic and local CLI runtimes such as Claude CLI and Codex CLI. It should
-reduce real transferred context, redact secrets, build local derived memory,
-and write audit manifests without full prompts or responses.
+<p align="center">
+  <strong>Local control plane for coding-agent traffic.</strong>
+</p>
 
-Molenkopf has a fixed core safety pipeline for secret redaction, content classification, safe compression for logs, JSON and stacktraces, local retrieval storage, audit manifests, and redacted SSE events. Optional plugins extend this pipeline; core safety behavior is not toggleable.
+Molenkopf sits between coding agents and provider or runtime backends. It proxies
+OpenAI-compatible and Anthropic/Claude API traffic, can bridge local Claude CLI
+and Codex CLI runtimes, and gives teams local keys, routing, usage, budgets,
+redaction, audit manifests, and dashboard controls.
+
+The core safety pipeline is fixed: secret redaction, content classification,
+safe compression for structured operational text, local retrieval storage,
+audit manifests, and redacted SSE events are always owned by Molenkopf.
+Optional plugins extend the pipeline; they do not replace core safety behavior.
 
 Product intent and non-negotiable plugin semantics live in
 `docs/PRODUCT_INTENT.md` and `docs/MOLENKOPF_PLUGIN_API.md`.
+
+## Quickstart
+
+### npm package
+
+Requires Node.js 24 or newer.
+
+```bash
+npm install -g @bothat-io/molenkopf
+node -e "require('node:fs').writeFileSync('.env','MOLENKOPF_SESSION_SECRET='+require('node:crypto').randomBytes(32).toString('hex')+'\n')"
+molenkopf proxy
+```
+
+### Docker
+
+```bash
+node -e "require('node:fs').writeFileSync('.env','MOLENKOPF_SESSION_SECRET='+require('node:crypto').randomBytes(32).toString('hex')+'\n')"
+docker run --rm --env-file .env -p 127.0.0.1:8787:8787 -v molenkopf-data:/data ghcr.io/bothat-io/molenkopf:latest
+```
+
+### Source checkout
+
+```bash
+npm run bootstrap
+node -e "require('node:fs').writeFileSync('.env','MOLENKOPF_SESSION_SECRET='+require('node:crypto').randomBytes(32).toString('hex')+'\n')"
+npm run dev
+```
+
+Open `http://127.0.0.1:8787/` after startup.
+
+Use `docs/DEPLOYMENT.md` when you need a different port or non-loopback access.
+
+## Screenshot
+
+![Molenkopf dashboard overview](docs/assets/dashboard-overview.png)
 
 ## Safety Notice
 
@@ -37,8 +78,8 @@ Built now:
 - Per-agent multi-account routing: each agent (`x-molenkopf-agent`) routes to its bound provider/account; config `profiles`/`agents` resolve to providers.
 - Real token accounting: upstream `usage` is read from the provider response and recorded as
   real input/output tokens (not only a chars/4 estimate).
-- Text-derived memory graph: concepts (files, symbols, error types) are extracted from the
-  real redacted transferred text into a bounded co-occurrence graph.
+- `project-graph-plugin`: derives graph metadata from token usage and scoped audit
+  metadata without scanning source files or storing prompts/responses.
 - Static pipeline with request IDs, redaction, classification, compression, retrieval, audit, SSE events, and upstream routing.
 - Local API under `/__molenkopf/*`: bootstrap endpoints for health, session
   status, and first-run admin creation, user-scoped usage/key endpoints, and admin-only
@@ -46,7 +87,7 @@ Built now:
 - Dashboard shell served at `/__molenkopf/dashboard` with Overview and Admin
   views backed by an isolated React/Vite dashboard package. Dedicated Providers,
   Plugins, Requests, Audit, Agents, and Settings views are planned.
-- Plugin pages are local HTML surfaces under `/__molenkopf/plugins/:id/page`; context compression and memory graph pages read scoped plugin data endpoints and show explicit load errors instead of fake empty workspaces.
+- Plugin pages are local HTML surfaces under `/__molenkopf/plugins/:id/page`; context compression, token optimization, and project graph pages read scoped plugin data endpoints and show explicit load errors instead of fake empty workspaces.
 - The context compression plugin must expose safe token accounting for real transferred context only. Empty states must not show placeholder pressure or fake savings. Usage notes: `docs/CONTEXT_COMPRESSION_PLUGIN_README.md`.
 - Practical dashboard and proxy connection guide: `docs/MOLENKOPF_USAGE.md`.
 - JSON config startup target for providers, agents, and plugin policies:
@@ -80,18 +121,8 @@ screen is reachable there until the first admin is created.
 
 ## Control Plane Usage
 
-Open `http://127.0.0.1:8787/__molenkopf/dashboard` after starting Molenkopf.
-Root `/` redirects there, while upstream agent traffic still uses `/v1/...`.
-
-Every `/v1/...` proxy request must present a valid Molenkopf API key. Use
-`Authorization: Bearer mk_...` when Molenkopf supplies provider credentials. If
-the client must also forward an upstream `Authorization` header, put the
-Molenkopf key in `x-molenkopf-token: mk_...`; Molenkopf strips that header
-before forwarding upstream.
-
-```text
-Authorization: Bearer mk_...
-```
+Root `/` opens the dashboard at `/__molenkopf/dashboard`; upstream agent traffic
+stays on `/v1/...` and requires a Molenkopf API key.
 
 `x-molenkopf-agent` is optional local request metadata. It may select an
 explicit agent binding only when that binding is already allowed for the
@@ -117,73 +148,7 @@ Plugin toggles happen in the Admin plugin section or by posting `{ "id": "contex
 
 Agent drafts are stored as local proxy metadata through `/__molenkopf/agents/draft`; raw token fields are rejected and only `tokenHash` is accepted. The dashboard keeps a `localStorage` fallback if the local API is unavailable. These drafts are routing metadata, not provider credentials.
 
-For a step-by-step local setup and test flow, read `docs/MOLENKOPF_USAGE.md`.
-
-Plugin pages open in standalone windows from `/__molenkopf/plugins/context-compressor-plugin/page` and `/__molenkopf/plugins/obsidian-graph-plugin/page`. The graph workspace is derived from safe request metadata and redacted transferred text. Context and graph pages group by project/key where available and surface plugin-data failures explicitly.
-
-## Commands
-Install from npm with Node.js 24 or newer:
-
-```bash
-npm install -g @bothat-io/molenkopf
-node -e "require('node:fs').writeFileSync('.env','MOLENKOPF_SESSION_SECRET='+require('node:crypto').randomBytes(32).toString('hex')+'\n')"
-molenkopf proxy
-```
-
-Quick Docker start on the Docker host:
-
-```bash
-cp .env.example .env
-# Edit .env and set a unique MOLENKOPF_SESSION_SECRET.
-docker pull ghcr.io/bothat-io/molenkopf:latest
-docker run --rm \
-  --env-file .env \
-  -p 127.0.0.1:8787:8787 \
-  -v molenkopf-data:/data \
-  ghcr.io/bothat-io/molenkopf:latest
-```
-
-Open `http://127.0.0.1:8787/` and create the first admin user. The Docker
-quickstart binds Molenkopf to `127.0.0.1` on the host for local use; do not
-publish the port publicly before admin setup and deployment security are done.
-Docker requires `--env-file .env`; admin users are created only in the browser.
-
-Use `docs/DEPLOYMENT.md` when you need a different port or non-loopback access.
-
-For local development, use a source checkout:
-
-```bash
-npm run bootstrap
-cp .env.example .env
-# Edit .env and set a unique MOLENKOPF_SESSION_SECRET.
-npm run dev
-```
-
-## Connect A Client
-
-Use Molenkopf as the OpenAI-compatible base URL:
-
-```text
-http://127.0.0.1:8787/v1
-```
-
-Authenticate proxy traffic with a Molenkopf API key:
-
-```text
-Authorization: Bearer mk_...
-```
-
-If your client also sends an upstream provider credential in `Authorization`,
-send the Molenkopf key separately:
-
-```text
-x-molenkopf-token: mk_...
-x-molenkopf-agent: codex-local
-```
-
-These local headers are stripped before upstream forwarding. See
-`docs/MOLENKOPF_USAGE.md` for a concrete `curl` request, provider setup, and
-dashboard checks.
+Plugin pages open in standalone windows from `/__molenkopf/plugins/context-compressor-plugin/page`, `/__molenkopf/plugins/token-optimizer-plugin/page`, and `/__molenkopf/plugins/project-graph-plugin/page`. The `project-graph-plugin` workspace is derived from token usage and scoped audit metadata, not source scans or raw prompts. Plugin pages group by project/key where available and surface plugin-data failures explicitly.
 
 ## Limitations
 

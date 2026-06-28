@@ -1,6 +1,6 @@
 import { verifySessionPayload } from "../../../core/src/auth/session.ts";
 import type { User } from "../../../core/src/identity/types.ts";
-import type { RuntimeState } from "./runtime-state.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 
 // Auth lives on the Identity store (users/teams). With no password-bearing user,
 // Molenkopf stays in first-run mode until the browser flow creates an admin.

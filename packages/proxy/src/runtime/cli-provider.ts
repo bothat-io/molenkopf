@@ -10,14 +10,33 @@ export type CliProviderResult = {
   usage?: { inputTokens?: number; outputTokens?: number };
 };
 
+export type CliProviderOptions = { signal?: AbortSignal };
+
 export function isCliProvider(provider: ProviderConfig): boolean {
   return provider.kind === "cli" && (provider.runtime === "claude" || provider.runtime === "codex");
 }
 
-export async function runCliProvider(provider: ProviderConfig, body: string, requestId: string, path = "/v1/responses"): Promise<CliProviderResult> {
+export function isModelListPath(path: string): boolean {
+  const clean = path.split("?")[0];
+  return clean === "/v1/models" || clean === "/models";
+}
+
+export function cliModelList(provider: ProviderConfig): CliProviderResult {
+  const ids = [...new Set([provider.id, provider.runtime === "codex" ? "gpt-5" : "sonnet"])];
+  return {
+    status: 200,
+    headers: { "content-type": "application/json" },
+    body: Buffer.from(JSON.stringify({
+      object: "list",
+      data: ids.map((id) => ({ id, object: "model", created: 0, owned_by: "molenkopf-cli" }))
+    }))
+  };
+}
+
+export async function runCliProvider(provider: ProviderConfig, body: string, requestId: string, path = "/v1/responses", options: CliProviderOptions = {}): Promise<CliProviderResult> {
   const request = cliRequest(body, provider);
   const prompt = request.prompt;
-  const output = await executeCliProvider(provider, prompt, request.runModel);
+  const output = await executeCliProvider(provider, prompt, request.runModel, { signal: options.signal });
   const usage = { inputTokens: estimateTokens(prompt), outputTokens: estimateTokens(output) };
   const model = request.responseModel;
   if (isAnthropicMessages(path) && wantsStream(body)) {

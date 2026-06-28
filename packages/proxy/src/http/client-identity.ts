@@ -29,6 +29,10 @@ export function clientIdForAgent(agentId: string): string {
   return `agent:${safeSubjectId(agentId)}`;
 }
 
+export function clientIdForUser(userId: string): string {
+  return `user:${userId}`;
+}
+
 export function agentIdFromHeaders(headers: Headers): string | undefined {
   return clean(headers.get("x-molenkopf-agent"));
 }

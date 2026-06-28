@@ -59,6 +59,7 @@ test("distribute mode spreads load across providers by weight", async () => {
       { id: "backup", name: "Backup", kind: "local", target: `http://127.0.0.1:${backupPort}/v1` }
     ],
     activeProviderId: "primary",
+    providerCatalogMode: "explicit",
     dataDir: dir
   });
   const base = `http://127.0.0.1:${proxy.port}`;
@@ -99,6 +100,7 @@ test("distribute mode only chooses providers allowed by the API key team", async
     port: 0,
     target: `http://127.0.0.1:${primaryPort}/v1`,
     providers: [{ id: "backup", name: "Backup", kind: "local", target: `http://127.0.0.1:${backupPort}/v1` }],
+    providerCatalogMode: "explicit",
     dataDir: dir
   });
   const base = `http://127.0.0.1:${proxy.port}`;
@@ -134,6 +136,7 @@ test("distribute mode fails closed when no provider is allowed for the API key t
     port: 0,
     target: `http://127.0.0.1:${primaryPort}/v1`,
     providers: [{ id: "backup", name: "Backup", kind: "local", target: `http://127.0.0.1:${backupPort}/v1` }],
+    providerCatalogMode: "explicit",
     dataDir: dir
   });
   const base = `http://127.0.0.1:${proxy.port}`;

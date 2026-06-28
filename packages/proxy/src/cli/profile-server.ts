@@ -6,7 +6,7 @@ import { ensurePrivateDirSync } from "../../../core/src/storage/private-state.ts
 import { validateProviderTarget } from "../../../core/src/security/target-policy.ts";
 import { loadDefaultEnvFile } from "./env-file.ts";
 
-const WATCH_DIRS = ["packages/core/src", "packages/proxy/src"];
+export const DEV_WATCH_DIRS = ["packages/core/src", "packages/proxy/src", "packages/plugins"] as const;
 const RESTART_DEBOUNCE_MS = 250;
 const FORCE_KILL_MS = 1500;
 const DASHBOARD_DEV_PORT = 5173;
@@ -18,7 +18,7 @@ const PROFILE_DEFAULTS = {
 };
 
 type ProfileName = keyof typeof PROFILE_DEFAULTS;
-type Profile = { name: ProfileName; port: number; host: string; target: string; dataDir: string };
+type Profile = { name: ProfileName; port: number; host: string; target: string; dataDir: string; allowPublicBind: boolean };
 
 export function resolveProfile(name: string, env: Record<string, string | undefined> = process.env): Profile {
   if (!isProfileName(name)) throw new Error("profile must be one of: dev, test, prod");
@@ -28,23 +28,30 @@ export function resolveProfile(name: string, env: Record<string, string | undefi
   const dataDir = env[`MOLENKOPF_${upper}_DATA_DIR`] || base.dataDir;
   const target = env[`MOLENKOPF_${upper}_TARGET`] || env.MOLENKOPF_TARGET || "https://api.openai.com/v1";
   const host = env[`MOLENKOPF_${upper}_HOST`] || "127.0.0.1";
+  const allowPublicBind = boolEnv(env[`MOLENKOPF_${upper}_ALLOW_PUBLIC_BIND`]);
   validateHost(host);
   validateTarget(target);
   if (!dataDir.trim()) throw new Error("dataDir must not be empty");
-  return { name, port, host, target, dataDir: resolve(dataDir) };
+  return { name, port, host, target, dataDir: resolve(dataDir), allowPublicBind };
 }
 
 export function proxyArgs(profile: Profile) {
-  return [
+  const args = [
     "--experimental-strip-types", "--experimental-sqlite", "--disable-warning=ExperimentalWarning",
     "packages/proxy/src/cli/main.ts", "proxy",
     "--target", profile.target, "--host", profile.host,
     "--port", String(profile.port), "--data-dir", profile.dataDir
   ];
+  if (profile.allowPublicBind) args.push("--allow-public-bind");
+  return args;
 }
 
 export function devWatchEnabled(profile: Profile, env: Record<string, string | undefined> = process.env) {
   return profile.name === "dev" && env.MOLENKOPF_DEV_WATCH !== "0";
+}
+
+export function cliDevWatchEnabled(profile: Profile, argv: readonly string[] = process.argv, env: Record<string, string | undefined> = process.env) {
+  return devWatchEnabled(profile, env) && !argv.includes("--no-watch");
 }
 
 function spawnProxy(profile: Profile, revision?: string) {
@@ -60,9 +67,20 @@ function run() {
   ensurePrivateDirSync(profile.dataDir);
   console.log(`Molenkopf ${profile.name}: http://${profile.host}:${profile.port}`);
   console.log(`data-dir: ${profile.dataDir}`);
-  if (devWatchEnabled(profile)) return runWatched(profile);
+  if (cliDevWatchEnabled(profile)) return runWatched(profile);
+  const dashboard = profile.name === "dev" && dashboardDevEnabled() ? spawnDashboardDev() : undefined;
   const child = spawnProxy(profile);
-  child.on("exit", (code, signal) => process.exit(code ?? (signal ? 1 : 0)));
+  const stop = (code: number) => {
+    child.kill();
+    dashboard?.kill();
+    process.exit(code);
+  };
+  child.on("exit", (code, signal) => {
+    dashboard?.kill();
+    process.exit(code ?? (signal ? 1 : 0));
+  });
+  process.on("SIGINT", () => stop(130));
+  process.on("SIGTERM", () => stop(143));
 }
 
 function runWatched(profile: Profile) {
@@ -79,6 +97,7 @@ function runWatched(profile: Profile) {
     child.on("exit", (code, signal) => {
       if (restarting) { restarting = false; startChild(); return; }
       closeWatchers(watchers);
+      dashboard?.kill();
       process.exit(code ?? (signal ? 1 : 0));
     });
   };
@@ -99,7 +118,7 @@ function runWatched(profile: Profile) {
   };
 
   startChild();
-  for (const dir of WATCH_DIRS) {
+  for (const dir of DEV_WATCH_DIRS) {
     try {
       const root = resolve(dir);
       watchers.push(watch(root, { recursive: true }, (_event, file) => scheduleRestart(file ? join(dir, String(file)) : dir)));
@@ -159,6 +178,10 @@ function parsePort(value: string): number {
   const port = Number(value);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("invalid profile port");
   return port;
+}
+
+function boolEnv(value: string | undefined): boolean {
+  return value === "1" || value?.toLowerCase() === "true";
 }
 
 function validateHost(value: string): void {

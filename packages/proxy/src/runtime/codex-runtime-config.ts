@@ -7,6 +7,8 @@ export function codexConfigSummary(toml: string): RuntimeProfileConfig {
   const values = topLevelValues(toml);
   const bypass = values.get("dangerously_bypass_approvals_and_sandbox") === "true";
   return {
+    model: cleanToken(values.get("model"), 96),
+    modelReasoningEffort: cleanToken(values.get("model_reasoning_effort"), 32),
     sandbox: bypass ? "danger-full-access" : enumText(values.get("sandbox_mode") || "", CODEX_SANDBOX, "invalid_sandbox"),
     approval: bypass ? "never" : enumText(values.get("approval_policy") || "", CODEX_APPROVAL, "invalid_approval")
   };
@@ -34,4 +36,9 @@ function enumText(value: string, allowed: Set<string>, error: string): string | 
   if (!value) return undefined;
   if (!allowed.has(value)) throw new Error(error);
   return value;
+}
+
+function cleanToken(value: string | undefined, limit: number): string | undefined {
+  const cleaned = (value ?? "").replace(/[^a-z0-9._:@/-]/gi, "_").slice(0, limit);
+  return cleaned || undefined;
 }

@@ -1,3 +1,4 @@
+import { join, resolve } from "node:path";
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
 
 type ParsedRequest = Record<string, unknown> | undefined;
@@ -22,14 +23,49 @@ export function cliArgs(provider: ProviderConfig, runModel?: string): string[] {
   const args = [...(provider.cliArgs ?? defaultArgs(provider))];
   if (provider.runtime === "claude") {
     ensureFlag(args, "--no-session-persistence");
-    if (runModel && !hasModelFlag(args)) args.push("--model", runModel);
+    setOptionValue(args, "--output-format", "stream-json");
+    ensureFlag(args, "--include-partial-messages");
+    if (provider.runtimeAuthDir) hardenImportedClaudeArgs(args);
+    if (runModel) setOptionValue(args, "--model", runModel);
   }
   if (provider.runtime === "codex") {
     ensureFlag(args, "--ephemeral");
-    if (provider.runtimeAuthDir) ensureFlag(args, "--ignore-user-config");
-    if (runModel && !hasModelFlag(args)) args.push("-m", runModel);
+    ensureFlag(args, "--json");
+    if (provider.runtimeAuthDir) {
+      ensureFlag(args, "--ignore-user-config");
+      ensureFlag(args, "--ignore-rules");
+      ensureFlag(args, "--skip-git-repo-check");
+      setOptionValue(args, "--sandbox", provider.runtimeProfile?.sandbox ?? "read-only");
+      setOptionValue(args, "--cd", runtimeProviderCwd(provider));
+    }
+    if (runModel) setOptionValue(args, "-m", runModel);
   }
   return args;
+}
+
+export function runtimeProviderWorkspace(provider: ProviderConfig): string {
+  return join(provider.runtimeAuthDir ?? ".", "workspace");
+}
+
+export function runtimeProviderCwd(provider: ProviderConfig): string {
+  if (provider.runtime === "codex" && provider.runtimeProfile?.sandbox === "danger-full-access") return resolve(".");
+  return runtimeProviderWorkspace(provider);
+}
+
+function hardenImportedClaudeArgs(args: string[]): void {
+  removeOptions(args, [
+    "--settings",
+    "--add-dir",
+    "--allowedTools",
+    "--allowed-tools",
+    "--disallowedTools",
+    "--disallowed-tools",
+    "--permission-mode",
+    "--tools"
+  ]);
+  ensureFlag(args, "--safe-mode");
+  setOptionValue(args, "--permission-mode", "plan");
+  setOptionEquals(args, "--tools", "");
 }
 
 function requestModel(parsed: ParsedRequest, provider: ProviderConfig): { responseModel: string; runModel?: string } {
@@ -47,8 +83,27 @@ function ensureFlag(args: string[], flag: string): void {
   if (!args.includes(flag)) args.push(flag);
 }
 
-function hasModelFlag(args: string[]): boolean {
-  return args.some((arg) => arg === "-m" || arg === "--model" || arg.startsWith("--model="));
+function setOptionValue(args: string[], flag: string, value: string): void {
+  removeOptions(args, [flag]);
+  args.push(flag, value);
+}
+
+function setOptionEquals(args: string[], flag: string, value: string): void {
+  removeOptions(args, [flag]);
+  args.push(`${flag}=${value}`);
+}
+
+function removeOptions(args: string[], flags: string[]): void {
+  for (let index = args.length - 1; index >= 0; index -= 1) {
+    if (flags.some((flag) => args[index].startsWith(`${flag}=`))) {
+      args.splice(index, 1);
+      continue;
+    }
+    if (!flags.includes(args[index])) continue;
+    let count = 1;
+    while (index + count < args.length && !args[index + count].startsWith("-")) count += 1;
+    args.splice(index, count);
+  }
 }
 
 function parseBody(body: string): ParsedRequest {

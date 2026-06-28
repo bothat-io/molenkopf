@@ -1,32 +1,48 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { DEFAULT_CLI_PROVIDER_TIMEOUT_MS } from "../../../core/src/providers/provider-catalog.ts";
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
-import { cliArgs } from "./cli-request.ts";
+import { createCliOutputCollector, type CliOutputEvent } from "./cli-output-events.ts";
+import { cliArgs, runtimeProviderCwd, runtimeProviderWorkspace } from "./cli-request.ts";
 import { cliEnv } from "./cli-env.ts";
 
-export function executeCliProvider(provider: ProviderConfig, prompt: string, runModel?: string): Promise<string> {
+export type CliExecutionOptions = { signal?: AbortSignal; onEvent?: (event: CliOutputEvent) => void };
+
+export function executeCliProvider(provider: ProviderConfig, prompt: string, runModel?: string, options: CliExecutionOptions = {}): Promise<string> {
   return new Promise((resolve, reject) => {
     const baseArgs = cliArgs(provider, runModel);
     const args = provider.cliInputMode === "argument" ? [...baseArgs, prompt] : baseArgs;
     const spec = cliSpawnSpec(provider.cliCommand ?? "claude", args);
-    const timeoutMs = provider.cliTimeoutMs ?? 120000;
+    const timeoutMs = provider.cliTimeoutMs ?? DEFAULT_CLI_PROVIDER_TIMEOUT_MS;
     const lifecycle = newLifecycle(provider);
-    const child = spawn(spec.command, spec.args, { stdio: ["pipe", "pipe", "pipe"], windowsHide: true, env: cliEnv(provider) });
+    const child = spawn(spec.command, spec.args, { stdio: ["pipe", "pipe", "pipe"], windowsHide: true, env: cliEnv(provider), cwd: cliCwd(provider), detached: process.platform !== "win32" });
     const stdout: Buffer[] = [], stderr: Buffer[] = [];
+    const outputEvents = createCliOutputCollector(options.onEvent);
     const limits = outputLimits();
     let settled = false, killTimer: NodeJS.Timeout | undefined, stdoutSeen = false, stderrSeen = false;
     const timer = setTimeout(() => {
       lifecycle.add(`timeout ${timeoutMs}ms`);
-      lifecycle.add(`kill SIGTERM ${child.kill("SIGTERM") ? "sent" : "failed"}`);
-      killTimer = setTimeout(() => lifecycle.add(`kill SIGKILL ${child.kill("SIGKILL") ? "sent" : "failed"}`), 250);
+      terminateProcessTree(child.pid, "SIGTERM", lifecycle);
+      killTimer = setTimeout(() => terminateProcessTree(child.pid, "SIGKILL", lifecycle), 250);
       killTimer.unref?.();
       fail(new Error(`local cli provider timed out after ${timeoutMs}ms${detail(lifecycle.items, stdout, stderr)}`), false);
     }, timeoutMs);
+    const abort = () => {
+      lifecycle.add("aborted");
+      terminateProcessTree(child.pid, "SIGTERM", lifecycle);
+      killTimer = setTimeout(() => terminateProcessTree(child.pid, "SIGKILL", lifecycle), 250);
+      killTimer.unref?.();
+      fail(new Error(`local cli provider aborted${detail(lifecycle.items, stdout, stderr)}`), false);
+    };
+    if (options.signal?.aborted) abort();
+    else options.signal?.addEventListener("abort", abort, { once: true });
 
     child.stdout.on("data", (chunk) => {
       if (!stdoutSeen) { stdoutSeen = true; lifecycle.add("stdout first byte"); }
-      if (!capture(stdout, Buffer.from(chunk), limits.streamBytes)) overflow("stdout");
+      const buffer = Buffer.from(chunk);
+      outputEvents.feed(buffer);
+      if (!capture(stdout, buffer, limits.streamBytes)) overflow("stdout");
     });
     child.stderr.on("data", (chunk) => {
       if (!stderrSeen) { stderrSeen = true; lifecycle.add("stderr first byte"); }
@@ -38,7 +54,7 @@ export function executeCliProvider(provider: ProviderConfig, prompt: string, run
       if (settled) { if (killTimer) clearTimeout(killTimer); return; }
       if (code !== 0) return fail(new Error(exitMessage(code, stdout, stderr, lifecycle.items)), true);
       finish(true);
-      const output = Buffer.concat(stdout).toString("utf8").trim();
+      const output = outputEvents.finish(Buffer.concat(stdout).toString("utf8")).trim();
       if (!output) return reject(new Error(`local cli provider returned empty output${detail(lifecycle.items, stdout, stderr)}`));
       resolve(output);
     });
@@ -55,6 +71,7 @@ export function executeCliProvider(provider: ProviderConfig, prompt: string, run
     function finish(clearKill: boolean): void {
       settled = true;
       clearTimeout(timer);
+      options.signal?.removeEventListener("abort", abort);
       if (clearKill && killTimer) clearTimeout(killTimer);
     }
     function overflow(stream: "stdout" | "stderr"): void {
@@ -65,10 +82,42 @@ export function executeCliProvider(provider: ProviderConfig, prompt: string, run
   });
 }
 
+function cliCwd(provider: ProviderConfig): string | undefined {
+  if (!provider.runtimeAuthDir) return undefined;
+  const workspace = runtimeProviderWorkspace(provider);
+  mkdirSync(workspace, { recursive: true });
+  return runtimeProviderCwd(provider);
+}
+
 function newLifecycle(provider: ProviderConfig) {
   const started = Date.now();
   const items = [`0ms spawn runtime=${provider.runtime ?? "cli"}`];
   return { items, add: (event: string) => items.push(`${Date.now() - started}ms ${event}`) };
+}
+
+function terminateProcessTree(pid: number | undefined, signal: NodeJS.Signals, lifecycle: ReturnType<typeof newLifecycle>): void {
+  if (!pid) return void lifecycle.add(`kill ${signal} failed missing pid`);
+  if (process.platform === "win32") {
+    try {
+      const taskkill = spawn("taskkill.exe", ["/pid", String(pid), "/t", "/f"], { stdio: "ignore", windowsHide: true });
+      taskkill.once("error", () => lifecycle.add(`kill tree ${signal} failed`));
+      lifecycle.add(`kill tree ${signal} sent`);
+    } catch {
+      lifecycle.add(`kill tree ${signal} failed`);
+    }
+    return;
+  }
+  try {
+    process.kill(-pid, signal);
+    lifecycle.add(`kill group ${signal} sent`);
+  } catch {
+    try {
+      process.kill(pid, signal);
+      lifecycle.add(`kill ${signal} sent`);
+    } catch {
+      lifecycle.add(`kill ${signal} failed`);
+    }
+  }
 }
 
 function exitMessage(code: number | null, stdout: Buffer[], stderr: Buffer[], events: string[]): string {

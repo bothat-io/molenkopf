@@ -2,26 +2,51 @@ import type { AuditManifest, AuditStore } from "../../../core/src/manifest/audit
 import type { EventBus } from "../../../core/src/events/event-bus.ts";
 import type { RewriteAudit } from "../../../core/src/pipeline/openai-request-rewriter.ts";
 import type { UsageTotals } from "../../../core/src/manifest/usage-meter.ts";
-import { isPluginEnabled, recordUsage, type RuntimeState } from "./runtime-state.ts";
-import { recordCommunicationGraph } from "./communication-graph.ts";
+import { recordUsage } from "./usage-accounting.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 import { safeSubjectId, type ClientIdentity } from "./client-identity.ts";
 import type { PluginHost } from "./plugin-host.ts";
+import type { RequestModelMetadata } from "./request-model.ts";
 
-export async function finishRequest(manifest: AuditManifest, auditStore: AuditStore, events: EventBus, state: RuntimeState, pluginHost?: PluginHost): Promise<void> {
+export async function finishRequest(manifest: AuditManifest, auditStore: AuditStore, events: EventBus, state: RuntimeState, pluginHost?: PluginHost, pluginIds?: readonly string[]): Promise<void> {
   const stored = auditSafeManifest(manifest);
   await auditStore.write(stored);
   state.requests++;
   state.compressedItems += manifest.compressedItems;
   recordUsage(state, manifest);
   state.latest = stored;
-  if (isPluginEnabled(state, "obsidian-graph-plugin")) recordCommunicationGraph(state.communicationGraph, stored);
-  await pluginHost?.audit(stored);
+  if (pluginIds) pluginHost?.setRequestPlugins(manifest.requestId, pluginIds);
+  await pluginHost?.audit(stored, pluginIds);
   events.emit("request_finished", { requestId: manifest.requestId, data: { statusCode: manifest.statusCode, durationMs: manifest.durationMs } });
 }
 
-export function buildManifest(requestId: string, method: string, path: string, target: string, providerId: string, statusCode: number, durationMs: number, client: ClientIdentity, audit?: RewriteAudit, usage?: UsageTotals): AuditManifest {
+export async function finishProxyRequest(input: {
+  auditStore: AuditStore;
+  events: EventBus;
+  state: RuntimeState;
+  pluginHost?: PluginHost;
+  pluginIds?: readonly string[];
+  requestId: string;
+  method: string;
+  path: string;
+  target: string;
+  providerId: string;
+  started: number;
+  client: ClientIdentity;
+  statusCode: number;
+  audit?: RewriteAudit;
+  usage?: UsageTotals;
+  requestModel?: RequestModelMetadata;
+}): Promise<void> {
+  const manifest = buildManifest(input.requestId, input.method, input.path, input.target, input.providerId, input.statusCode, Date.now() - input.started, input.client, input.audit, input.usage, input.requestModel);
+  await finishRequest(manifest, input.auditStore, input.events, input.state, input.pluginHost, input.pluginIds);
+}
+
+export function buildManifest(requestId: string, method: string, path: string, target: string, providerId: string, statusCode: number, durationMs: number, client: ClientIdentity, audit?: RewriteAudit, usage?: UsageTotals, requestModel?: RequestModelMetadata): AuditManifest {
   return {
     requestId, timestamp: new Date().toISOString(), method, path, targetHost: new URL(target).host, providerId,
+    requestedModel: requestModel?.model,
+    requestedReasoning: requestModel?.reasoning,
     client,
     compressedItems: audit?.compressedItems ?? 0,
     estimatedOriginalTokens: audit?.estimatedOriginalTokens ?? 0,

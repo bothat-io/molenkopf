@@ -1,10 +1,13 @@
-import { useState, type DragEvent, type ReactNode } from "react";
+import { useEffect, useState, type DragEvent, type ReactNode } from "react";
 import "./CollapsibleGroup.css";
 
-export type GroupMetric = { key: string; content: ReactNode };
+export type GroupMetric = { key: string; content?: ReactNode; label?: ReactNode; value?: ReactNode };
+export function CollapsiblePanel({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <div className={`collapsible-panel ${className}`.trim()}>{children}</div>;
+}
 
 export function CollapsibleGroup({
-  title, subtitle, metrics, actions, open, children, empty, onToggle, onDropValue
+  title, subtitle, metrics, actions, open, children, empty, onToggle, onDropValue, summaryClassName = "", bodyClassName = "", mainClassName = "", sideClassName = ""
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
@@ -15,10 +18,16 @@ export function CollapsibleGroup({
   empty?: ReactNode;
   onToggle: (open: boolean) => void;
   onDropValue?: (value: string) => void;
+  summaryClassName?: string;
+  bodyClassName?: string;
+  mainClassName?: string;
+  sideClassName?: string;
 }) {
   const [dropActive, setDropActive] = useState(false);
+  const [isOpen, setIsOpen] = useState(open);
   const canDrop = Boolean(onDropValue);
-  return <details className={`collapsible-group${canDrop ? " can-drop" : ""}${dropActive ? " is-drop-active" : ""}`} open={open} onToggle={(event) => onToggle(event.currentTarget.open)}
+  useEffect(() => setIsOpen(open), [open]);
+  return <details className={`collapsible-group${canDrop ? " can-drop" : ""}${dropActive ? " is-drop-active" : ""}`} open={isOpen} onToggle={(event) => { setIsOpen(event.currentTarget.open); onToggle(event.currentTarget.open); }}
     onDragEnter={(event) => { if (isUserDrag(event)) setDropActive(true); }}
     onDragOver={(event) => { if (isUserDrag(event)) event.preventDefault(); }}
     onDragLeave={() => setDropActive(false)}
@@ -29,14 +38,16 @@ export function CollapsibleGroup({
       const value = event.dataTransfer.getData("text/molenkopf-user");
       if (value) onDropValue(value);
     }}>
-    <summary>
-      <div className="collapsible-main"><strong>{title}</strong>{subtitle ? <span>{subtitle}</span> : null}</div>
-      <div className="collapsible-side">
-        {metrics?.map((metric) => <span key={metric.key}>{metric.content}</span>)}
+    <summary className={summaryClassName}>
+      <div className={`collapsible-main ${mainClassName}`.trim()}><strong>{title}</strong>{subtitle ? <span>{subtitle}</span> : null}</div>
+      <div className={`collapsible-side ${sideClassName}`.trim()}>
+        {metrics?.map((metric) => metric.content !== undefined
+          ? <span key={metric.key}>{metric.content}</span>
+          : <span key={metric.key} className="collapsible-metric"><b>{metric.label}</b><span>{metric.value}</span></span>)}
         {actions ? <span className="collapsible-actions" onClick={(event) => event.stopPropagation()}>{actions}</span> : null}
       </div>
     </summary>
-    {open ? children : empty || null}
+    {isOpen ? <div className={`collapsible-body ${bodyClassName}`.trim()}>{children}</div> : empty || null}
   </details>;
 }
 

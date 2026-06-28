@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
+import { DEFAULT_RUNTIME_AUTH_CLI_TIMEOUT_MS } from "../src/http/runtime-auth-registry.ts";
 import { installFakeClaude, installFakeCodex, postJson, runtimeProof, setupAdmin, withPath } from "./runtime-auth-test-utils.ts";
 import { auth, issueKey } from "./proxy-auth-utils.ts";
 
@@ -14,7 +15,14 @@ test("imports a supplied runtime auth JSON without exposing the secret", async (
   try {
     await installFakeCodex(dir);
     restorePath = withPath(dir);
-    proxy = await startProxy({ port: 0, target: "http://127.0.0.1:1/v1", dataDir: dir });
+    proxy = await startProxy({
+      port: 0,
+      target: "http://127.0.0.1:1/v1",
+      providers: [{ id: "base", name: "Base", kind: "api", target: "http://127.0.0.1:1/v1", allowDistribution: false }],
+      activeProviderId: "base",
+      providerCatalogMode: "explicit",
+      dataDir: dir
+    });
     const base = `http://127.0.0.1:${proxy.port}`;
     const admin = await setupAdmin(base);
     const authJson = JSON.stringify({ refresh_token: "codex-session-secret", account: "work" });
@@ -42,6 +50,7 @@ test("imports a supplied runtime auth JSON without exposing the secret", async (
     const provider = providers.items.find((item: { id: string }) => item.id === "codex-work");
     assert.equal(provider.runtime, "codex");
     assert.equal(provider.runtimeAuthConfigured, true);
+    assert.equal(provider.cliTimeoutMs, DEFAULT_RUNTIME_AUTH_CLI_TIMEOUT_MS);
     assert.equal(provider.allowDistribution, true);
     assert.equal(provider.sharePercent, 100);
     assert.equal(provider.runtimeAuthDir, undefined);

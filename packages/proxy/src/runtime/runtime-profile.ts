@@ -1,6 +1,7 @@
 import { join, normalize, posix, win32 } from "node:path";
 import type { RuntimeProfileConfig } from "../../../core/src/providers/provider-catalog.ts";
 import { ensurePrivateDir, writePrivateFile } from "../../../core/src/storage/private-state.ts";
+import { safeClaudeSettingsJson } from "./claude-settings.ts";
 import { codexConfigSummary } from "./codex-runtime-config.ts";
 
 type Runtime = "claude" | "codex";
@@ -17,7 +18,7 @@ export function runtimeProfileFromImport(body: Body, runtime: Runtime): RuntimeP
   const profile = profileFields(body, runtime);
   if (runtime === "claude") {
     const settingsSource = text(body.settingsJson) || profileText;
-    const settingsJson = settingsSource ? jsonText(settingsSource) : undefined;
+    const settingsJson = settingsSource ? safeClaudeSettingsJson(settingsSource) : undefined;
     if (settingsSource && !settingsJson) throw new Error("invalid_profile_json");
     const derived = settingsJson ? claudeSettingsSummary(settingsJson) : {};
     return mergeProfile(profile, derived, settingsJson ? { settingsRef: "settings.json" } : {}, { settingsJson });
@@ -50,7 +51,9 @@ export function runtimeCliArgs(runtime: Runtime, authDir: string, profile?: Runt
     for (const dir of profile.addDirs ?? []) args.push("--add-dir", dir);
   } else {
     if (profile.sandbox) args.push("--sandbox", profile.sandbox);
+    if (profile.model) args.push("-m", profile.model);
     if (profile.approval) args.push("-c", `approval_policy="${profile.approval}"`);
+    if (profile.modelReasoningEffort) args.push("-c", `model_reasoning_effort="${profile.modelReasoningEffort}"`);
     for (const dir of profile.addDirs ?? []) args.push("--add-dir", dir);
   }
   return args;
@@ -64,6 +67,8 @@ function profileFields(body: Body, runtime: Runtime): RuntimeProfileConfig | und
     allowedTools: list(source.allowedTools),
     disallowedTools: list(source.disallowedTools),
     addDirs: safeAddDirs(list(source.addDirs)),
+    model: runtime === "codex" ? text(field(source, "model")).slice(0, 96) || undefined : undefined,
+    modelReasoningEffort: runtime === "codex" ? text(field(source, "modelReasoningEffort", "model_reasoning_effort", "reasoningEffort", "reasoning_effort")).slice(0, 32) || undefined : undefined,
     sandbox: runtime === "codex" ? enumValue(field(source, "sandbox", "sandboxMode", "sandbox_mode"), CODEX_SANDBOX, "invalid_sandbox") : undefined,
     approval: runtime === "codex" ? enumValue(field(source, "approval", "approvalPolicy", "approval_policy"), CODEX_APPROVAL, "invalid_approval") : undefined
   };
@@ -97,6 +102,8 @@ function withSummary(profile: RuntimeProfileConfig): RuntimeProfileConfig | unde
   const summary = [
     profile.settingsRef ? "Claude settings" : "",
     profile.configRef ? "Codex config" : "",
+    profile.model ? `model ${profile.model}` : "",
+    profile.modelReasoningEffort ? `thinking ${profile.modelReasoningEffort}` : "",
     profile.permissionMode ? `mode ${profile.permissionMode}` : "",
     profile.sandbox ? `sandbox ${profile.sandbox}` : "",
     profile.approval ? `approval ${profile.approval}` : "",
@@ -157,11 +164,6 @@ function record(value: unknown): Body | undefined {
 
 function parseJson(value: string): unknown {
   try { return JSON.parse(value); } catch { return undefined; }
-}
-
-function jsonText(value: string): string | undefined {
-  const parsed = parseJson(value);
-  return record(parsed) ? `${JSON.stringify(parsed, null, 2)}\n` : undefined;
 }
 
 function field(source: Body, ...names: string[]): unknown {

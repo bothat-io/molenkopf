@@ -13,6 +13,8 @@ export type AuditManifest = {
   path: string;
   targetHost: string;
   providerId?: string;
+  requestedModel?: string;
+  requestedReasoning?: string;
   client?: { id: string; label: string; source: "user" | "agent" | "api_key" | "unattributed"; userId?: string; agentId?: string; teamIds?: string[]; keyId?: string; project?: string };
   compressedItems: number;
   estimatedOriginalTokens: number;

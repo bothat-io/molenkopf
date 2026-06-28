@@ -3,7 +3,7 @@ import { verifyPasswordAsync, hashPasswordAsync, passwordTooLong } from "../../.
 import { signSession } from "../../../core/src/auth/session.ts";
 import type { User } from "../../../core/src/identity/types.ts";
 import { authRequired, canManage, currentUser } from "./auth-state.ts";
-import { type RuntimeState } from "./runtime-state.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 import { jsonHeaders, readJson, writeJson } from "./local-api-io.ts";
 import { isValidUserId } from "./identity-id.ts";
 import { MIN_PASSWORD_LENGTH } from "./password-policy.ts";

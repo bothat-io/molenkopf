@@ -22,25 +22,27 @@ export type PluginHookPhase =
 
 ## Permissions
 
-Current runtime permissions are intentionally narrower:
-`metadata:read`, `body:read`, `body:write`, `audit:read`, `audit:write`,
-`events:write`, and `provider:write`. The following target set is future-only.
+Current descriptor-v2 capabilities are intentionally explicit and enforced by
+the proxy where hooks or actions touch runtime data:
 
 ```ts
-export type PluginPermission =
+export type PluginCapability =
   | "metadata:read"
-  | "headers:read"
-  | "headers:write"
-  | "body:read"
+  | "body:redacted:read"
   | "body:write"
-  | "response:read"
-  | "response:write"
+  | "audit:read:scoped"
+  | "audit:read:all"
   | "audit:write"
   | "events:write"
-  | "memory:write"
-  | "storage:write"
-  | "metrics:write";
+  | "settings:read"
+  | "settings:write"
+  | "policy:recommend"
+  | "policy:write"
+  | "action:execute";
 ```
+
+Header, response, memory, storage, and metrics write permissions in older
+sketches are not current runtime capabilities.
 
 ## Descriptor
 

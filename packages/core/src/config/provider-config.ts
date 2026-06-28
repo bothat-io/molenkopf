@@ -1,4 +1,4 @@
-import type { ProviderConfig } from "../providers/provider-catalog.ts";
+import { DEFAULT_CLI_PROVIDER_TIMEOUT_MS, type ProviderConfig } from "../providers/provider-catalog.ts";
 import { validateProviderTarget } from "../security/target-policy.ts";
 
 type JsonRecord = Record<string, unknown>;
@@ -53,7 +53,7 @@ function cliProvider(item: JsonRecord, id: string, runtime: "claude" | "codex"):
     cliCommand: stringOrUndefined(item.command) ?? runtime,
     cliArgs: stringArray(item.args ?? (runtime === "codex" ? ["exec"] : ["--print"]), `$.providers.${id}.args`),
     cliInputMode: item.inputMode === "argument" ? "argument" : "stdin",
-    cliTimeoutMs: positiveNumber(item.timeoutMs, 120000),
+    cliTimeoutMs: positiveNumber(item.timeoutMs, DEFAULT_CLI_PROVIDER_TIMEOUT_MS),
     authScheme: "none",
     credentialRef: "none",
     enabled: item.enabled === undefined ? true : boolean(item.enabled, `$.providers.${id}.enabled`)

@@ -1,18 +1,21 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { rm } from "node:fs/promises";
-import { join } from "node:path";
+import { rename, rm } from "node:fs/promises";
+import { basename, join } from "node:path";
+import { DEFAULT_CLI_PROVIDER_TIMEOUT_MS } from "../../../core/src/providers/provider-catalog.ts";
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
 import { defaultDataDir } from "../../../core/src/storage/local-paths.ts";
 import { ensurePrivateDir, writePrivateFile } from "../../../core/src/storage/private-state.ts";
-import type { RoutingMode } from "./runtime-state.ts";
+import type { RoutingMode } from "./runtime-types.ts";
 import { runtimeCliArgs } from "../runtime/runtime-profile.ts";
 
 type RuntimeAuthMeta = Pick<ProviderConfig, "id" | "name" | "runtime" | "runtimeProfile" | "allowDistribution"> & { authRef: string };
 type RuntimeAuthState = { activeProviderId?: string; routingMode?: RoutingMode };
+export type RuntimeAuthQuarantine = { from: string; to: string };
 
 const ID_RE = /^[a-z0-9][a-z0-9._:-]{0,63}$/i;
 const META_FILE = "provider.json";
 const STATE_FILE = "state.json";
+export const DEFAULT_RUNTIME_AUTH_CLI_TIMEOUT_MS = DEFAULT_CLI_PROVIDER_TIMEOUT_MS;
 
 export function restoreRuntimeAuthProviders(dataDir: string | undefined): { providers: ProviderConfig[]; activeProviderId?: string; routingMode?: RoutingMode } {
   const root = runtimeAuthRoot(dataDir);
@@ -54,9 +57,19 @@ export async function persistRuntimeAuthSelection(dataDir: string | undefined, a
   await writePrivateFile(join(root, STATE_FILE), `${JSON.stringify({ activeProviderId, routingMode }, null, 2)}\n`);
 }
 
-export async function removeRuntimeAuthProvider(provider: ProviderConfig): Promise<void> {
-  if (!provider.runtimeAuthDir) return;
-  await rm(provider.runtimeAuthDir, { recursive: true, force: true });
+export async function quarantineRuntimeAuthProvider(provider: ProviderConfig): Promise<RuntimeAuthQuarantine | undefined> {
+  if (!provider.runtimeAuthDir || !existsSync(provider.runtimeAuthDir)) return undefined;
+  const to = join(provider.runtimeAuthDir, "..", `.${basename(provider.runtimeAuthDir)}.removing.${process.pid}.${Date.now()}`);
+  await rename(provider.runtimeAuthDir, to);
+  return { from: provider.runtimeAuthDir, to };
+}
+
+export async function restoreRuntimeAuthQuarantine(quarantine: RuntimeAuthQuarantine | undefined): Promise<void> {
+  if (quarantine && existsSync(quarantine.to)) await rename(quarantine.to, quarantine.from);
+}
+
+export async function deleteRuntimeAuthQuarantine(quarantine: RuntimeAuthQuarantine | undefined): Promise<void> {
+  if (quarantine) await rm(quarantine.to, { recursive: true, force: true });
 }
 
 export function runtimeAuthProvider(id: string, name: string, runtime: "claude" | "codex", authDir: string, authRef: string, profile?: ProviderConfig["runtimeProfile"]): ProviderConfig {
@@ -69,7 +82,7 @@ export function runtimeAuthProvider(id: string, name: string, runtime: "claude" 
     cliCommand: runtime,
     cliArgs: runtimeCliArgs(runtime, authDir, profile),
     cliInputMode: "stdin",
-    cliTimeoutMs: 120000,
+    cliTimeoutMs: DEFAULT_RUNTIME_AUTH_CLI_TIMEOUT_MS,
     authScheme: "none",
     credentialRef: "none",
     runtimeAuthDir: authDir,

@@ -9,7 +9,7 @@ import { AuditStore } from "../../core/src/manifest/audit-store.ts";
 import { IdentityStore } from "../../core/src/identity/identity-store.ts";
 import { issueApiKey } from "../../core/src/identity/api-keys.ts";
 
-test("plugin data endpoints expose scoped compression and memory data without query secrets", async () => {
+test("plugin data endpoints expose scoped compression data without query secrets", async () => {
   const dir = await mkdtemp(join(tmpdir(), "molenkopf-plugin-data-"));
   let upstreamPath = "";
   const upstream = createServer((req, res) => {
@@ -45,7 +45,6 @@ test("plugin data endpoints expose scoped compression and memory data without qu
     });
     // Compression is opt-in (transparent by default); enable it to assert compressed metrics.
     await fetch(`${base}/__molenkopf/plugins/toggle`, { method: "POST", headers: { "content-type": "application/json", cookie: admin }, body: JSON.stringify({ id: "context-compressor-plugin", enabled: true }) });
-    // Request carrying real text so the memory graph derives concepts from it.
     await fetch(`${base}/v1/responses`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${issued.secret}` },
@@ -59,9 +58,9 @@ test("plugin data endpoints expose scoped compression and memory data without qu
       body: JSON.stringify({ input: longLog })
     });
     const favicon = await fetch(`${base}/favicon.ico`);
-    assert.equal(favicon.status, 204);
+    assert.equal(favicon.status, 200);
     const faviconQuery = await fetch(`${base}/favicon.ico?token=favicon-secret`);
-    assert.equal(faviconQuery.status, 204);
+    assert.equal(faviconQuery.status, 200);
     const devtoolsProbe = await fetch(`${base}/.well-known/appspecific/com.chrome.devtools.json`);
     assert.equal(devtoolsProbe.status, 204);
 
@@ -86,18 +85,10 @@ test("plugin data endpoints expose scoped compression and memory data without qu
     assert.equal(compression.requestGroups[0].project, "project-alpha/client");
     assert.equal(compression.requestGroups[0].keyId, issued.view.id);
     assert.equal(compression.requests.length, 2);
+    assert.equal(compression.latest.requestId, latest.requestId);
+    assert.equal(compression.requests.at(-1).requestId, latest.requestId);
     assert.doesNotMatch(JSON.stringify(compression), /super-secret|favicon-secret|api_key=|chrome\.devtools/);
 
-    const graph = await fetch(`${base}/__molenkopf/plugins/obsidian-graph-plugin/data`, { headers: { cookie: admin } }).then((response) => response.json());
-    assert.equal(graph.plugin.id, "obsidian-graph-plugin");
-    const project = graph.metrics.projects.find((item: { id: string }) => item.id === "project-alpha/client");
-    assert.equal(project.requests, 2);
-    assert.equal(project.inputTokens, 22);
-    assert.equal(project.outputTokens, 14);
-    // Memory graph is derived from the real transferred text, not HTTP metadata.
-    assert.equal(graph.memoryGraph.nodes.some((node: { id: string; label: string }) => node.id === "file:src/app.ts" && node.label === "app.ts"), true);
-    assert.equal(graph.memoryGraph.nodes.some((node: { id: string }) => node.id === "symbol:handleRetry"), true);
-    assert.doesNotMatch(JSON.stringify(graph), /POST \/v1\/responses|super-secret|api_key=/);
   } finally {
     if (proxy) await proxy.close();
     identity.close();
@@ -122,7 +113,7 @@ test("unknown plugin data routes return not found", async () => {
     const cookie = await setupAdmin(base);
     const response = await fetch(`${base}/__molenkopf/plugins/missing/data`, { headers: { cookie } });
     assert.equal(response.status, 404);
-    assert.deepEqual(await response.json(), { error: "unknown_plugin" });
+    assert.deepEqual(await response.json(), { error: "plugin_not_found" });
   } finally {
     if (proxy) await proxy.close();
     await close(upstream);

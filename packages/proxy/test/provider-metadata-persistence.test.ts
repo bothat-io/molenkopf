@@ -39,6 +39,39 @@ test("manual env-ref providers persist without raw credentials", async () => {
   }
 });
 
+test("dashboard API provider credentials survive restart without entering runtime settings", async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), "molenkopf-provider-local-cred-"));
+  let proxy = await startProxy({ port: 0, target: "http://127.0.0.1:9/v1", dataDir });
+  try {
+    let base = `http://127.0.0.1:${proxy.port}`;
+    let admin = cookieOf(await post(base, "/__molenkopf/setup-admin", { username: "admin", password: "admin-secret" }));
+    const secret = "sk-dashboard-provider-secret";
+    const added = await post(base, "/__molenkopf/providers/add", {
+      id: "openai-secret",
+      name: "OpenAI Secret",
+      kind: "openai",
+      target: "https://api.openai.com/v1",
+      credential: secret
+    }, admin);
+    assert.equal(added.status, 200);
+    let settings = await readFile(join(dataDir, "runtime-settings.json"), "utf8");
+    assert.doesNotMatch(settings, /sk-dashboard-provider-secret/);
+    assert.match(settings, /local-provider:openai-secret/);
+    await proxy.close();
+
+    proxy = await startProxy({ port: 0, target: "http://127.0.0.1:9/v1", dataDir });
+    base = `http://127.0.0.1:${proxy.port}`;
+    admin = cookieOf(await post(base, "/__molenkopf/login", { username: "admin", password: "admin-secret" }));
+    const providers = await fetch(`${base}/__molenkopf/providers`, { headers: { cookie: admin } }).then((r) => r.json());
+    const provider = providers.items.find((item: { id: string }) => item.id === "openai-secret");
+    assert.equal(provider.credentialConfigured, true);
+    assert.doesNotMatch(JSON.stringify(providers), /sk-dashboard-provider-secret/);
+  } finally {
+    await proxy.close().catch(() => {});
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
 test("admin-added CLI providers keep runtime metadata across restart", async () => {
   const dataDir = await mkdtemp(join(tmpdir(), "molenkopf-provider-cli-meta-"));
   let proxy = await startProxy({ port: 0, target: "http://127.0.0.1:9/v1", dataDir });

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cliArgs, cliRequest } from "../src/runtime/cli-request.ts";
+import { join, resolve } from "node:path";
+import { cliArgs, cliRequest, runtimeProviderCwd } from "../src/runtime/cli-request.ts";
 import type { ProviderConfig } from "../../core/src/providers/provider-catalog.ts";
 
 const claudeProvider: ProviderConfig = {
@@ -37,10 +38,99 @@ test("CLI request models preserve real client model choices", () => {
 });
 
 test("CLI args make Claude and Codex runs ephemeral and model-aware", () => {
-  assert.deepEqual(cliArgs(claudeProvider, "sonnet"), ["--print", "--no-session-persistence", "--model", "sonnet"]);
-  assert.deepEqual(cliArgs(codexProvider, "gpt-5"), ["exec", "--ephemeral", "-m", "gpt-5"]);
+  assert.deepEqual(cliArgs(claudeProvider, "sonnet"), ["--print", "--no-session-persistence", "--output-format", "stream-json", "--include-partial-messages", "--model", "sonnet"]);
+  assert.deepEqual(cliArgs(codexProvider, "gpt-5"), ["exec", "--ephemeral", "--json", "-m", "gpt-5"]);
 });
 
-test("imported Codex providers ignore user config files", () => {
-  assert.deepEqual(cliArgs({ ...codexProvider, runtimeAuthDir: "runtime-auth/codex-work" }), ["exec", "--ephemeral", "--ignore-user-config"]);
+test("imported Claude providers disable project settings and tools", () => {
+  assert.deepEqual(cliArgs({
+    ...claudeProvider,
+    runtimeAuthDir: "runtime-auth/claude-work",
+    cliArgs: [
+      "--print",
+      "--settings",
+      "settings.json",
+      "--permission-mode",
+      "bypassPermissions",
+      "--add-dir",
+      "C:\\repo",
+      "--allowedTools",
+      "Bash(git *)",
+      "--tools",
+      "Read"
+    ]
+  }), [
+    "--print",
+    "--no-session-persistence",
+    "--output-format",
+    "stream-json",
+    "--include-partial-messages",
+    "--safe-mode",
+    "--permission-mode",
+    "plan",
+    "--tools="
+  ]);
+});
+
+test("imported Codex providers run in an isolated read-only workspace", () => {
+  assert.deepEqual(cliArgs({ ...codexProvider, runtimeAuthDir: "runtime-auth/codex-work" }), [
+    "exec",
+    "--ephemeral",
+    "--json",
+    "--ignore-user-config",
+    "--ignore-rules",
+    "--skip-git-repo-check",
+    "--sandbox",
+    "read-only",
+    "--cd",
+    join("runtime-auth", "codex-work", "workspace")
+  ]);
+});
+
+test("imported Codex providers respect explicit imported sandbox profiles", () => {
+  const provider = {
+    ...codexProvider,
+    runtimeAuthDir: "runtime-auth/codex-work",
+    runtimeProfile: { sandbox: "danger-full-access", approval: "never", model: "gpt-5", modelReasoningEffort: "xhigh" },
+    cliArgs: ["exec", "--sandbox", "danger-full-access", "-m", "gpt-5", "-c", 'approval_policy="never"', "-c", 'model_reasoning_effort="xhigh"']
+  };
+  assert.deepEqual(cliArgs({
+    ...provider
+  }), [
+    "exec",
+    "-m",
+    "gpt-5",
+    "-c",
+    'approval_policy="never"',
+    "-c",
+    'model_reasoning_effort="xhigh"',
+    "--ephemeral",
+    "--json",
+    "--ignore-user-config",
+    "--ignore-rules",
+    "--skip-git-repo-check",
+    "--sandbox",
+    "danger-full-access",
+    "--cd",
+    resolve(".")
+  ]);
+  assert.deepEqual(cliArgs(provider, "gpt-5-mini"), [
+    "exec",
+    "-c",
+    'approval_policy="never"',
+    "-c",
+    'model_reasoning_effort="xhigh"',
+    "--ephemeral",
+    "--json",
+    "--ignore-user-config",
+    "--ignore-rules",
+    "--skip-git-repo-check",
+    "--sandbox",
+    "danger-full-access",
+    "--cd",
+    resolve("."),
+    "-m",
+    "gpt-5-mini"
+  ]);
+  assert.equal(runtimeProviderCwd(provider), resolve("."));
 });

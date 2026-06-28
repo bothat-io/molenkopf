@@ -7,26 +7,25 @@ release work.
 
 Continuation of [MOLENKOPF_EXECUTION_PACKAGES.md](MOLENKOPF_EXECUTION_PACKAGES.md).
 
-## EP9: Memory And Obsidian
+## EP9: Memory And Project Graph
 
 Dependency: EP8.
 
-Owners: `packages/core/src/memory/*`, `packages/proxy/src/http/memory-api.ts`,
-`packages/proxy/src/http/workspaces/obsidian-memory-page.ts`.
+Owners: `packages/plugins/project-graph-plugin/*`, `packages/core/src/memory/*`.
 
 Build:
 - Emit `SafeTextTransfer` from the safe text pipeline.
 - Build derived `MemoryNode` and `MemoryEdge` store.
-- Add bounded memory graph JSON API.
-- Add Obsidian dry-run/apply with explicit vault root and path guards.
+- Add bounded project graph JSON API through the plugin data route.
+- Defer Obsidian dry-run/apply behind explicit vault root and path guards.
 
 Acceptance:
-- Graph is text-derived memory, not HTTP provider/status metadata.
-- Dry-run writes no files; apply cannot escape selected vault root.
+- Graph is source-structure-derived metadata, not HTTP provider/status metadata.
+- Deferred exports write no files in dry-run; apply cannot escape selected vault root.
 
 Verify:
-- Memory extraction and merge tests.
-- Obsidian serializer/dry-run/apply tests.
+- Project graph scanner, builder, storage, and query tests.
+- Deferred Obsidian serializer/dry-run/apply tests.
 
 ## EP10: Employee Operations UI
 

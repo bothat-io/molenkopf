@@ -5,6 +5,7 @@ import { once } from "node:events";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { hashPasswordAsync } from "../../core/src/auth/password.ts";
 import { parseMolenkopfConfigJson } from "../../core/src/config/molenkopf-config.ts";
 import { IdentityStore } from "../../core/src/identity/identity-store.ts";
 import { issueApiKey } from "../../core/src/identity/api-keys.ts";
@@ -51,12 +52,48 @@ test("config agent model policy blocks disallowed models before upstream", async
   });
   const base = `http://127.0.0.1:${proxy.port}`;
   try {
+    const admin = await loginAdmin(base);
     const denied = await fetch(`${base}/v1/responses`, { method: "POST", headers: jsonAuth(seeded.secret, "coder"), body: JSON.stringify({ model: "other-model", input: "x" }) });
     assert.equal(denied.status, 403);
+    assert.deepEqual(await denied.json(), { error: "model_forbidden" });
     assert.equal(hits, 0);
+    const latest = await fetch(`${base}/__molenkopf/requests/latest`, { headers: { cookie: admin } }).then((r) => r.json());
+    assert.equal(latest.statusCode, 403);
+    assert.equal(latest.requestedModel, "other-model");
     const allowed = await fetch(`${base}/v1/responses`, { method: "POST", headers: jsonAuth(seeded.secret, "coder"), body: JSON.stringify({ model: "allowed-model", input: "x" }) });
     assert.equal(allowed.status, 200);
+    await allowed.text();
     assert.equal(hits, 1);
+  } finally {
+    await proxy.close();
+    upstream.close();
+    await rm(seeded.dataDir, { recursive: true, force: true });
+  }
+});
+
+test("config agent default model is inserted before forwarding", async () => {
+  const captured: Record<string, unknown>[] = [];
+  const upstream = createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+    req.on("end", () => { captured.push(JSON.parse(Buffer.concat(chunks).toString("utf8"))); res.writeHead(200, { "content-type": "application/json" }); res.end("{}"); });
+  });
+  const port = await listenOn(upstream);
+  const seeded = await seedAgentKey("coder");
+  const proxy = await startProxy({
+    port: 0,
+    target: `http://127.0.0.1:${port}/v1`,
+    dataDir: seeded.dataDir,
+    configAgents: [{ id: "coder", providerId: "default", enabled: true, allowedModels: ["default-model", "custom-model"], defaultModel: "default-model" }]
+  });
+  const base = `http://127.0.0.1:${proxy.port}`;
+  try {
+    const defaulted = await fetch(`${base}/v1/responses`, { method: "POST", headers: jsonAuth(seeded.secret, "coder"), body: JSON.stringify({ input: "x" }) });
+    assert.equal(defaulted.status, 200);
+    assert.equal(captured.at(-1)?.model, "default-model");
+    const explicit = await fetch(`${base}/v1/responses`, { method: "POST", headers: jsonAuth(seeded.secret, "coder"), body: JSON.stringify({ model: "custom-model", input: "x" }) });
+    assert.equal(explicit.status, 200);
+    assert.equal(captured.at(-1)?.model, "custom-model");
   } finally {
     await proxy.close();
     upstream.close();
@@ -98,6 +135,8 @@ async function seedAgentKey(agentLabel: string): Promise<{ dataDir: string; secr
   const store = new IdentityStore(dataDir);
   await store.load();
   await store.putTeam({ id: "team", name: "Team", allowedProviders: "*", managerIds: [], createdAt: "x" });
+  await store.putUser({ id: "admin", displayName: "Admin", role: "admin", teamIds: ["team"], password: await hashPasswordAsync("admin-secret"), sessionVersion: 0, createdAt: "x" });
+  await store.putTeam({ ...store.getTeam("team")!, managerIds: ["admin"] });
   await store.putUser({ id: "bob", displayName: "Bob", role: "member", teamIds: ["team"], createdAt: "x" });
   const issued = await issueApiKey(store, "bob", { agentLabel, project: "policy", teamId: "team" });
   store.close();
@@ -107,6 +146,16 @@ async function seedAgentKey(agentLabel: string): Promise<{ dataDir: string; secr
 
 function jsonAuth(secret: string, agent: string): HeadersInit {
   return { "content-type": "application/json", authorization: `Bearer ${secret}`, "x-molenkopf-agent": agent };
+}
+
+async function loginAdmin(base: string): Promise<string> {
+  const response = await fetch(`${base}/__molenkopf/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ username: "admin", password: "admin-secret" })
+  });
+  assert.equal(response.status, 200);
+  return (response.headers.get("set-cookie") ?? "").split(";")[0];
 }
 
 async function listenOn(server: Server): Promise<number> {

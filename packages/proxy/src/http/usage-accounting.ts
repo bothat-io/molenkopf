@@ -3,7 +3,7 @@ import { costEur } from "../../../core/src/identity/pricing.ts";
 import { budgetPeriodKey } from "../../../core/src/identity/budget.ts";
 import type { BudgetPeriod } from "../../../core/src/identity/types.ts";
 import { clientIdForAgent } from "./client-identity.ts";
-import type { RuntimeState, UsagePeriodTotals, UsageTotals } from "./runtime-state.ts";
+import type { RuntimeState, UsagePeriodTotals, UsageTotals } from "./runtime-types.ts";
 
 export function recordUsage(state: RuntimeState, manifest: AuditManifest): void {
   const cost = costEur(state.identity?.data.pricing?.[manifest.providerId ?? ""], manifest.upstreamInputTokens ?? 0, manifest.upstreamOutputTokens ?? 0);
@@ -15,9 +15,14 @@ export function recordUsage(state: RuntimeState, manifest: AuditManifest): void 
     else if (client.source === "user") accumulate(state.usageByUser, client.id, manifest, cost, at);
     for (const id of agentUsageKeys(client)) accumulate(state.usageByAgent, id, manifest, cost, at);
     if (client.keyId) accumulate(state.usageByKey, client.keyId, manifest, cost, at);
-    for (const teamId of client.teamIds ?? []) accumulate(state.usageByTeam, teamId, manifest, cost, at);
+  for (const teamId of client.teamIds ?? []) accumulate(state.usageByTeam, teamId, manifest, cost, at);
   }
+  state.usageSnapshotCursor = auditCursor(manifest);
   state.usageSnapshot?.schedule(state);
+}
+
+export function auditCursor(manifest: AuditManifest): string {
+  return `${manifest.timestamp}\u0000${manifest.requestId}`;
 }
 
 export function userUsageKey(userId: string): string {
@@ -88,7 +93,29 @@ function addUsage(usage: UsagePeriodTotals, manifest: AuditManifest, cost: numbe
   usage.inputTokens += manifest.upstreamInputTokens ?? 0;
   usage.outputTokens += manifest.upstreamOutputTokens ?? 0;
   usage.costEur = (usage.costEur ?? 0) + cost;
+  if (manifest.requestedModel) addModelUsage(usage, manifest.requestedModel, manifest, cost);
   return usage;
+}
+
+function addModelUsage(usage: UsagePeriodTotals, model: string, manifest: AuditManifest, cost: number): void {
+  usage.models ??= {};
+  const current = usage.models[model] ?? { requests: 0, inputTokens: 0, outputTokens: 0, costEur: 0 };
+  current.requests++;
+  current.inputTokens += manifest.upstreamInputTokens ?? 0;
+  current.outputTokens += manifest.upstreamOutputTokens ?? 0;
+  current.costEur = (current.costEur ?? 0) + cost;
+  if (manifest.requestedReasoning) addReasoningUsage(current, manifest.requestedReasoning, manifest, cost);
+  usage.models[model] = current;
+}
+
+function addReasoningUsage(usage: NonNullable<UsagePeriodTotals["models"]>[string], reasoning: string, manifest: AuditManifest, cost: number): void {
+  usage.reasoning ??= {};
+  const current = usage.reasoning[reasoning] ?? { requests: 0, inputTokens: 0, outputTokens: 0, costEur: 0 };
+  current.requests++;
+  current.inputTokens += manifest.upstreamInputTokens ?? 0;
+  current.outputTokens += manifest.upstreamOutputTokens ?? 0;
+  current.costEur = (current.costEur ?? 0) + cost;
+  usage.reasoning[reasoning] = current;
 }
 
 function tokensOf(usage: UsageTotals | undefined): number {

@@ -24,7 +24,7 @@ test("package checker rejects sensitive tarball entries", async () => {
   }
 });
 
-test("package checker accepts the reviewed runtime inventory shape", async () => {
+test("package checker accepts descriptor-v2-derived plugin inventory", async () => {
   const root = await fixtureRoot();
   try {
     const paths = requiredPaths().concat([
@@ -32,7 +32,6 @@ test("package checker accepts the reviewed runtime inventory shape", async () =>
       "bin/launcher.js",
       "packages/core/src/security/secret-redactor.ts",
       "packages/proxy/src/cli/main.ts",
-      "packages/plugins/context-compressor-plugin/page.html",
       "packages/dashboard/dist/assets/index.js"
     ]);
     assert.deepEqual(packageFailures(manifest(), paths, root), []);
@@ -44,34 +43,44 @@ test("package checker accepts the reviewed runtime inventory shape", async () =>
 function manifest() {
   return { files: [
     ".env.example", "bin/", "packages/core/src/", "packages/proxy/src/",
-    "packages/plugins/context-compressor-plugin/descriptor.ts",
-    "packages/plugins/context-compressor-plugin/plugin.ts",
-    "packages/plugins/context-compressor-plugin/page.html",
-    "packages/plugins/obsidian-graph-plugin/descriptor.ts",
-    "packages/plugins/obsidian-graph-plugin/plugin.ts",
-    "packages/plugins/obsidian-graph-plugin/page.html",
-    "packages/plugins/shared/audit-projects.ts", "packages/dashboard/dist/",
+    "packages/plugins/", "packages/dashboard/dist/",
     "packages/dashboard/public/molenkopf-logo.png",
     "packages/dashboard/public/favicon.png", "docs/DEPLOYMENT.md",
+    "docs/PLUGIN_DEVELOPMENT.md", "docs/PLUGIN_POLICY.md",
     "docs/MOLENKOPF_USAGE.md", "docs/MOLENKOPF_PLUGIN_API.md",
-    "docs/PRODUCT_INTENT.md", "docs/THREAT_MODEL.md",
+    "docs/PRODUCT_INTENT.md", "docs/assets/",
+    "docs/plugins/", "docs/THREAT_MODEL.md",
     "molenkopf.config.example.json", "README.md", "LICENSE", "SECURITY.md"
   ] };
 }
 
 function requiredPaths() {
   return [
-    ".env.example", "bin/molenkopf.js",
+    ".env.example", "bin/molenkopf.js", "bin/launcher.js",
     "packages/core/src/security/secret-redactor.ts",
     "packages/proxy/src/cli/main.ts",
     "packages/plugins/context-compressor-plugin/descriptor.ts",
+    "packages/plugins/context-compressor-plugin/descriptor-v2.ts",
     "packages/plugins/context-compressor-plugin/plugin.ts",
-    "packages/plugins/obsidian-graph-plugin/descriptor.ts",
+    "packages/plugins/context-compressor-plugin/page.html",
+    "packages/plugins/example-plugin/descriptor-v2.ts",
+    "packages/plugins/example-plugin/plugin.ts",
+    "packages/plugins/example-plugin/page.html",
+    "packages/plugins/project-graph-plugin/descriptor-v2.ts",
+    "packages/plugins/project-graph-plugin/plugin.ts",
+    "packages/plugins/project-graph-plugin/page.html",
+    "packages/plugins/token-optimizer-plugin/descriptor-v2.ts",
+    "packages/plugins/token-optimizer-plugin/plugin.ts",
+    "packages/plugins/token-optimizer-plugin/page.html",
+    "packages/plugins/shared/audit-projects.ts",
     "packages/dashboard/dist/index.html",
     "packages/dashboard/public/molenkopf-logo.png",
     "packages/dashboard/public/favicon.png", "docs/DEPLOYMENT.md",
+    "docs/PLUGIN_DEVELOPMENT.md", "docs/PLUGIN_POLICY.md",
     "docs/MOLENKOPF_USAGE.md", "docs/MOLENKOPF_PLUGIN_API.md",
-    "docs/PRODUCT_INTENT.md", "docs/THREAT_MODEL.md",
+    "docs/PRODUCT_INTENT.md", "docs/assets/dashboard-overview.png",
+    "docs/plugins/context-compressor-plugin.md",
+    "docs/plugins/token-optimizer-plugin.md", "docs/THREAT_MODEL.md",
     "molenkopf.config.example.json", "README.md", "LICENSE", "SECURITY.md"
   ];
 }
@@ -80,7 +89,18 @@ async function fixtureRoot() {
   const root = await mkdtemp(join(tmpdir(), "molenkopf-package-check-"));
   for (const path of requiredPaths()) {
     await mkdir(join(root, path, ".."), { recursive: true });
-    await writeFile(join(root, path), "x");
+    await writeFile(join(root, path), path.endsWith("descriptor-v2.ts") ? descriptorStub(path) : "x");
   }
   return root;
+}
+
+function descriptorStub(path) {
+  const pluginId = path.split("/")[2];
+  return [
+    `export const descriptorV2 = {`,
+    `  id: "${pluginId}",`,
+    `  modulePath: "plugin.ts",`,
+    `  workspace: { pagePath: "/__molenkopf/plugins/${pluginId}/page" }`,
+    `};`
+  ].join("\n");
 }

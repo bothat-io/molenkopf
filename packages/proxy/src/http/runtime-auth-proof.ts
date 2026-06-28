@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import type { RuntimeState } from "./runtime-state.ts";
+import type { RuntimeAuthProofStore, RuntimeState } from "./runtime-types.ts";
 
 type Proof = { digest: string; expiresAt: number };
 
@@ -52,4 +52,4 @@ function stableJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-export type RuntimeAuthProofStore = Record<string, Proof>;
+export type { RuntimeAuthProofStore };

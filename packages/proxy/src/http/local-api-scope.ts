@@ -1,5 +1,5 @@
 import type { AuditManifest } from "../../../core/src/manifest/audit-store.ts";
-import type { RuntimeState } from "./runtime-state.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 import { authRequired, canManage, type AuthUser } from "./auth-state.ts";
 
 export function filterAuditForUser(state: RuntimeState, user: AuthUser | undefined, manifests: AuditManifest[]): AuditManifest[] {

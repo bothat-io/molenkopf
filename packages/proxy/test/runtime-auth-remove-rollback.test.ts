@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
 import { once } from "node:events";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRuntimeState } from "../src/http/runtime-state.ts";
-import { removeProvider } from "../src/http/local-api-provider-actions.ts";
+import { removeProvider, selectProvider } from "../src/http/local-api-provider-actions.ts";
+import { persistRuntimeSettings } from "../src/http/runtime-settings.ts";
 
 test("runtime-auth provider removal preserves auth files when settings persist fails", async () => {
   const dir = await mkdtemp(join(tmpdir(), "molenkopf-runtime-remove-fail-"));
@@ -27,6 +28,25 @@ test("runtime-auth provider removal preserves auth files when settings persist f
   assert.equal(result.json.error, "persist_failed");
   assert.equal(existsSync(authDir), true);
   assert.equal(state.providers.some((provider) => provider.id === "claude-fail"), true);
+  await rm(dir, { recursive: true, force: true });
+});
+
+test("provider selection restores runtime settings when runtime-auth state write fails", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "molenkopf-routing-atomic-"));
+  const state = createRuntimeState({
+    target: "http://127.0.0.1:9/v1",
+    dataDir: dir,
+    providers: [{ id: "backup", name: "Backup", kind: "local", target: "http://127.0.0.1:10/v1", authScheme: "none" }]
+  }, "127.0.0.1");
+  await persistRuntimeSettings(state);
+  await writeFile(join(dir, "runtime-auth"), "not-a-directory");
+
+  const result = await call((req, res) => selectProvider(req, res, state), { id: "backup" });
+  assert.equal(result.status, 500);
+  assert.equal(result.json.error, "persist_failed");
+  assert.equal(state.activeProviderId, "default");
+  const settings = JSON.parse(await readFile(join(dir, "runtime-settings.json"), "utf8"));
+  assert.equal(settings.activeProviderId, "default");
   await rm(dir, { recursive: true, force: true });
 });
 

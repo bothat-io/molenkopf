@@ -36,14 +36,14 @@ test("removing a user removes their keys; removing a team detaches members", asy
   await s.load();
   await s.putTeam(team("alpha"));
   await s.putUser(user("bob", { teamIds: ["alpha"] }));
-  s.data.keys["key_1"] = { id: "key_1", hash: "h", prefix: "mk_x", ownerUserId: "bob", createdAt: "x" };
+  s.data.keys["key_1"] = { id: "key_1", hash: "a".repeat(64), prefix: "mk_x", ownerUserId: "bob", createdAt: "x" };
   await s.save();
 
   assert.equal(await s.removeUser("bob"), true);
   assert.equal(s.data.keys["key_1"], undefined, "owned key removed with user");
 
   await s.putUser(user("carol", { teamIds: ["alpha"] }));
-  s.data.keys["key_2"] = { id: "key_2", hash: "h2", prefix: "mk_y", ownerUserId: "carol", teamId: "alpha", createdAt: "x" };
+  s.data.keys["key_2"] = { id: "key_2", hash: "b".repeat(64), prefix: "mk_y", ownerUserId: "carol", teamId: "alpha", createdAt: "x" };
   assert.equal(await s.removeTeam("alpha"), true);
   assert.deepEqual(s.getUser("carol")?.teamIds, [], "team membership detached");
   assert.equal(s.data.keys["key_2"].disabled, true, "team-bound key disabled with team removal");
@@ -74,7 +74,7 @@ test("identity mutations validate candidate references before persistence", asyn
   await assert.rejects(s.putTeam(team("broken", { managerIds: ["missing-manager"] })), /references missing manager/);
   assert.equal(s.getTeam("broken"), undefined);
 
-  s.data.keys["bad_key"] = { id: "bad_key", hash: "h", prefix: "mk_bad", ownerUserId: "missing", createdAt: "x" };
+  s.data.keys["bad_key"] = { id: "bad_key", hash: "c".repeat(64), prefix: "mk_bad", ownerUserId: "missing", createdAt: "x" };
   await assert.rejects(s.save(), /references missing owner/);
   s.close();
 

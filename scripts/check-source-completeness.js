@@ -19,12 +19,16 @@ export function sourceCompletenessFailures(root = process.cwd()) {
   checkDockerfileCopies(root, failures);
   checkPackageFiles(root, pkg, failures);
   checkBin(root, pkg, failures);
-  checkRelativeTsImports(root, failures);
+  checkRelativeImports(root, failures);
   checkDashboardPublicAssets(root, failures);
   return failures;
 }
 
 function checkDockerfileCopies(root, failures) {
+  if (!exists(root, "Dockerfile")) {
+    failures.push("Dockerfile missing");
+    return;
+  }
   const text = read(root, "Dockerfile");
   for (const line of text.split(/\r?\n/)) {
     const trimmed = line.trim();
@@ -50,8 +54,8 @@ function checkBin(root, pkg, failures) {
   if (typeof bin !== "string" || !exists(root, bin)) failures.push("package.json bin.molenkopf target missing");
 }
 
-function checkRelativeTsImports(root, failures) {
-  for (const file of sourceFiles(root, "packages")) {
+function checkRelativeImports(root, failures) {
+  for (const file of sourceFiles(root)) {
     const text = read(root, file);
     for (const specifier of relativeImports(text)) {
       if (!resolvesImport(root, dirname(file), specifier)) failures.push(`${file}: missing relative import ${specifier}`);
@@ -62,32 +66,42 @@ function checkRelativeTsImports(root, failures) {
 function checkDashboardPublicAssets(root, failures) {
   const publicDir = "packages/dashboard/public";
   if (!isDir(root, publicDir)) failures.push(`${publicDir} missing`);
-  for (const asset of ["packages/dashboard/public/molenkopf-logo.png", "packages/dashboard/public/favicon.png"]) {
+  for (const asset of ["packages/dashboard/public/molenkopf-logo.png", "packages/dashboard/public/favicon.png", "packages/dashboard/public/favicon.ico"]) {
     if (!exists(root, asset)) failures.push(`dashboard public asset missing: ${asset}`);
   }
 }
 
 function relativeImports(text) {
-  return [...text.matchAll(/(?:from\s+|import\s*\()\s*["'](\.{1,2}\/[^"']+)["']/g)].map((match) => match[1]);
+  return [
+    ...matches(text, /\b(?:import|export)\s+(?:type\s+)?[^"']*?\s+from\s*["'](\.{1,2}\/[^"']+)["']/g),
+    ...matches(text, /\bimport\s*\(\s*["'](\.{1,2}\/[^"']+)["']\s*\)/g),
+    ...matches(text, /\brequire\s*\(\s*["'](\.{1,2}\/[^"']+)["']\s*\)/g),
+    ...matches(text, /\bimport\s*["'](\.{1,2}\/[^"']+)["']/g)
+  ];
 }
 
 function resolvesImport(root, baseDir, specifier) {
   const target = join(baseDir, specifier);
-  if (extname(target)) return exists(root, target);
-  return [".ts", ".tsx", ".js", ".json", "/index.ts", "/index.tsx"].some((suffix) => exists(root, `${target}${suffix}`));
+  if (extname(target)) return existsExact(root, target);
+  return [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".json", "/index.ts", "/index.tsx", "/index.js", "/index.jsx", "/index.mjs", "/index.cjs", "/index.json"]
+    .some((suffix) => existsExact(root, `${target}${suffix}`));
 }
 
-function sourceFiles(root, dir) {
+function sourceFiles(root) {
+  return ["packages", "bin", "scripts", "test"].flatMap((dir) => sourceFilesIn(root, dir));
+}
+
+function sourceFilesIn(root, dir) {
   if (!exists(root, dir)) return [];
   return readdirSync(join(root, dir), { withFileTypes: true }).flatMap((entry) => {
     const path = `${dir}/${entry.name}`;
-    if (entry.isDirectory()) return generated(path) ? [] : sourceFiles(root, path);
-    return entry.isFile() && /\.(ts|tsx)$/.test(entry.name) ? [path] : [];
+    if (entry.isDirectory()) return generated(path) ? [] : sourceFilesIn(root, path);
+    return entry.isFile() && /\.(ts|tsx|js|jsx|mjs|cjs)$/.test(entry.name) ? [path] : [];
   });
 }
 
 function generated(path) {
-  return path.includes("/dist/") || path.includes("/node_modules/");
+  return path.includes("/dist/") || path.includes("/node_modules/") || path.includes("/coverage/") || path.includes("/cypress/screenshots/") || path.includes("/cypress/videos/");
 }
 
 function read(root, path) {
@@ -104,4 +118,25 @@ function exists(root, path) {
 
 function isDir(root, path) {
   return exists(root, path) && statSync(resolve(root, path)).isDirectory();
+}
+
+function existsExact(root, path) {
+  const absolute = resolve(root, path);
+  if (!existsSync(absolute)) return false;
+  const relative = normalizeRelative(root, absolute);
+  let current = root;
+  for (const segment of relative.split("/").filter(Boolean)) {
+    const match = readdirSync(current, { withFileTypes: true }).find((entry) => entry.name === segment);
+    if (!match) return false;
+    current = join(current, segment);
+  }
+  return true;
+}
+
+function normalizeRelative(root, absolute) {
+  return absolute.slice(resolve(root).length).replace(/^[\\/]/, "").replace(/\\/g, "/");
+}
+
+function matches(text, pattern) {
+  return [...text.matchAll(pattern)].map((match) => match[1]);
 }

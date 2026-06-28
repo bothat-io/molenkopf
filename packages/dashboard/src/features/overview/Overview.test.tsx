@@ -8,7 +8,8 @@ describe("OverviewTab", () => {
       config={{ bindHost: "127.0.0.1", port: 8787 }}
       currentUser={{ id: "member-a", displayName: "Member Alpha", role: "member", teamIds: ["alpha"] }}
       keys={[{ id: "k1", prefix: "mk_a", ownerUserId: "member-a", project: "alpha", teamId: "alpha" }]}
-      usage={{ users: [{ id: "member-a", displayName: "Member Alpha", role: "member", teamIds: ["alpha"], usage: { requests: 2, inputTokens: 3, outputTokens: 4, savedTokens: 99 } as any }], teams: [{ id: "alpha", name: "Alpha", members: 1 }] }}
+      usage={{ users: [{ id: "member-a", displayName: "Member Alpha", role: "member", teamIds: ["alpha"], usage: { requests: 2, inputTokens: 3, outputTokens: 4, models: { "gpt-live-test": { requests: 2, inputTokens: 3, outputTokens: 4 } }, savedTokens: 99 } as any }], teams: [{ id: "alpha", name: "Alpha", members: 1 }] }}
+      providers={[{ id: "codex", name: "Codex", kind: "cli", target: "cli://codex", active: true, runtimeAuthConfigured: true, runtimeProfile: { summary: ["thinking xhigh"], diagnostics: { modelReasoningEffort: "xhigh" } } }]}
       selectedSecret=""
       onNewKey={() => {}}
       onRevoke={() => {}}
@@ -18,7 +19,10 @@ describe("OverviewTab", () => {
     expect(html).toContain("Usage gauge");
     expect(html).toContain("unlimited");
     expect(html).not.toContain("no budget");
-    expect(html).toContain("Token mix");
+    expect(html).toContain("Input / output");
+    expect(html).not.toContain("Models used");
+    expect(html).toContain("gpt-live-test");
+    expect(html).toContain("thinking: xhigh");
     expect(html).not.toContain("Saved");
     expect(html).toContain("My teams");
     expect(html).toContain("Team members");

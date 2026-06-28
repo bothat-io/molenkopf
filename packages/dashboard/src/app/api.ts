@@ -1,4 +1,4 @@
-import type { DashboardData, Session } from "./types";
+import type { DashboardData, GlobalPluginPolicyView, Session, TeamPluginPolicyView, TeamView, TokenOptimizerData, EffectivePluginPolicyView as EffectivePolicyView } from "./types";
 
 export type ApiOptions = { signal?: AbortSignal; timeoutMs?: number };
 
@@ -14,6 +14,10 @@ export async function getJson<T>(path: string, options?: ApiOptions): Promise<T>
 
 export async function postJson<T>(path: string, body: unknown, options?: ApiOptions): Promise<T> {
   return requestJson<T>(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }, options);
+}
+
+export async function putJson<T>(path: string, body: unknown, options?: ApiOptions): Promise<T> {
+  return requestJson<T>(path, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }, options);
 }
 
 async function requestJson<T>(path: string, init?: RequestInit, options: ApiOptions = {}): Promise<T> {
@@ -41,22 +45,40 @@ export async function loadSession(options?: ApiOptions): Promise<Session> {
 
 export async function loadDashboardData(canManage: boolean, options?: ApiOptions): Promise<DashboardData> {
   if (!canManage) {
-    const [usage, keys] = await Promise.all([
+    const [usage, keys, tokenOptimizer] = await Promise.all([
       getJson<DashboardData["usage"]>("/__molenkopf/usage", options),
-      getJson<DashboardData["keys"]>("/__molenkopf/keys", options)
+      getJson<DashboardData["keys"]>("/__molenkopf/keys", options),
+      getJson<TokenOptimizerData>("/__molenkopf/plugins/token-optimizer-plugin/data", options).catch(() => undefined)
     ]);
-    return { usage, keys, config: {}, providers: {}, summary: {}, plugins: {} };
+    return { usage, keys, config: {}, providers: {}, summary: {}, plugins: {}, tokenOptimizer };
   }
-  const [usage, keys, config, providers, summary, plugins, identity] = await Promise.all([
+  const [usage, keys, config, providers, summary, plugins, identity, globalPolicy, tokenOptimizer] = await Promise.all([
     getJson<DashboardData["usage"]>("/__molenkopf/usage", options),
     getJson<DashboardData["keys"]>("/__molenkopf/keys", options),
     getJson<DashboardData["config"]>("/__molenkopf/config", options),
     getJson<DashboardData["providers"]>("/__molenkopf/providers", options),
     getJson<DashboardData["summary"]>("/__molenkopf/audit/summary", options),
     getJson<DashboardData["plugins"]>("/__molenkopf/plugins", options),
-    getJson<DashboardData["identity"]>("/__molenkopf/identity", options)
+    getJson<DashboardData["identity"]>("/__molenkopf/identity", options),
+    getJson<GlobalPluginPolicyView>("/__molenkopf/plugin-policies/global", options).catch(() => undefined),
+    getJson<TokenOptimizerData>("/__molenkopf/plugins/token-optimizer-plugin/data", options).catch(() => undefined)
   ]);
-  return { usage, keys, config, providers, summary, plugins, identity };
+  const pluginPolicies = await loadPluginPolicies(identity?.teams || [], options);
+  return { usage, keys, config, providers, summary, plugins, identity, pluginPolicies: { global: globalPolicy, ...pluginPolicies }, tokenOptimizer };
+}
+
+async function loadPluginPolicies(teams: TeamView[], options?: ApiOptions) {
+  const entries = await Promise.all(teams.map(async (team) => {
+    const [policy, effective] = await Promise.all([
+      getJson<TeamPluginPolicyView>(`/__molenkopf/plugin-policies/teams/${team.id}`, options).catch(() => ({ teamId: team.id, pluginPolicies: {} })),
+      getJson<EffectivePolicyView>(`/__molenkopf/plugin-policies/effective/${team.id}`, options).catch(() => ({ teamId: team.id, policies: {} }))
+    ]);
+    return [team.id, { policy, effective }] as const;
+  }));
+  return {
+    teams: Object.fromEntries(entries.map(([teamId, value]) => [teamId, value.policy])),
+    effective: Object.fromEntries(entries.map(([teamId, value]) => [teamId, value.effective]))
+  };
 }
 
 function withTimeout(init: RequestInit | undefined, options: ApiOptions): { init: RequestInit; clear: () => void } {

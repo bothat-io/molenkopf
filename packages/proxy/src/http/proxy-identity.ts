@@ -1,6 +1,6 @@
 import { authenticateKey, touchKey } from "../../../core/src/identity/api-keys.ts";
 import type { IdentityStore } from "../../../core/src/identity/identity-store.ts";
-import { agentIdFromHeaders, deriveClientIdentity, safeSubjectId, type ClientIdentity } from "./client-identity.ts";
+import { agentIdFromHeaders, clientIdForUser, deriveClientIdentity, safeSubjectId, type ClientIdentity } from "./client-identity.ts";
 import { effectiveProviderAllowlist } from "./provider-access.ts";
 
 // Resolves a proxy request to a client identity. A Molenkopf-issued API key
@@ -43,7 +43,7 @@ export function resolveClientIdentity(identity: IdentityStore | undefined, heade
       const teamIds = owner ? scopedTeamIds(owner.teamIds, key.teamId) : [];
       const agentId = agentIdFromHeaders(headers);
       const client: ClientIdentity = {
-        id: `user:${safeSubjectId(key.ownerUserId)}`,
+        id: clientIdForUser(key.ownerUserId),
         label: key.agentLabel ? `key:${key.id} agent:${safeSubjectId(key.agentLabel)}` : `key:${key.id}`,
         source: "api_key",
         userId: key.ownerUserId,

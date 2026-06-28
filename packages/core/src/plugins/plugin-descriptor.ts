@@ -3,7 +3,7 @@ import { builtinPluginDescriptors as descriptors } from "./builtin-plugin-descri
 import { staticPluginPipeline } from "./static-pipeline.ts";
 
 export type PluginCategory = "safety" | "compression" | "storage" | "events" | "routing" | "visualization";
-export type PluginDataScope = "metrics" | "audit-summary" | "requests" | "memory-graph";
+export type PluginDataScope = "metrics" | "audit-summary" | "requests" | "memory-graph" | "project-graph" | "routes" | "symbols";
 export type PluginType = "observer" | "classifier" | "redactor" | "transformer" | "retriever" | "router" | "auditor" | "stream-filter";
 export type PluginTrafficMutation = "none" | "mask" | "transform" | "augment-context" | "route" | "block" | "audit-log" | "event-filter";
 export type PluginRuntimeHook =
@@ -26,7 +26,7 @@ export type PluginWorkspace = {
 };
 
 export type PluginTrafficAccess = {
-  reads: ("metadata" | "redacted-body" | "body" | "audit" | "events")[];
+  reads: ("metadata" | "redacted-body" | "body" | "audit" | "events" | "project-files" | "project-graph")[];
   mutates: PluginTrafficMutation[];
 };
 

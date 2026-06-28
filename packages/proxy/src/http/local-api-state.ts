@@ -3,11 +3,13 @@ import { staticPluginPipeline } from "../../../core/src/plugins/static-pipeline.
 import { viewProviders } from "../../../core/src/providers/provider-catalog.ts";
 import { summarizeAudit } from "../../../core/src/manifest/audit-summary.ts";
 import { weightShares } from "../../../core/src/routing/distribution.ts";
-import { activeProvider, CONTROL_PLANE_LIMITS, distributionEligible, emptyUsage, providerWeight, type RuntimeState } from "./runtime-state.ts";
+import { activeProvider, distributionEligible, emptyUsage, providerWeight } from "./runtime-state.ts";
+import { CONTROL_PLANE_LIMITS, type RuntimeState } from "./runtime-types.ts";
 import { canManage, providerAllowed, type AuthUser } from "./auth-state.ts";
 import { listAgentDrafts } from "./agent-drafts.ts";
 import { orderIndex, redactionBeforeCompression } from "./local-api-pipeline.ts";
 import { consumerAllowed } from "./local-api-scope.ts";
+import { builtinPluginDescriptorV2 } from "./plugin-platform.ts";
 
 function hostOf(target: string): string {
   if (target.startsWith("cli://")) return target;
@@ -158,12 +160,21 @@ export function buildStats(state: RuntimeState) {
 export function pluginView(plugin: MolenkopfPlugin, state: RuntimeState) {
   const enabled = state.pluginEnabled[plugin.id] ?? plugin.enabledByDefault;
   const lifecycle = state.pluginLifecycle[plugin.id];
+  const descriptor = builtinPluginDescriptorV2().find((item) => item.id === plugin.id);
   return {
     ...plugin,
     enabled,
     status: enabled ? "enabled" : "disabled",
     lifecycleStatus: lifecycle?.status ?? (enabled ? "enabled" : "disabled"),
     lifecycleError: lifecycle?.error,
+    defaultMaxRisk: descriptor?.defaultPolicy.maxRisk,
+    actions: descriptor?.actions.map((action) => ({
+      id: action.id,
+      label: action.label,
+      risk: action.risk,
+      requiredRole: action.requiredRole,
+      sideEffects: [...action.sideEffects]
+    })) ?? [],
     updatedAt: state.pluginUpdatedAt[plugin.id],
     source: state.pluginUpdatedAt[plugin.id] ? "local" : "default"
   };

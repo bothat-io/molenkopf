@@ -66,7 +66,7 @@ function bodyTimeoutMs(): number {
 
 function bodyLimitBytes(): number {
   const configured = Number(process.env.MOLENKOPF_PROXY_BODY_LIMIT_BYTES);
-  return Number.isFinite(configured) && configured > 0 ? configured : 8 * 1024 * 1024;
+  return Number.isFinite(configured) && configured > 0 ? configured : 32 * 1024 * 1024;
 }
 
 export function writeJson(res: ServerResponse, status: number, data: unknown) {

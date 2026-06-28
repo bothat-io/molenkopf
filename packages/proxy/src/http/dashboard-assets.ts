@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 const dashboardRoot = resolve(here, "..", "..", "..", "dashboard");
 const defaultDist = join(dashboardRoot, "dist");
+const publicDir = join(dashboardRoot, "public");
+const publicAssetNames = new Set(["favicon.ico", "favicon.png", "molenkopf-logo.png"]);
 const routePrefix = "/__molenkopf/dashboard";
 
 export function isDashboardRequest(url: string | undefined): boolean {
@@ -27,9 +29,16 @@ export async function handleDashboardRequest(req: IncomingMessage, res: ServerRe
   }
   if (!path) return writeText(res, 400, "bad request");
   if (path.startsWith(`${routePrefix}/assets/`)) return serveDistPath(path.slice(routePrefix.length + 1), true, res);
-  if (path === `${routePrefix}/favicon.png` || path === `${routePrefix}/molenkopf-logo.png`) return serveDistPath(path.slice(routePrefix.length + 1), true, res);
+  if (path === `${routePrefix}/favicon.ico` || path === `${routePrefix}/favicon.png` || path === `${routePrefix}/molenkopf-logo.png`) return serveDistPath(path.slice(routePrefix.length + 1), true, res);
   if (hasExtension(path)) return writeText(res, 404, "not found");
   return serveIndex(res);
+}
+
+export async function handleDashboardFaviconRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (req.method !== "GET" && req.method !== "HEAD") { writeText(res, 405, "method not allowed"); return; }
+  const devOrigin = process.env.MOLENKOPF_DASHBOARD_DEV_ORIGIN;
+  if (devOrigin) { await proxyDevDashboard(req, res, devOrigin, `${routePrefix}/favicon.ico`); return; }
+  serveDistPath("favicon.ico", true, res);
 }
 
 async function serveIndex(res: ServerResponse) {
@@ -42,18 +51,17 @@ async function serveIndex(res: ServerResponse) {
 function serveDistPath(routePath: string, immutable: boolean, res: ServerResponse) {
   const safe = safeRelative(routePath);
   if (!safe) return writeText(res, 400, "bad request");
-  const file = normalize(join(distDir(), safe));
-  const root = distDir();
-  if (!(file.startsWith(`${root}${sep}`)) || !existsSync(file)) return writeText(res, 404, "not found");
+  const file = existingDistPath(safe) ?? existingPublicAsset(safe);
+  if (!file) return writeText(res, 404, "not found");
   res.writeHead(200, { "content-type": contentType(file), "cache-control": immutable ? "public, max-age=31536000, immutable" : "no-store" });
   createReadStream(file).pipe(res);
 }
 
-async function proxyDevDashboard(req: IncomingMessage, res: ServerResponse, origin: string) {
+async function proxyDevDashboard(req: IncomingMessage, res: ServerResponse, origin: string, overridePath?: string) {
   try {
     const incoming = parseIncoming(req.url);
     if (!incoming) return writeText(res, 400, "bad request");
-    const target = new URL(`${incoming.pathname}${incoming.search}`, origin);
+    const target = new URL(`${overridePath ?? incoming.pathname}${overridePath ? "" : incoming.search}`, origin);
     if (target.pathname === routePrefix) target.pathname = `${routePrefix}/`;
     const upstream = await fetch(target, { method: req.method });
     const headers: Record<string, string> = {};
@@ -93,6 +101,17 @@ function hasExtension(path: string): boolean {
 
 function distDir() {
   return process.env.MOLENKOPF_DASHBOARD_DIST || defaultDist;
+}
+
+function existingDistPath(safe: string): string | undefined {
+  const root = resolve(distDir());
+  const file = normalize(join(root, safe));
+  return file.startsWith(`${root}${sep}`) && existsSync(file) ? file : undefined;
+}
+
+function existingPublicAsset(safe: string): string | undefined {
+  const file = join(publicDir, safe);
+  return publicAssetNames.has(safe) && existsSync(file) ? file : undefined;
 }
 
 function contentType(file: string): string {

@@ -18,8 +18,10 @@ Use this workflow when working on Molenkopf releases or Docker publishing.
 - Do not move or recreate a published official tag after GHCR images exist.
 - Do not add Major/Minor floating tags like `:0` or `:0.1` yet.
 - Keep `latest` only for official `v*.*.*` tag releases.
+- Do not merge a release PR until the required PR checks are green on the
+  current PR head. Do not rely on local checks alone for this decision.
 - Create official `v*.*.*` tags only after the PR has merged to `main` and
-  the `main` test workflow is green.
+  the `main` push test workflow is green.
 
 ## Known Test State
 
@@ -38,13 +40,18 @@ Use this workflow when working on Molenkopf releases or Docker publishing.
 ## Preferred Next Steps
 
 1. Put workflow, ignore-file, and README updates into a PR to `main`.
-2. Merge before creating the next official release tag.
-3. Confirm the `main` push test workflow is green after the merge.
-4. Run `npm run release:verify` from clean `main`.
-5. Use the next real version tag only when the release should be official.
-6. Push the tag and wait for GHCR Docker publishing to finish.
-7. Run `npm run release:npm:check`, then publish npm manually if desired.
-8. If more workflow testing is needed, add an explicit preview tag path first.
+2. Wait for required PR checks to pass on the exact PR head commit.
+3. Merge the PR through GitHub using the repository's required merge method.
+4. Wait for the `main` push test workflow to pass on the merged `main` commit.
+5. Sync local `main` to `origin/main` after the GitHub merge. If GitHub used a
+   squash merge, expect old local commits to diverge; do not continue while
+   `main` shows ahead/behind.
+6. Run `npm run release:verify` from clean synced `main`.
+7. Use the next real version tag only when the release should be official.
+8. Push the tag and wait for GHCR Docker publishing to finish.
+9. For npm, tell the user to run
+   `npm run release:npm:publish -- --tag vX.Y.Z` as the final manual step.
+10. If more workflow testing is needed, add an explicit preview tag path first.
 
 ## Preview Release Rule
 
@@ -97,14 +104,16 @@ dependent on the validated Docker image artifact, not a rebuilt image.
 - The first `npm publish --access public` creates the org-scoped package when it
   does not already exist.
 - Keep npm publish manual/protected until the release policy is stable.
+- On tag-triggered release runs, `publish-npm` is expected to be skipped unless
+  the workflow is manually dispatched with the protected publish inputs.
 - Do not store npm usernames, passwords, 2FA codes, access tokens, or recovery
   codes in repo files, skills, docs, Docker images, or workflow logs.
 - First validate from clean tagged `main`: `npm run release:verify`.
-- Use `npm run release:npm:check` before manual npm publish. The script checks
-  the package scope, public access config, clean `main`, matching `vX.Y.Z` tag,
-  and npm login. It does not publish.
-- For a local manual publish, use npm login/session auth and publish with
-  `npm publish --access public` from the release commit/package.
+- For a local manual publish, tell the user to run
+  `npm run release:npm:publish -- --tag vX.Y.Z`. The script validates the tag,
+  checks that local `main` matches `origin/main`, checks the successful release
+  workflow, creates a clean tag worktree, and then runs `npm publish --access
+  public` interactively so the user can enter npm login or OTP prompts.
 - For later automation, prefer npm Trusted Publishing from a protected GitHub
   Actions environment. If that is not available, use a granular automation token
   only as a protected GitHub Actions secret/environment secret. Do not commit it.
