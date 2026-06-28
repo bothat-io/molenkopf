@@ -1,26 +1,27 @@
-# Project Graph Plugin
+# project-graph-plugin
 
-The Project Graph plugin builds local code-structure metadata from explicitly
-configured project roots.
+The project-graph-plugin derives graph metadata from token usage and scoped
+audit metadata. It does not scan local source files.
 
 ## Scope
 
-- discovers files only under an admin-supplied root
-- stores structural graph metadata, not full source files
+- derives route, provider, client, project, and token-count graph nodes from
+  audit manifests
+- stores structural graph metadata, not full source files, prompts, or responses
 - stores graph metadata under plugin storage in the local Molenkopf data dir
 - exposes graph summaries, routes, symbols, storage facts, and event facts through the generic plugin data route
-- exposes scan, query, neighborhood, and delete actions through the generic plugin action route
+- exposes query, neighborhood, and delete actions through the generic plugin action route
 
 ## Descriptor v2
 
 - category: `storage`
 - risk: `orange`
-- MVP actions: `scan.preview`, `scan.run`, `graph.query`, `graph.neighborhood`, `graph.delete`
+- MVP actions: `graph.query`, `graph.neighborhood`, `graph.delete`
 - workspace data scopes: `metrics`, `project-graph`, `routes`, `symbols`
 
 ## Non-goals
 
-- no automatic whole-machine scans
+- no source tree scans
 - no source-code persistence
 - no Obsidian vault writes in MVP
 - no MCP write tools
@@ -28,8 +29,8 @@ configured project roots.
 
 ## Safety
 
-- project scanning uses explicit roots only
-- denied paths and sensitive file names are excluded
+- active runtime actions do not accept project root paths
 - graph writes pass plugin storage safety before persistence
 - plugin output still passes platform `safePluginOutput(...)`
-- persisted graph data stores structural metadata and safe signatures only, not full source bodies
+- persisted graph data stores structural metadata only, not full source bodies,
+  prompts, or responses

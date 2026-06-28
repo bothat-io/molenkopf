@@ -52,11 +52,11 @@ test("serves a plugin's own page from its plugin folder", async () => {
     const projectGraph = await pluginFetch(base, "project-graph-plugin", cookie);
     assert.equal(projectGraph.status, 200);
     const projectGraphHtml = await projectGraph.text();
-    assert.match(projectGraphHtml, /Scan root/);
-    assert.match(projectGraphHtml, /Run scan/);
-    assert.match(projectGraphHtml, /Scan is running/);
-    assert.match(projectGraphHtml, /Preview is running/);
-    assert.match(projectGraphHtml, /Query graph/);
+    assert.doesNotMatch(projectGraphHtml, /Scan root/);
+    assert.doesNotMatch(projectGraphHtml, /Run scan/);
+    assert.doesNotMatch(projectGraphHtml, /Scan is running/);
+    assert.doesNotMatch(projectGraphHtml, /Preview is running/);
+    assert.match(projectGraphHtml, /token-derived graph controls/);
     assert.match(projectGraphHtml, /graph\.query/);
     assert.match(projectGraphHtml, /Unexpected .* response/);
     const missing = await pluginFetch(base, "does-not-exist", cookie);

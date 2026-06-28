@@ -37,8 +37,8 @@ Built now:
 - Per-agent multi-account routing: each agent (`x-molenkopf-agent`) routes to its bound provider/account; config `profiles`/`agents` resolve to providers.
 - Real token accounting: upstream `usage` is read from the provider response and recorded as
   real input/output tokens (not only a chars/4 estimate).
-- Project Graph plugin: scans explicitly configured source roots and stores structural metadata
-  for files, symbols, imports, routes, tests, plugin facts, storage usage, and events.
+- `project-graph-plugin`: derives graph metadata from token usage and scoped audit
+  metadata without scanning source files or storing prompts/responses.
 - Static pipeline with request IDs, redaction, classification, compression, retrieval, audit, SSE events, and upstream routing.
 - Local API under `/__molenkopf/*`: bootstrap endpoints for health, session
   status, and first-run admin creation, user-scoped usage/key endpoints, and admin-only
@@ -119,7 +119,7 @@ Agent drafts are stored as local proxy metadata through `/__molenkopf/agents/dra
 
 For a step-by-step local setup and test flow, read `docs/MOLENKOPF_USAGE.md`.
 
-Plugin pages open in standalone windows from `/__molenkopf/plugins/context-compressor-plugin/page`, `/__molenkopf/plugins/token-optimizer-plugin/page`, and `/__molenkopf/plugins/project-graph-plugin/page`. The Project Graph workspace is derived from explicitly scanned source roots, not request metadata or raw prompts. Plugin pages group by project/key where available and surface plugin-data failures explicitly.
+Plugin pages open in standalone windows from `/__molenkopf/plugins/context-compressor-plugin/page`, `/__molenkopf/plugins/token-optimizer-plugin/page`, and `/__molenkopf/plugins/project-graph-plugin/page`. The `project-graph-plugin` workspace is derived from token usage and scoped audit metadata, not source scans or raw prompts. Plugin pages group by project/key where available and surface plugin-data failures explicitly.
 
 ## Commands
 Install from npm with Node.js 24 or newer:

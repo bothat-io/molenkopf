@@ -20,7 +20,7 @@ export function PluginWorkspace(props: {
   onResetTeamPluginPolicy: (teamId: string, pluginId: string) => Promise<void> | void;
 }) {
   const items = useMemo(
-    () => [...(props.data.plugins.items || [])].sort((a, b) => a.name.localeCompare(b.name)),
+    () => [...(props.data.plugins.items || [])].sort((a, b) => a.id.localeCompare(b.id)),
     [props.data.plugins.items]
   );
   const [scope, setScope] = useState("global");
@@ -61,7 +61,7 @@ function PluginRow(props: {
   const blockedReasons = team ? effective?.policy.blockedReasons || [] : [];
   const sourceLabel = team ? (effective?.teamOverrideExists ? "Team override active" : "Inherited from global") : "Global default";
   return <CollapsibleGroup
-    title={plugin.name}
+    title={plugin.id}
     subtitle={plugin.description || plugin.category}
     open={false}
     onToggle={() => {}}

@@ -21,7 +21,7 @@ export function PluginWorkspaceSummary({ plugin, actions }: { plugin: PluginView
 }
 
 export function pluginActionLabels(plugin: PluginView): string[] {
-  return plugin.actions?.map((action) => action.label || action.id).filter(Boolean) || [];
+  return plugin.actions?.map((action) => action.id).filter(Boolean) || [];
 }
 
 export function isSafePluginPagePath(path: string | undefined): path is string {
@@ -35,7 +35,7 @@ export function pluginEffect(plugin: PluginView): string {
 
 export function pluginMetric(id: string, savedTokens: number | undefined, category: string | undefined): string {
   if (id === "context-compressor-plugin") return `${num(savedTokens)} tokens saved`;
-  if (id === "project-graph-plugin") return "project graph";
+  if (id === "project-graph-plugin") return "project-graph-plugin";
   if (id === "token-optimizer-plugin") return "recommendations";
   return category || "none";
 }

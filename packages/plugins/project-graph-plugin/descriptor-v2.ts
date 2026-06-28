@@ -3,51 +3,23 @@ import type { BuiltinPluginRuntimeMetadata } from "../../core/src/plugins/plugin
 import { projectGraphSettingsSchema } from "./settings.ts";
 
 const capabilities = [
-  "project:roots:read", "project:files:discover", "project:files:read",
-  "project:graph:read", "project:graph:write", "settings:read", "action:execute"
+  "metadata:read", "audit:read:scoped", "project:graph:read",
+  "project:graph:write", "settings:read", "action:execute"
 ] as const;
 
 export const descriptorV2: PluginDescriptorV2 = {
   descriptorVersion: pluginDescriptorVersion,
   id: "project-graph-plugin",
-  name: "Project Graph",
+  name: "project-graph-plugin",
   category: "storage",
   risk: "orange",
   capabilities,
   settingsSchema: projectGraphSettingsSchema,
   actions: [
     {
-      id: "scan.preview",
-      label: "Preview scan",
-      description: "Discover safe source files under a configured project root without reading file contents.",
-      requiredCapabilities: ["project:files:discover", "action:execute"],
-      requiredRole: "admin",
-      risk: "yellow",
-      inputSchema: { type: "object", properties: { rootPath: { type: "string", maxLength: 500 }, maxFiles: { type: "integer", minimum: 1, maximum: 5000, default: 5000 } }, required: ["rootPath"] },
-      outputSchema: { type: "object", properties: {}, additionalProperties: true },
-      confirmation: "none",
-      sideEffects: ["none"],
-      auditEvent: true,
-      outputSafety: "adminSafe"
-    },
-    {
-      id: "scan.run",
-      label: "Run scan",
-      description: "Read safe source files under a configured project root and build an in-memory project graph.",
-      requiredCapabilities: ["project:files:discover", "project:files:read", "project:graph:write", "action:execute"],
-      requiredRole: "admin",
-      risk: "orange",
-      inputSchema: { type: "object", properties: { rootPath: { type: "string", maxLength: 500 }, mode: { type: "enum", values: ["manual"], default: "manual" } }, required: ["rootPath"] },
-      outputSchema: { type: "object", properties: {}, additionalProperties: true },
-      confirmation: "required",
-      sideEffects: ["storage"],
-      auditEvent: true,
-      outputSafety: "adminSafe"
-    },
-    {
       id: "graph.query",
-      label: "Query graph",
-      description: "Search symbols in the latest in-memory project graph.",
+      label: "graph.query",
+      description: "Search the project graph derived from token and audit metadata.",
       requiredCapabilities: ["project:graph:read", "action:execute"],
       requiredRole: "member",
       risk: "green",
@@ -60,8 +32,8 @@ export const descriptorV2: PluginDescriptorV2 = {
     },
     {
       id: "graph.neighborhood",
-      label: "Node neighborhood",
-      description: "Return adjacent graph nodes and edges for the latest in-memory project graph.",
+      label: "graph.neighborhood",
+      description: "Return adjacent graph nodes and edges from the derived project graph.",
       requiredCapabilities: ["project:graph:read", "action:execute"],
       requiredRole: "member",
       risk: "green",
@@ -74,7 +46,7 @@ export const descriptorV2: PluginDescriptorV2 = {
     },
     {
       id: "graph.delete",
-      label: "Delete graph",
+      label: "graph.delete",
       description: "Delete the stored project graph for a root id.",
       requiredCapabilities: ["project:graph:write", "action:execute"],
       requiredRole: "admin",
@@ -87,7 +59,7 @@ export const descriptorV2: PluginDescriptorV2 = {
       outputSafety: "adminSafe"
     }
   ],
-  defaultPolicy: { enabled: true, maxRisk: "orange", capabilities, settings: projectGraphSettingsSchema, actions: ["scan.preview", "scan.run", "graph.query", "graph.neighborhood", "graph.delete"] },
+  defaultPolicy: { enabled: true, maxRisk: "orange", capabilities, settings: projectGraphSettingsSchema, actions: ["graph.query", "graph.neighborhood", "graph.delete"] },
   workspace: {
     pagePath: "/__molenkopf/plugins/project-graph-plugin/page",
     dataPath: "/__molenkopf/plugins/project-graph-plugin/data"
@@ -98,9 +70,9 @@ export const descriptorV2: PluginDescriptorV2 = {
 
 export const runtimeMetadata: BuiltinPluginRuntimeMetadata = {
   type: "observer",
-  description: "Builds local source-code structure graphs from explicitly configured project roots.",
-  traffic: { reads: ["metadata", "project-files", "project-graph"], mutates: ["none"] },
-  permissions: ["project:files:discover", "project:files:read", "project:graph:read", "project:graph:write"],
+  description: "Derives project graph metadata from token usage and scoped audit metadata without scanning source files.",
+  traffic: { reads: ["metadata", "audit", "project-graph"], mutates: ["none"] },
+  permissions: ["metadata:read", "audit:read", "project:graph:read", "project:graph:write"],
   hooks: ["workspace:local-page"],
   defaultEnabled: true,
   canDisable: true

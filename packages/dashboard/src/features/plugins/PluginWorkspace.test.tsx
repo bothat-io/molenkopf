@@ -1,6 +1,7 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { PluginWorkspace } from "./PluginWorkspace";
+import { pluginActionLabels } from "./PluginWorkspaceMeta";
 
 describe("PluginWorkspace", () => {
   it("renders one generic plugin surface with scope selection and plugin accordions", () => {
@@ -19,5 +20,24 @@ describe("PluginWorkspace", () => {
     expect(html).toContain("transformer");
     expect(html).toContain("12 tokens saved");
     expect(html).toContain("Turn on");
+  });
+
+  it("uses plugin ids as accordion titles", () => {
+    const html = renderToString(<PluginWorkspace
+      data={{ usage: {}, keys: { items: [] }, config: {}, providers: {}, summary: {}, plugins: { items: [{ id: "project-graph-plugin", name: "Project Graph", enabled: true, canToggle: true, lifecycleStatus: "booted", type: "observer", category: "storage", traffic: { mutates: ["none"] }, actions: [{ id: "graph.query", label: "Query graph", risk: "green", requiredRole: "member", sideEffects: ["none"] }] }] }, pluginPolicies: { global: { globalPluginPolicy: {} }, teams: {}, effective: {} } }}
+      teams={[]}
+      onPluginToggle={() => {}}
+      onSaveGlobalPluginPolicy={() => {}}
+      onSaveTeamPluginPolicy={() => {}}
+      onResetTeamPluginPolicy={() => {}}
+    />);
+    expect(html).toContain("project-graph-plugin");
+    expect(html).not.toContain("Query graph");
+    expect(html).not.toContain(">Project Graph</");
+    expect(pluginActionLabels({
+      id: "project-graph-plugin",
+      name: "Project Graph",
+      actions: [{ id: "graph.query", label: "Query graph", risk: "green", requiredRole: "member", sideEffects: ["none"] }]
+    })).toEqual(["graph.query"]);
   });
 });

@@ -4,12 +4,12 @@ export { descriptorV2 } from "./descriptor-v2.ts";
 
 export const plugin: MolenkopfPluginModule = {
   async getData(ctx, runtime) {
-    const graphData = await projectGraphDataView(runtime);
+    const graphData = await projectGraphDataView(runtime, ctx.manifests);
     return {
       plugin: ctx.plugin,
       scopes: ctx.scopes,
       settingsView: {},
-      latestScanStatus: "not_scanned",
+      latestDerivationStatus: "not_derived",
       latestWarnings: [],
       graphSummaries: [],
       routes: [],
@@ -18,12 +18,12 @@ export const plugin: MolenkopfPluginModule = {
       pluginDescriptorFacts: [],
       storageUsageFacts: [],
       eventUsageFacts: [],
-      suggestedRootPath: ctx.canManage ? process.cwd() : undefined,
       ...graphData,
-      queryExamples: ["symbol:PluginDescriptor", "route:/__molenkopf", "tests:plugin"],
+      queryExamples: ["route:/v1", "provider:", "client:"],
       safety: {
         storesFullSource: false,
-        scansExplicitRootsOnly: true,
+        scansFilesystem: false,
+        derivesFromTokenMetadata: true,
         mcpExposure: "disabled"
       }
     };

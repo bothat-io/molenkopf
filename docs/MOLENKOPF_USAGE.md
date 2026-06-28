@@ -63,7 +63,8 @@ Expected result:
   authenticated admin session.
 - `Dashboard -> Overview` updates after refresh or polling.
 - `Context compression flow` increments request and token counters.
-- `Project Graph workspace` can preview and scan an explicit local source root.
+- `project-graph-plugin` derives graph metadata from observed token/audit
+  metadata without scanning local source files.
 
 ## Provider Setup
 
@@ -167,9 +168,9 @@ for request/audit/plugin details.
 
 Open plugin pages from the Admin plugin section. Context compression owns token
 pressure and savings views. Token optimizer owns recommendation summaries.
-Project Graph owns explicit-root source scanning and stores structural metadata
-only; it does not read an Obsidian vault yet and does not render raw source,
-prompt, or response content.
+`project-graph-plugin` owns token-derived graph metadata only; it does not scan source
+roots, read an Obsidian vault, or render raw source, prompt, or response
+content.
 
 ## Current Boundaries
 
