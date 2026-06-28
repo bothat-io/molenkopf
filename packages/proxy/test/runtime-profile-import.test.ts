@@ -30,6 +30,8 @@ test("Claude profile import validates and applies effective permissions", () => 
   assert.deepEqual(viewRuntimeProfile(imported.profile)?.diagnostics, {
     settingsSource: "settings.json",
     configSource: undefined,
+    model: undefined,
+    modelReasoningEffort: undefined,
     permissionMode: "auto",
     sandbox: undefined,
     approval: undefined,
@@ -92,8 +94,18 @@ test("Codex profile import stores full config files and summarizes safe fields",
     ].join("\n")
   }, "codex");
 
-  assert.deepEqual(imported.profile?.summary, ["Codex config", "sandbox danger-full-access", "approval never"]);
-  assert.deepEqual(runtimeCliArgs("codex", "C:\\auth", imported.profile), ["exec", "--sandbox", "danger-full-access", "-c", 'approval_policy="never"']);
+  assert.deepEqual(imported.profile?.summary, ["Codex config", "model gpt-5.5", "thinking xhigh", "sandbox danger-full-access", "approval never"]);
+  assert.deepEqual(runtimeCliArgs("codex", "C:\\auth", imported.profile), [
+    "exec",
+    "--sandbox",
+    "danger-full-access",
+    "-m",
+    "gpt-5.5",
+    "-c",
+    'approval_policy="never"',
+    "-c",
+    'model_reasoning_effort="xhigh"'
+  ]);
   assert.match(imported.configToml ?? "", /\[projects\.'c:\\example\\workspace\\app-alpha'\]/);
 });
 

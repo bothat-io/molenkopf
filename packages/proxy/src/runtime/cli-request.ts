@@ -26,7 +26,7 @@ export function cliArgs(provider: ProviderConfig, runModel?: string): string[] {
     setOptionValue(args, "--output-format", "stream-json");
     ensureFlag(args, "--include-partial-messages");
     if (provider.runtimeAuthDir) hardenImportedClaudeArgs(args);
-    if (runModel && !hasModelFlag(args)) args.push("--model", runModel);
+    if (runModel) setOptionValue(args, "--model", runModel);
   }
   if (provider.runtime === "codex") {
     ensureFlag(args, "--ephemeral");
@@ -38,7 +38,7 @@ export function cliArgs(provider: ProviderConfig, runModel?: string): string[] {
       setOptionValue(args, "--sandbox", provider.runtimeProfile?.sandbox ?? "read-only");
       setOptionValue(args, "--cd", runtimeProviderCwd(provider));
     }
-    if (runModel && !hasModelFlag(args)) args.push("-m", runModel);
+    if (runModel) setOptionValue(args, "-m", runModel);
   }
   return args;
 }
@@ -104,10 +104,6 @@ function removeOptions(args: string[], flags: string[]): void {
     while (index + count < args.length && !args[index + count].startsWith("-")) count += 1;
     args.splice(index, count);
   }
-}
-
-function hasModelFlag(args: string[]): boolean {
-  return args.some((arg) => arg === "-m" || arg === "--model" || arg.startsWith("--model="));
 }
 
 function parseBody(body: string): ParsedRequest {

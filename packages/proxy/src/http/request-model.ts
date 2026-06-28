@@ -1,16 +1,30 @@
+import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
+
 export type RequestModelMetadata = { model?: string; reasoning?: string };
 
-export function requestModelMetadataFromBody(body: string): RequestModelMetadata {
-  if (!body.trim()) return {};
+export function requestModelMetadataFromBody(body: string, provider?: ProviderConfig): RequestModelMetadata {
+  if (!body.trim()) return providerMetadata(provider);
   try {
     const parsed = JSON.parse(body) as Record<string, unknown>;
     return {
-      model: cleanToken(parsed.model, 96),
-      reasoning: requestedReasoning(parsed)
+      model: cleanToken(parsed.model, 96) ?? providerModel(provider),
+      reasoning: requestedReasoning(parsed) ?? cleanToken(provider?.runtimeProfile?.modelReasoningEffort, 32)
     };
   } catch {
-    return {};
+    return providerMetadata(provider);
   }
+}
+
+function providerMetadata(provider: ProviderConfig | undefined): RequestModelMetadata {
+  return {
+    model: providerModel(provider),
+    reasoning: cleanToken(provider?.runtimeProfile?.modelReasoningEffort, 32)
+  };
+}
+
+function providerModel(provider: ProviderConfig | undefined): string | undefined {
+  return cleanToken(provider?.runtimeProfile?.model, 96)
+    ?? (provider?.runtime === "claude" ? "sonnet" : provider?.runtime === "codex" ? "gpt-5" : undefined);
 }
 
 function requestedReasoning(parsed: Record<string, unknown>): string | undefined {

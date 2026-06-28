@@ -91,15 +91,19 @@ test("imported Codex providers respect explicit imported sandbox profiles", () =
   const provider = {
     ...codexProvider,
     runtimeAuthDir: "runtime-auth/codex-work",
-    runtimeProfile: { sandbox: "danger-full-access", approval: "never" },
-    cliArgs: ["exec", "--sandbox", "danger-full-access", "-c", 'approval_policy="never"']
+    runtimeProfile: { sandbox: "danger-full-access", approval: "never", model: "gpt-5", modelReasoningEffort: "xhigh" },
+    cliArgs: ["exec", "--sandbox", "danger-full-access", "-m", "gpt-5", "-c", 'approval_policy="never"', "-c", 'model_reasoning_effort="xhigh"']
   };
   assert.deepEqual(cliArgs({
     ...provider
   }), [
     "exec",
+    "-m",
+    "gpt-5",
     "-c",
     'approval_policy="never"',
+    "-c",
+    'model_reasoning_effort="xhigh"',
     "--ephemeral",
     "--json",
     "--ignore-user-config",
@@ -109,6 +113,24 @@ test("imported Codex providers respect explicit imported sandbox profiles", () =
     "danger-full-access",
     "--cd",
     resolve(".")
+  ]);
+  assert.deepEqual(cliArgs(provider, "gpt-5-mini"), [
+    "exec",
+    "-c",
+    'approval_policy="never"',
+    "-c",
+    'model_reasoning_effort="xhigh"',
+    "--ephemeral",
+    "--json",
+    "--ignore-user-config",
+    "--ignore-rules",
+    "--skip-git-repo-check",
+    "--sandbox",
+    "danger-full-access",
+    "--cd",
+    resolve("."),
+    "-m",
+    "gpt-5-mini"
   ]);
   assert.equal(runtimeProviderCwd(provider), resolve("."));
 });

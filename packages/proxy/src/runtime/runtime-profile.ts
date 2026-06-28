@@ -50,7 +50,9 @@ export function runtimeCliArgs(runtime: Runtime, authDir: string, profile?: Runt
     for (const dir of profile.addDirs ?? []) args.push("--add-dir", dir);
   } else {
     if (profile.sandbox) args.push("--sandbox", profile.sandbox);
+    if (profile.model) args.push("-m", profile.model);
     if (profile.approval) args.push("-c", `approval_policy="${profile.approval}"`);
+    if (profile.modelReasoningEffort) args.push("-c", `model_reasoning_effort="${profile.modelReasoningEffort}"`);
     for (const dir of profile.addDirs ?? []) args.push("--add-dir", dir);
   }
   return args;
@@ -97,6 +99,8 @@ function withSummary(profile: RuntimeProfileConfig): RuntimeProfileConfig | unde
   const summary = [
     profile.settingsRef ? "Claude settings" : "",
     profile.configRef ? "Codex config" : "",
+    profile.model ? `model ${profile.model}` : "",
+    profile.modelReasoningEffort ? `thinking ${profile.modelReasoningEffort}` : "",
     profile.permissionMode ? `mode ${profile.permissionMode}` : "",
     profile.sandbox ? `sandbox ${profile.sandbox}` : "",
     profile.approval ? `approval ${profile.approval}` : "",

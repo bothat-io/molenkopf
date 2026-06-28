@@ -7,6 +7,8 @@ export const DEFAULT_CLI_PROVIDER_TIMEOUT_MS = 600000;
 export type RuntimeProfileConfig = {
   settingsRef?: string;
   configRef?: string;
+  model?: string;
+  modelReasoningEffort?: string;
   permissionMode?: string;
   allowedTools?: string[];
   disallowedTools?: string[];
@@ -19,6 +21,8 @@ export type RuntimeProfileConfig = {
 export type RuntimeProfileDiagnostics = {
   settingsSource?: string;
   configSource?: string;
+  model?: string;
+  modelReasoningEffort?: string;
   permissionMode?: string;
   sandbox?: string;
   approval?: string;
@@ -100,6 +104,8 @@ function runtimeDiagnostics(profile: RuntimeProfileConfig | undefined): RuntimeP
   return {
     settingsSource: profile.settingsRef,
     configSource: profile.configRef,
+    model: profile.model,
+    modelReasoningEffort: profile.modelReasoningEffort,
     permissionMode: profile.permissionMode,
     sandbox: profile.sandbox,
     approval: profile.approval,

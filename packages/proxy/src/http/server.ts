@@ -99,7 +99,7 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
   events.emit("request_started", { requestId, data: { method: req.method, path } });
   const originalBody = await readBody(req);
   const jsonRequest = (inbound.get("content-type") ?? "").includes("application/json");
-  const requestModel = jsonRequest ? requestModelMetadataFromBody(originalBody) : undefined;
+  const requestModel = jsonRequest ? requestModelMetadataFromBody(originalBody, provider) : undefined;
   if (jsonRequest && originalBody) {
     const modelPolicy = enforceModelPolicy(policy, originalBody);
     if (modelPolicy.ok === false) { events.emit("request_failed", { requestId, data: { error: modelPolicy.error } }); return writeJson(res, modelPolicy.status, { error: modelPolicy.error }); }
