@@ -6,6 +6,8 @@ import { cliRequest } from "../runtime/cli-request.ts";
 import { isOpenAiResponses, wantsStream } from "../runtime/cli-provider.ts";
 import { anthropicStep, anthropicStreamDone, anthropicStreamStart, anthropicTextDelta, openAiProgress, openAiStep, openAiStreamDone, openAiStreamStart, openAiTextDelta, streamError } from "./cli-sse-format.ts";
 
+const CLI_STREAM_PROGRESS_INTERVAL_MS = 2000;
+
 export type CliStreamResult = {
   status: number;
   usage?: { inputTokens?: number; outputTokens?: number };
@@ -35,7 +37,7 @@ async function streamOpenAiCliProvider(provider: ProviderConfig, body: string, r
     connection: "keep-alive"
   });
   res.write(openAiStreamStart(requestId, request.responseModel));
-  const keepAlive = setInterval(() => res.write(openAiProgress(requestId, request.responseModel)), 10000);
+  const keepAlive = setInterval(() => res.write(openAiProgress(requestId, request.responseModel)), CLI_STREAM_PROGRESS_INTERVAL_MS);
   keepAlive.unref?.();
   const abort = new AbortController();
   let clientClosed = false;
@@ -74,7 +76,7 @@ async function streamAnthropicCliProvider(provider: ProviderConfig, body: string
   const inputTokens = estimateTokens(request.prompt);
   res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
   res.write(anthropicStreamStart(requestId, request.responseModel, { inputTokens }));
-  const keepAlive = setInterval(() => res.write(": keep-alive\n\n"), 10000);
+  const keepAlive = setInterval(() => res.write(": keep-alive\n\n"), CLI_STREAM_PROGRESS_INTERVAL_MS);
   keepAlive.unref?.();
   const abort = new AbortController();
   let clientClosed = false, streamedText = "";
