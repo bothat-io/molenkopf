@@ -2,7 +2,8 @@ import type { AuditManifest, AuditStore } from "../../../core/src/manifest/audit
 import type { EventBus } from "../../../core/src/events/event-bus.ts";
 import type { RewriteAudit } from "../../../core/src/pipeline/openai-request-rewriter.ts";
 import type { UsageTotals } from "../../../core/src/manifest/usage-meter.ts";
-import { recordUsage, type RuntimeState } from "./runtime-state.ts";
+import { recordUsage } from "./usage-accounting.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 import { safeSubjectId, type ClientIdentity } from "./client-identity.ts";
 import type { PluginHost } from "./plugin-host.ts";
 import type { RequestModelMetadata } from "./request-model.ts";

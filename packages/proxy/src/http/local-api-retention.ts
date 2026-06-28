@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { AuditStore } from "../../../core/src/manifest/audit-store.ts";
 import { RetrievalStore } from "../../../core/src/store/retrieval-store.ts";
-import type { RuntimeState } from "./runtime-state.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 import { readJson, writeJson } from "./local-api-io.ts";
 
 type PurgeScope = "audit" | "retrieval" | "all";

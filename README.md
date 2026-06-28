@@ -2,22 +2,29 @@
   <img src="packages/dashboard/public/molenkopf-logo.png" alt="Molenkopf logo" width="72">
 </p>
 
-# Molenkopf
+<h1 align="center">Molenkopf</h1>
 
-Molenkopf is a local gateway for API and CLI based coding agents. It is not
-only an OpenAI-compatible API proxy: it also supports Anthropic/Claude API
-traffic and local CLI runtimes such as Claude CLI and Codex CLI. It should
-reduce real transferred context, redact secrets, build local derived project
-structure, and write audit manifests without full prompts or responses.
+<p align="center">
+  <strong>Local control plane for coding-agent traffic.</strong>
+</p>
 
-Molenkopf has a fixed core safety pipeline for secret redaction, content classification, safe compression for logs, JSON and stacktraces, local retrieval storage, audit manifests, and redacted SSE events. Optional plugins extend this pipeline; core safety behavior is not toggleable.
+Molenkopf sits between coding agents and provider or runtime backends. It proxies
+OpenAI-compatible and Anthropic/Claude API traffic, can bridge local Claude CLI
+and Codex CLI runtimes, and gives teams local keys, routing, usage, budgets,
+redaction, audit manifests, and dashboard controls.
+
+The core safety pipeline is fixed: secret redaction, content classification,
+safe compression for structured operational text, local retrieval storage,
+audit manifests, and redacted SSE events are always owned by Molenkopf.
+Optional plugins extend the pipeline; they do not replace core safety behavior.
 
 Product intent and non-negotiable plugin semantics live in
 `docs/PRODUCT_INTENT.md` and `docs/MOLENKOPF_PLUGIN_API.md`.
 
 ## Quickstart
 
-Install from npm with Node.js 24 or newer:
+1. Install with Node.js 24 or newer, create a session secret, and start the
+   local proxy:
 
 ```bash
 npm install -g @bothat-io/molenkopf
@@ -25,9 +32,37 @@ node -e "require('node:fs').writeFileSync('.env','MOLENKOPF_SESSION_SECRET='+req
 molenkopf proxy
 ```
 
-Open `http://127.0.0.1:8787/` and create the first admin user.
+2. Open `http://127.0.0.1:8787/`, create the first admin user, configure a
+   provider or imported runtime, and create a Molenkopf API key.
 
-Quick Docker start on the Docker host:
+3. Point an OpenAI-compatible client at Molenkopf:
+
+```text
+Base URL: http://127.0.0.1:8787/v1
+Authorization: Bearer mk_...
+```
+
+4. Or connect a local CLI runtime:
+
+```powershell
+$env:ANTHROPIC_BASE_URL = 'http://127.0.0.1:8787'
+$env:ANTHROPIC_API_KEY = '<molenkopf-api-key>'
+claude
+```
+
+Connect Codex CLI through the OpenAI-compatible endpoint:
+
+```powershell
+$env:OPENAI_BASE_URL = 'http://127.0.0.1:8787/v1'
+$env:OPENAI_API_KEY = '<molenkopf-api-key>'
+codex
+```
+
+If a client must also send its upstream provider credential in `Authorization`,
+send the Molenkopf key as `x-molenkopf-token: mk_...`; Molenkopf strips local
+headers before forwarding upstream.
+
+5. Docker on the host:
 
 ```bash
 cp .env.example .env
@@ -35,7 +70,7 @@ cp .env.example .env
 docker run --rm --env-file .env -p 127.0.0.1:8787:8787 -v molenkopf-data:/data ghcr.io/bothat-io/molenkopf:latest
 ```
 
-For local development, use a source checkout:
+6. Source checkout for local development:
 
 ```bash
 npm run bootstrap
@@ -115,18 +150,8 @@ screen is reachable there until the first admin is created.
 
 ## Control Plane Usage
 
-Open `http://127.0.0.1:8787/__molenkopf/dashboard` after starting Molenkopf.
-Root `/` redirects there, while upstream agent traffic still uses `/v1/...`.
-
-Every `/v1/...` proxy request must present a valid Molenkopf API key. Use
-`Authorization: Bearer mk_...` when Molenkopf supplies provider credentials. If
-the client must also forward an upstream `Authorization` header, put the
-Molenkopf key in `x-molenkopf-token: mk_...`; Molenkopf strips that header
-before forwarding upstream.
-
-```text
-Authorization: Bearer mk_...
-```
+Root `/` opens the dashboard at `/__molenkopf/dashboard`; upstream agent traffic
+stays on `/v1/...` and requires a Molenkopf API key.
 
 `x-molenkopf-agent` is optional local request metadata. It may select an
 explicit agent binding only when that binding is already allowed for the
@@ -152,35 +177,7 @@ Plugin toggles happen in the Admin plugin section or by posting `{ "id": "contex
 
 Agent drafts are stored as local proxy metadata through `/__molenkopf/agents/draft`; raw token fields are rejected and only `tokenHash` is accepted. The dashboard keeps a `localStorage` fallback if the local API is unavailable. These drafts are routing metadata, not provider credentials.
 
-For a step-by-step local setup and test flow, read `docs/MOLENKOPF_USAGE.md`.
-
 Plugin pages open in standalone windows from `/__molenkopf/plugins/context-compressor-plugin/page`, `/__molenkopf/plugins/token-optimizer-plugin/page`, and `/__molenkopf/plugins/project-graph-plugin/page`. The `project-graph-plugin` workspace is derived from token usage and scoped audit metadata, not source scans or raw prompts. Plugin pages group by project/key where available and surface plugin-data failures explicitly.
-
-## Connect A Client
-
-Use Molenkopf as the OpenAI-compatible base URL:
-
-```text
-http://127.0.0.1:8787/v1
-```
-
-Authenticate proxy traffic with a Molenkopf API key:
-
-```text
-Authorization: Bearer mk_...
-```
-
-If your client also sends an upstream provider credential in `Authorization`,
-send the Molenkopf key separately:
-
-```text
-x-molenkopf-token: mk_...
-x-molenkopf-agent: codex-local
-```
-
-These local headers are stripped before upstream forwarding. See
-`docs/MOLENKOPF_USAGE.md` for a concrete `curl` request, provider setup, and
-dashboard checks.
 
 ## Limitations
 

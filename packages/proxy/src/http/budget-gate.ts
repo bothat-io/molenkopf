@@ -1,5 +1,6 @@
 import type { Budget } from "../../../core/src/identity/types.ts";
-import { keyCostUsed, keyTokensUsed, orgCostUsed, orgTokensUsed, teamCostUsed, teamTokensUsed, userCostUsed, userTokensUsed, type RuntimeState } from "./runtime-state.ts";
+import { keyCostUsed, keyTokensUsed, orgCostUsed, orgTokensUsed, teamCostUsed, teamTokensUsed, userCostUsed, userTokensUsed } from "./usage-accounting.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 import type { ClientIdentity } from "./client-identity.ts";
 
 // Hierarchical budget enforcement: key -> user -> team(s) -> org. The first

@@ -1,5 +1,5 @@
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
-import type { ResolvedAgent } from "./runtime-state.ts";
+import type { ResolvedAgent } from "./runtime-types.ts";
 
 export type ProxyOptions = {
   target: string;

@@ -1,16 +1,16 @@
-import {
-  pluginDescriptorVersion,
-  type PluginActionConfirmation,
-  type PluginActionDescriptor,
-  type PluginActionOutputSafety,
-  type PluginActionSideEffect,
-  type PluginCapability,
-  type PluginCategory,
-  type PluginDataScope,
-  type PluginDefaultPolicy,
-  type PluginDescriptorV2,
-  type PluginRisk,
-  type PluginRole
+import { pluginDescriptorVersion } from "./plugin-descriptor-v2-constants.ts";
+import type {
+  PluginActionConfirmation,
+  PluginActionDescriptor,
+  PluginActionOutputSafety,
+  PluginActionSideEffect,
+  PluginCapability,
+  PluginCategory,
+  PluginDataScope,
+  PluginDefaultPolicy,
+  PluginDescriptorV2,
+  PluginRisk,
+  PluginRole
 } from "./plugin-descriptor-v2.ts";
 
 const PLUGIN_CATEGORIES: PluginDescriptorV2["category"][] = ["safety", "compression", "storage", "events", "routing", "visualization"];

@@ -1,14 +1,8 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const dockerfile = read("Dockerfile");
-const dockerignore = read(".dockerignore");
-const release = read(".github/workflows/release.yml");
-const testWorkflow = read(".github/workflows/test.yml");
-const pkg = read("package.json");
-const dockerSmoke = read("scripts/smoke-docker.js");
 
 const requiredDockerfile = [
   /COPY packages\/core\/src packages\/core\/src/,
@@ -64,30 +58,48 @@ const requiredDockerSmoke = [
   /volume/
 ];
 
-const failures = [
-  ...missing("package.json", pkg, [/smoke:docker/, /check:source-completeness/, /release:verify[\s\S]*smoke:docker/]),
-  ...missing("smoke-docker.js", dockerSmoke, requiredDockerSmoke),
-  ...missing("Dockerfile", dockerfile, requiredDockerfile),
-  ...missing(".dockerignore", dockerignore, [/!LICENSE/, /!packages\/dashboard\/public\//]),
-  ...missing("release.yml", release, requiredRelease),
-  ...missing("test.yml", testWorkflow, requiredTest)
-];
-
-if (/name: E2E[\s\S]{0,300}CYPRESS_INSTALL_BINARY:\s*["']0["']/.test(testWorkflow)) {
-  failures.push("test.yml: E2E job must install the Cypress binary");
+export function containerContractFailures(rootDir = root) {
+  const dockerfile = read(rootDir, "Dockerfile");
+  const dockerignore = read(rootDir, ".dockerignore");
+  const release = read(rootDir, ".github/workflows/release.yml");
+  const testWorkflow = read(rootDir, ".github/workflows/test.yml");
+  const pkg = read(rootDir, "package.json");
+  const dockerSmoke = read(rootDir, "scripts/smoke-docker.js");
+  const failures = [
+    ...missing("package.json", pkg, [/smoke:docker/, /check:source-completeness/, /release:verify[\s\S]*smoke:docker/]),
+    ...missing("smoke-docker.js", dockerSmoke, requiredDockerSmoke),
+    ...missing("Dockerfile", dockerfile, requiredDockerfile),
+    ...missing(".dockerignore", dockerignore, [/!LICENSE/, /!packages\/dashboard\/public\//]),
+    ...missing("release.yml", release, requiredRelease),
+    ...missing("test.yml", testWorkflow, requiredTest)
+  ];
+  if (testWorkflow && /name: E2E[\s\S]{0,300}CYPRESS_INSTALL_BINARY:\s*["']0["']/.test(testWorkflow)) {
+    failures.push("test.yml: E2E job must install the Cypress binary");
+  }
+  return failures;
 }
 
-if (failures.length) {
-  for (const failure of failures) console.error(failure);
-  process.exit(1);
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const failures = containerContractFailures();
+
+  if (failures.length) {
+    for (const failure of failures) console.error(failure);
+    process.exit(1);
+  }
+
+  console.log("container contract ok");
 }
 
-console.log("container contract ok");
-
-function read(path) {
-  return readFileSync(resolve(root, path), "utf8");
+function read(rootDir, path) {
+  try {
+    return readFileSync(resolve(rootDir, path), "utf8");
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return undefined;
+    throw error;
+  }
 }
 
 function missing(label, text, patterns) {
+  if (text === undefined) return [`${label}: missing required file`];
   return patterns.flatMap((pattern, index) => pattern.test(text) ? [] : [`${label}: missing required pattern ${index + 1}`]);
 }

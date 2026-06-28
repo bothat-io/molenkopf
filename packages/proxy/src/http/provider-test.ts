@@ -6,7 +6,7 @@ import type { ProviderConfig } from "../../../core/src/providers/provider-catalo
 import { isCliProvider, runCliProvider } from "../runtime/cli-provider.ts";
 import { cliErrorDiagnostics, safeCliMessage, successfulCliLifecycle } from "../runtime/cli-diagnostics.ts";
 import { runtimeProfileFromImport, writeRuntimeProfileFiles } from "../runtime/runtime-profile.ts";
-import type { RuntimeState } from "./runtime-state.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 import { missingProviderCredential } from "./header-utils.ts";
 import { readJson, writeJson } from "./local-api-io.ts";
 import { providerHttpTest } from "./provider-http-test.ts";

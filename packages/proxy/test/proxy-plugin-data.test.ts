@@ -58,9 +58,9 @@ test("plugin data endpoints expose scoped compression data without query secrets
       body: JSON.stringify({ input: longLog })
     });
     const favicon = await fetch(`${base}/favicon.ico`);
-    assert.equal(favicon.status, 204);
+    assert.equal(favicon.status, 200);
     const faviconQuery = await fetch(`${base}/favicon.ico?token=favicon-secret`);
-    assert.equal(faviconQuery.status, 204);
+    assert.equal(faviconQuery.status, 200);
     const devtoolsProbe = await fetch(`${base}/.well-known/appspecific/com.chrome.devtools.json`);
     assert.equal(devtoolsProbe.status, 204);
 
@@ -85,6 +85,8 @@ test("plugin data endpoints expose scoped compression data without query secrets
     assert.equal(compression.requestGroups[0].project, "project-alpha/client");
     assert.equal(compression.requestGroups[0].keyId, issued.view.id);
     assert.equal(compression.requests.length, 2);
+    assert.equal(compression.latest.requestId, latest.requestId);
+    assert.equal(compression.requests.at(-1).requestId, latest.requestId);
     assert.doesNotMatch(JSON.stringify(compression), /super-secret|favicon-secret|api_key=|chrome\.devtools/);
 
   } finally {

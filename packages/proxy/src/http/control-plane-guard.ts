@@ -1,5 +1,5 @@
 import type { IncomingMessage } from "node:http";
-import type { RuntimeState } from "./runtime-state.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 import { isLoopbackBindHost } from "./public-bind.ts";
 
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);

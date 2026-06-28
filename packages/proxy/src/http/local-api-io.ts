@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { CONTROL_PLANE_LIMITS } from "./runtime-state.ts";
+import { CONTROL_PLANE_LIMITS } from "./runtime-types.ts";
 
 export class LocalApiError extends Error {
   status: number;

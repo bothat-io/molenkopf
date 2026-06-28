@@ -1,6 +1,7 @@
 import type { AuditStore } from "../../../core/src/manifest/audit-store.ts";
 import type { UsageSnapshotStore } from "../../../core/src/identity/usage-snapshot.ts";
-import { recordUsage, type RuntimeState } from "./runtime-state.ts";
+import { recordUsage } from "./usage-accounting.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 
 const USAGE_FIELDS = ["usageByAgent", "usageByUser", "usageByProvider", "usageByKey", "usageByTeam"] as const;
 

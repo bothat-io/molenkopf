@@ -1,12 +1,12 @@
 import { getNeighborhood, listEventUsage, listPluginFacts, listRoutes, listStorageUsage, searchGraph } from "./graph-query.ts";
-import { deleteProjectGraph, listProjectGraphs, loadLatestProjectGraph } from "./graph-storage.ts";
+import { deleteProjectGraph, listProjectGraphs } from "./graph-storage.ts";
 import { safeProjectGraphEdgeForView, safeProjectGraphNodeForView, safeQueryResultForView } from "./safe-output.ts";
 import type { PluginActionContext, PluginJson, PluginRuntimeContext } from "../../core/src/plugins/plugin-api.ts";
 import type { AuditManifest } from "../../core/src/manifest/audit-store.ts";
 import { buildProjectGraphFromTokenContext } from "./token-graph-builder.ts";
 import type { ProjectGraph } from "./types.ts";
 
-let latestGraph: ProjectGraph | undefined;
+const scopedGraphs = new Map<string, ProjectGraph>();
 
 export async function handleProjectGraphAction(ctx: PluginActionContext, runtime: PluginRuntimeContext): Promise<PluginJson> {
   if (ctx.actionId === "graph.query") return queryGraphAction(ctx, runtime);
@@ -15,16 +15,16 @@ export async function handleProjectGraphAction(ctx: PluginActionContext, runtime
   return { error: "unknown_action" };
 }
 
-export async function queryGraphAction(ctx: PluginActionContext, runtime: PluginRuntimeContext): Promise<PluginJson> {
-  const graph = await currentGraph(runtime);
+export async function queryGraphAction(ctx: PluginActionContext, _runtime: PluginRuntimeContext): Promise<PluginJson> {
+  const graph = currentGraph(ctx);
   if (!graph) return { results: [], warnings: [{ code: "graph_not_derived" }] };
   const query = typeof ctx.input.query === "string" ? ctx.input.query : "";
   const limit = typeof ctx.input.limit === "number" ? ctx.input.limit : 20;
   return { results: safeQueryResultForView(searchGraph(graph, query, { limit })) };
 }
 
-export async function graphNeighborhoodAction(ctx: PluginActionContext, runtime: PluginRuntimeContext): Promise<PluginJson> {
-  const graph = await currentGraph(runtime);
+export async function graphNeighborhoodAction(ctx: PluginActionContext, _runtime: PluginRuntimeContext): Promise<PluginJson> {
+  const graph = currentGraph(ctx);
   if (!graph) return { nodes: [], edges: [], warnings: [{ code: "graph_not_derived" }] };
   const nodeId = typeof ctx.input.nodeId === "string" ? ctx.input.nodeId : "";
   const depth = typeof ctx.input.depth === "number" ? ctx.input.depth : 1;
@@ -39,17 +39,18 @@ export async function deleteGraphAction(ctx: PluginActionContext, runtime: Plugi
   const rootId = typeof ctx.input.rootId === "string" ? ctx.input.rootId : "";
   if (ctx.input.confirm !== rootId) return { ok: false, error: "confirmation_required" };
   const ok = await deleteProjectGraph(runtime.dataDir, rootId);
-  if (latestGraph?.rootId === rootId) latestGraph = undefined;
+  for (const [scope, graph] of scopedGraphs) if (graph.rootId === rootId) scopedGraphs.delete(scope);
   return { ok };
 }
 
 export function latestProjectGraph(): ProjectGraph | undefined {
-  return latestGraph;
+  return scopedGraphs.values().next().value;
 }
 
-export async function projectGraphDataView(runtime: PluginRuntimeContext, manifests: AuditManifest[] = []): Promise<PluginJson> {
-  if (manifests.length) latestGraph = buildProjectGraphFromTokenContext(manifests, runtime.now());
-  const graph = await currentGraph(runtime);
+export async function projectGraphDataView(runtime: PluginRuntimeContext, manifests: AuditManifest[] = [], scopeKey = scopeKeyFor()): Promise<PluginJson> {
+  if (manifests.length) scopedGraphs.set(scopeKey, buildProjectGraphFromTokenContext(manifests, runtime.now()));
+  else scopedGraphs.delete(scopeKey);
+  const graph = scopedGraphs.get(scopeKey);
   if (!graph) return { graphSummaries: await listProjectGraphs(runtime.dataDir), routes: [], topFilesByDegree: [], topSymbolsByDegree: [] };
   const graphSummaries = await listProjectGraphs(runtime.dataDir);
   const derivedSummary = { rootId: graph.rootId, projectId: graph.projectId, generatedAt: graph.generatedAt, stats: graph.stats, source: "token-context" };
@@ -66,10 +67,12 @@ export async function projectGraphDataView(runtime: PluginRuntimeContext, manife
   };
 }
 
-async function currentGraph(runtime: PluginRuntimeContext): Promise<ProjectGraph | undefined> {
-  if (latestGraph) return latestGraph;
-  latestGraph = await loadLatestProjectGraph(runtime.dataDir);
-  return latestGraph;
+function currentGraph(ctx: { userId?: string; teamIds?: readonly string[] }): ProjectGraph | undefined {
+  return scopedGraphs.get(scopeKeyFor(ctx));
+}
+
+function scopeKeyFor(ctx?: { userId?: string; teamIds?: readonly string[] }): string {
+  return ctx?.userId ? `user:${ctx.userId}|teams:${[...(ctx.teamIds ?? [])].sort().join(",")}` : "admin";
 }
 
 function rankByDegree(graph: ProjectGraph, kind: "file" | "symbol") {

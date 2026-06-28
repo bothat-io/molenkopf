@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { upsertAgentDraft } from "./agent-drafts.ts";
 import { readJson, writeJson } from "./local-api-io.ts";
 import { persistRuntimeSettings } from "./runtime-settings.ts";
-import type { RuntimeState } from "./runtime-state.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 
 export async function saveAgentDraft(req: IncomingMessage, res: ServerResponse, state: RuntimeState) {
   const body = await readJson(req);

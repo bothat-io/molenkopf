@@ -64,6 +64,36 @@ test("config agent model policy blocks disallowed models before upstream", async
   }
 });
 
+test("config agent default model is inserted before forwarding", async () => {
+  const captured: Record<string, unknown>[] = [];
+  const upstream = createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+    req.on("end", () => { captured.push(JSON.parse(Buffer.concat(chunks).toString("utf8"))); res.writeHead(200, { "content-type": "application/json" }); res.end("{}"); });
+  });
+  const port = await listenOn(upstream);
+  const seeded = await seedAgentKey("coder");
+  const proxy = await startProxy({
+    port: 0,
+    target: `http://127.0.0.1:${port}/v1`,
+    dataDir: seeded.dataDir,
+    configAgents: [{ id: "coder", providerId: "default", enabled: true, allowedModels: ["default-model", "custom-model"], defaultModel: "default-model" }]
+  });
+  const base = `http://127.0.0.1:${proxy.port}`;
+  try {
+    const defaulted = await fetch(`${base}/v1/responses`, { method: "POST", headers: jsonAuth(seeded.secret, "coder"), body: JSON.stringify({ input: "x" }) });
+    assert.equal(defaulted.status, 200);
+    assert.equal(captured.at(-1)?.model, "default-model");
+    const explicit = await fetch(`${base}/v1/responses`, { method: "POST", headers: jsonAuth(seeded.secret, "coder"), body: JSON.stringify({ model: "custom-model", input: "x" }) });
+    assert.equal(explicit.status, 200);
+    assert.equal(captured.at(-1)?.model, "custom-model");
+  } finally {
+    await proxy.close();
+    upstream.close();
+    await rm(seeded.dataDir, { recursive: true, force: true });
+  }
+});
+
 test("config agent plugin policy limits request body plugins", async () => {
   let captured = "";
   const upstream = createServer((req, res) => {

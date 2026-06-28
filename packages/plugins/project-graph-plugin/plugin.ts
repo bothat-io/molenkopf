@@ -4,7 +4,7 @@ export { descriptorV2 } from "./descriptor-v2.ts";
 
 export const plugin: MolenkopfPluginModule = {
   async getData(ctx, runtime) {
-    const graphData = await projectGraphDataView(runtime, ctx.manifests);
+    const graphData = await projectGraphDataView(runtime, ctx.manifests, graphScope(ctx));
     return {
       plugin: ctx.plugin,
       scopes: ctx.scopes,
@@ -30,3 +30,8 @@ export const plugin: MolenkopfPluginModule = {
   },
   executeAction: handleProjectGraphAction
 };
+
+function graphScope(ctx: { userId?: string; teamIds?: string[] }): string {
+  if (!ctx.userId) return "admin";
+  return `user:${ctx.userId ?? "anonymous"}|teams:${[...(ctx.teamIds ?? [])].sort().join(",")}`;
+}

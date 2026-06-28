@@ -5,7 +5,7 @@ import { explainEffectivePolicies, explainEffectivePolicyForPlugin } from "./plu
 import { builtinPluginDescriptorV2 } from "./plugin-platform.ts";
 import { readJson, writeJson } from "./local-api-io.ts";
 import { persistRuntimeSettings } from "./runtime-settings.ts";
-import type { RuntimeState } from "./runtime-state.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 
 type TeamPolicyPayload = Record<string, unknown>;
 

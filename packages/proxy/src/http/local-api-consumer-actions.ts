@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { buildConsumers } from "./local-api-state.ts";
 import { readJson, writeJson } from "./local-api-io.ts";
 import { persistRuntimeSettings } from "./runtime-settings.ts";
-import type { RuntimeState } from "./runtime-state.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 
 export async function setConsumerBudget(req: IncomingMessage, res: ServerResponse, state: RuntimeState) {
   const body = await readJson(req);

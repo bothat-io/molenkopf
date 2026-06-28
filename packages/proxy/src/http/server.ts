@@ -9,7 +9,7 @@ import { orderIndex } from "./local-api-pipeline.ts";
 import { RetrievalStore } from "../../../core/src/store/retrieval-store.ts";
 import { buildForwardHeaders, missingProviderCredential } from "./header-utils.ts";
 import { handleLocalRequest } from "./local-api.ts";
-import { createRuntimeState, emptyUsage, resolveRequestPluginIds, type RuntimeState } from "./runtime-state.ts";
+import { createRuntimeState, emptyUsage, resolveRequestPluginIds } from "./runtime-state.ts"; import type { RuntimeState } from "./runtime-types.ts";
 import { resolveRouting } from "./agent-router.ts";
 import { buildManifest, finishRequest } from "./request-finish.ts";
 import { resolveClientIdentity, stripMolenkopfAuthHeaders } from "./proxy-identity.ts";
@@ -27,9 +27,9 @@ import { inputError, listen, readBody, writeJson, writeRedirect } from "./server
 import { requirePublicBindFlag } from "./public-bind.ts";
 import { providerAllowedForClient } from "./provider-access.ts";
 import { restoreUsage } from "./usage-restore.ts";
-import { handleDashboardRequest, isDashboardRequest } from "./dashboard-assets.ts";
+import { handleDashboardFaviconRequest, handleDashboardRequest, isDashboardRequest } from "./dashboard-assets.ts";
 import { createPluginHost, type PluginHost } from "./plugin-host.ts";
-import { effectiveRequestPolicy, enforceModelPolicy } from "./request-policy.ts";
+import { applyDefaultModel, effectiveRequestPolicy, enforceModelPolicy } from "./request-policy.ts";
 import { rejectBudget } from "./budget-response.ts";
 import { handleCliModelListResponse } from "./cli-model-list-response.ts";
 import type { ProxyOptions, RunningProxy } from "./server-types.ts";
@@ -59,8 +59,8 @@ export async function startProxy(options: ProxyOptions): Promise<RunningProxy> {
 async function handle(req: IncomingMessage, res: ServerResponse, store: RetrievalStore, audit: AuditStore, events: EventBus, state: RuntimeState, pluginHost: PluginHost) {
   try {
     if (req.url === "/") return writeRedirect(res, "/__molenkopf/dashboard");
-    const probePath = auditPath(req.url);
-    if (probePath === "/favicon.ico" || probePath.startsWith("/.well-known/appspecific/")) { res.writeHead(204); return res.end(); }
+    const probePath = auditPath(req.url); if (probePath === "/favicon.ico") return await handleDashboardFaviconRequest(req, res);
+    if (probePath.startsWith("/.well-known/appspecific/")) { res.writeHead(204); return res.end(); }
     if (isDashboardRequest(req.url)) return await handleDashboardRequest(req, res);
     if (req.url?.startsWith("/__molenkopf/")) return await handleLocalRequest(req, res, audit, events, state, pluginHost);
     await handleProxy(req, res, store, audit, events, state, pluginHost);
@@ -99,17 +99,19 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
   events.emit("request_started", { requestId, data: { method: req.method, path } });
   const originalBody = await readBody(req);
   const jsonRequest = (inbound.get("content-type") ?? "").includes("application/json");
-  const requestModel = jsonRequest ? requestModelMetadataFromBody(originalBody, provider) : undefined;
-  if (jsonRequest && originalBody) {
-    const modelPolicy = enforceModelPolicy(policy, originalBody);
+  let body = originalBody;
+  if (jsonRequest && body) {
+    const defaulted = applyDefaultModel(policy, body);
+    if (defaulted.ok === false) { events.emit("request_failed", { requestId, data: { error: defaulted.error } }); return writeJson(res, defaulted.status, { error: defaulted.error }); }
+    body = defaulted.body;
+    const modelPolicy = enforceModelPolicy(policy, body);
     if (modelPolicy.ok === false) { events.emit("request_failed", { requestId, data: { error: modelPolicy.error } }); return writeJson(res, modelPolicy.status, { error: modelPolicy.error }); }
   }
-  let body = originalBody;
-  let audit: RewriteAudit | undefined;
+  const requestModel = jsonRequest ? requestModelMetadataFromBody(body, provider) : undefined; let audit: RewriteAudit | undefined;
   if (jsonRequest && originalBody) {
     const ctx: PluginContext = {
       requestId, method: req.method ?? "GET", path, consumerId: client.id, providerId: provider.id,
-      body: originalBody, redactedSecrets: 0, compressedItems: 0, savedTokens: 0, retrievalIds: [], compressorsUsed: [], notes: [],
+      body, redactedSecrets: 0, compressedItems: 0, savedTokens: 0, retrievalIds: [], compressorsUsed: [], notes: [],
       usageOf: (id) => state.usageByAgent[id] ?? emptyUsage(),
       note(message) { ctx.notes.push(message); }
     };
@@ -137,8 +139,7 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
     if (ctx.compressedItems) events.emit("request_compressed", { requestId, data: { items: ctx.compressedItems } });
   }
   audit = withBudgetWarnings(audit, budget.warnings);
-  const target = provider.target;
-  if (missingProviderCredential(provider)) return writeJson(res, 502, { error: "missing_provider_credential" });
+  const target = provider.target; if (missingProviderCredential(provider)) return writeJson(res, 502, { error: "missing_provider_credential" });
   const headers = buildForwardHeaders(inbound, provider);
   if (body) headers.set("content-length", String(Buffer.byteLength(body)));
   if (isCliProvider(provider)) {

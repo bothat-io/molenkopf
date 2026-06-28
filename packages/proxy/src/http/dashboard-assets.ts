@@ -32,6 +32,13 @@ export async function handleDashboardRequest(req: IncomingMessage, res: ServerRe
   return serveIndex(res);
 }
 
+export async function handleDashboardFaviconRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  if (req.method !== "GET" && req.method !== "HEAD") { writeText(res, 405, "method not allowed"); return; }
+  const devOrigin = process.env.MOLENKOPF_DASHBOARD_DEV_ORIGIN;
+  if (devOrigin) { await proxyDevDashboard(req, res, devOrigin, `${routePrefix}/favicon.png`); return; }
+  serveDistPath("favicon.png", true, res);
+}
+
 async function serveIndex(res: ServerResponse) {
   const file = join(distDir(), "index.html");
   if (!existsSync(file)) return writeText(res, 503, missingBuildHtml(), "text/html; charset=utf-8");
@@ -49,11 +56,11 @@ function serveDistPath(routePath: string, immutable: boolean, res: ServerRespons
   createReadStream(file).pipe(res);
 }
 
-async function proxyDevDashboard(req: IncomingMessage, res: ServerResponse, origin: string) {
+async function proxyDevDashboard(req: IncomingMessage, res: ServerResponse, origin: string, overridePath?: string) {
   try {
     const incoming = parseIncoming(req.url);
     if (!incoming) return writeText(res, 400, "bad request");
-    const target = new URL(`${incoming.pathname}${incoming.search}`, origin);
+    const target = new URL(`${overridePath ?? incoming.pathname}${overridePath ? "" : incoming.search}`, origin);
     if (target.pathname === routePrefix) target.pathname = `${routePrefix}/`;
     const upstream = await fetch(target, { method: req.method });
     const headers: Record<string, string> = {};

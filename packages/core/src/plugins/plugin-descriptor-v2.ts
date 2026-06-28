@@ -1,7 +1,7 @@
 import type { PluginMiniSchema } from "./plugin-settings-schema.ts";
 import { validatePluginDescriptorV2 } from "./plugin-descriptor-v2-validate.ts";
 
-export const pluginDescriptorVersion = 2 as const;
+export { pluginDescriptorVersion } from "./plugin-descriptor-v2-constants.ts";
 
 export type PluginRisk = "green" | "yellow" | "orange" | "red";
 export type PluginCapability =

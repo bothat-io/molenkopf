@@ -3,7 +3,7 @@ import { AuditCursorError, type AuditStore } from "../../../core/src/manifest/au
 import type { EventBus } from "../../../core/src/events/event-bus.ts";
 import { summarizeAudit } from "../../../core/src/manifest/audit-summary.ts";
 import { loadPluginPage } from "./plugin-page-loader.ts";
-import { type RuntimeState } from "./runtime-state.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 import { buildPluginData } from "./plugin-data.ts";
 import { buildAgentStatus, buildConfig, buildConsumers, buildPluginStatus, buildProviderStatus, buildStats, buildStatus } from "./local-api-state.ts";
 import { auditView, auditViews } from "./audit-view.ts";

@@ -3,7 +3,8 @@ import type { EventBus, MolenkopfEvent } from "../../../core/src/events/event-bu
 import { builtinPluginModules } from "../../../core/src/plugins/builtin-plugin-modules.ts";
 import type { MolenkopfPluginModule, PluginActionContext, PluginDataContext, PluginJson, PluginLifecycleContext, PluginRuntimeContext } from "../../../core/src/plugins/plugin-api.ts";
 import type { RetrievalStore } from "../../../core/src/store/retrieval-store.ts";
-import { isPluginEnabled, type RuntimeState } from "./runtime-state.ts";
+import { isPluginEnabled } from "./runtime-plugin-policy.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 import { safePluginOutput } from "./plugin-output-safety.ts";
 
 type Modules = Record<string, MolenkopfPluginModule>;

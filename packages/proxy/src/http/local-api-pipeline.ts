@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { staticPluginPipeline } from "../../../core/src/plugins/static-pipeline.ts";
-import type { RuntimeState } from "./runtime-state.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 import { readJson, writeJson } from "./local-api-io.ts";
 import { persistRuntimeSettings } from "./runtime-settings.ts";
 

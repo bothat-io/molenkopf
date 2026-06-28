@@ -23,7 +23,8 @@ Routes, flags, and environment variables use Molenkopf names.
 
 `npm run prod` is a local production profile with durable local state. Override
 it with `MOLENKOPF_PROD_PORT`, `MOLENKOPF_PROD_HOST`, `MOLENKOPF_PROD_TARGET`,
-and `MOLENKOPF_PROD_DATA_DIR` when needed.
+`MOLENKOPF_PROD_DATA_DIR`, and `MOLENKOPF_PROD_ALLOW_PUBLIC_BIND=1` when
+needed.
 
 ## Docker Build
 
@@ -85,7 +86,8 @@ same SQLite volume.
 
 ## Security Gates
 
-- Non-loopback source binds require `--allow-public-bind`.
+- Non-loopback source binds require `--allow-public-bind`; profile-server starts
+  can opt in with `MOLENKOPF_<PROFILE>_ALLOW_PUBLIC_BIND=1`.
 - `MOLENKOPF_SESSION_SECRET` is required for every server start.
 - `/v1/...` proxy APIs require a valid Molenkopf API key.
 - `x-molenkopf-token` carries Molenkopf auth when a client must keep

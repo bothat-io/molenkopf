@@ -1,7 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { validateProviderTarget } from "../../../core/src/security/target-policy.ts";
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
-import { distributionEligible, providerWeight, repairActiveProvider, type RuntimeState } from "./runtime-state.ts";
+import { distributionEligible, providerWeight, repairActiveProvider } from "./runtime-state.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 import { buildProviderStatus } from "./local-api-state.ts";
 import { readJson, writeJson } from "./local-api-io.ts";
 import { persistRuntimeAuthProvider, persistRuntimeAuthSelection, removeRuntimeAuthProvider } from "./runtime-auth-registry.ts";

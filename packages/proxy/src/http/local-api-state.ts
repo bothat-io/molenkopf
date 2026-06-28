@@ -3,7 +3,8 @@ import { staticPluginPipeline } from "../../../core/src/plugins/static-pipeline.
 import { viewProviders } from "../../../core/src/providers/provider-catalog.ts";
 import { summarizeAudit } from "../../../core/src/manifest/audit-summary.ts";
 import { weightShares } from "../../../core/src/routing/distribution.ts";
-import { activeProvider, CONTROL_PLANE_LIMITS, distributionEligible, emptyUsage, providerWeight, type RuntimeState } from "./runtime-state.ts";
+import { activeProvider, distributionEligible, emptyUsage, providerWeight } from "./runtime-state.ts";
+import { CONTROL_PLANE_LIMITS, type RuntimeState } from "./runtime-types.ts";
 import { canManage, providerAllowed, type AuthUser } from "./auth-state.ts";
 import { listAgentDrafts } from "./agent-drafts.ts";
 import { orderIndex, redactionBeforeCompression } from "./local-api-pipeline.ts";

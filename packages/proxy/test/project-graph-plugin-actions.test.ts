@@ -16,6 +16,7 @@ test("project graph derives nodes from token audit metadata", async () => {
   const runtime = { pluginId: "project-graph-plugin", now: () => new Date("2026-06-28T00:00:00.000Z") };
   const data = await plugin.getData?.({
     canManage: true,
+    userId: "admin",
     teamIds: [],
     scope: "local-api",
     plugin: { id: "project-graph-plugin" },
@@ -30,7 +31,7 @@ test("project graph derives nodes from token audit metadata", async () => {
   assert.equal(((data?.graphSummaries as Array<{ stats: Record<string, number> }>)[0]).stats.requests, 2);
   assert.equal((data?.routes as unknown[]).length, 1);
 
-  const query = await handleProjectGraphAction({ actionId: "graph.query", input: { query: "openai", limit: 5 }, scope: "local-api", teamIds: [] }, runtime);
+  const query = await handleProjectGraphAction({ actionId: "graph.query", input: { query: "openai", limit: 5 }, userId: "admin", scope: "local-api", teamIds: [] }, runtime);
   assert.ok((query.results as unknown[]).length >= 1);
 });
 
@@ -38,6 +39,7 @@ test("project graph safety flags reject filesystem scanning", async () => {
   const runtime = { pluginId: "project-graph-plugin", now: () => new Date("2026-06-28T00:00:00.000Z") };
   const data = await plugin.getData?.({
     canManage: true,
+    userId: "admin",
     teamIds: [],
     scope: "local-api",
     plugin: { id: "project-graph-plugin" },
@@ -50,6 +52,10 @@ test("project graph safety flags reject filesystem scanning", async () => {
     derivesFromTokenMetadata: true,
     mcpExposure: "disabled"
   });
+  assert.equal(data?.latestDerivationStatus, "not_derived");
+  assert.deepEqual(data?.routes, []);
+  const query = await handleProjectGraphAction({ actionId: "graph.query", input: { query: "openai", limit: 5 }, userId: "admin", scope: "local-api", teamIds: [] }, runtime);
+  assert.deepEqual(query, { results: [], warnings: [{ code: "graph_not_derived" }] });
 });
 
 function manifest(input: { path: string; project: string; providerId: string; inputTokens: number; outputTokens: number }): AuditManifest {

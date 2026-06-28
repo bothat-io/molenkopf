@@ -1,6 +1,8 @@
 import { pluginCatalog } from "../../../core/src/plugins/plugin-catalog.ts";
 import { clientIdForAgent } from "./client-identity.ts";
-import { CONTROL_PLANE_LIMITS, emptyUsage, enabledPluginIds, type AgentDraftMetadata, type AgentDraftView, type RuntimeState, type RuntimeStateResult } from "./runtime-state.ts";
+import { emptyUsage } from "./runtime-state.ts";
+import { enabledPluginIds } from "./runtime-plugin-policy.ts";
+import { CONTROL_PLANE_LIMITS, type AgentDraftMetadata, type AgentDraftView, type RuntimeState, type RuntimeStateResult } from "./runtime-types.ts";
 
 export function listAgentDrafts(state: RuntimeState): AgentDraftView[] {
   return state.agentDrafts.slice(0, CONTROL_PLANE_LIMITS.agentDrafts).map((draft) => viewDraft(draft, state));

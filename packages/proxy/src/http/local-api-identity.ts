@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { hashPasswordAsync, passwordTooLong } from "../../../core/src/auth/password.ts";
 import { normalizeBudget } from "../../../core/src/identity/budget.ts";
 import { viewUser, type Budget, type KeyPermissions, type Role, type Team, type User } from "../../../core/src/identity/types.ts";
-import type { RuntimeState } from "./runtime-state.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 import { readJson, writeJson } from "./local-api-io.ts";
 import { isValidSlugId, isValidUserId } from "./identity-id.ts";
 import { isWeakPassword } from "./password-policy.ts";

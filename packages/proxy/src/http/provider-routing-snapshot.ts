@@ -1,5 +1,5 @@
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
-import type { RoutingMode, RuntimeState } from "./runtime-state.ts";
+import type { RoutingMode, RuntimeState } from "./runtime-types.ts";
 
 type Snapshot = {
   providers: ProviderConfig[];

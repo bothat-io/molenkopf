@@ -5,7 +5,7 @@ import { DEFAULT_CLI_PROVIDER_TIMEOUT_MS } from "../../../core/src/providers/pro
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
 import { defaultDataDir } from "../../../core/src/storage/local-paths.ts";
 import { ensurePrivateDir, writePrivateFile } from "../../../core/src/storage/private-state.ts";
-import type { RoutingMode } from "./runtime-state.ts";
+import type { RoutingMode } from "./runtime-types.ts";
 import { runtimeCliArgs } from "../runtime/runtime-profile.ts";
 
 type RuntimeAuthMeta = Pick<ProviderConfig, "id" | "name" | "runtime" | "runtimeProfile" | "allowDistribution"> & { authRef: string };

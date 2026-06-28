@@ -22,6 +22,7 @@ test("dashboard production dist serves known assets without SPA fallback", async
 
     const index = await fetch(`${base}/__molenkopf/dashboard/settings`);
     const favicon = await fetch(`${base}/__molenkopf/dashboard/favicon.png`);
+    const rootFavicon = await fetch(`${base}/favicon.ico?token=secret`);
     const logo = await fetch(`${base}/__molenkopf/dashboard/molenkopf-logo.png`);
     const js = await fetch(`${base}/__molenkopf/dashboard/assets/index-test.js`);
     const missing = await fetch(`${base}/__molenkopf/dashboard/missing.png`);
@@ -32,6 +33,8 @@ test("dashboard production dist serves known assets without SPA fallback", async
     assert.equal(await index.text(), "<!doctype html><div id=\"root\">dashboard</div>");
     assert.equal(favicon.headers.get("content-type"), "image/png");
     assert.deepEqual([...new Uint8Array(await favicon.arrayBuffer())], [0x89, 0x50, 0x4e, 0x47]);
+    assert.equal(rootFavicon.headers.get("content-type"), "image/png");
+    assert.deepEqual([...new Uint8Array(await rootFavicon.arrayBuffer())], [0x89, 0x50, 0x4e, 0x47]);
     assert.equal(await logo.text(), "logo-bytes");
     assert.equal(js.headers.get("content-type"), "text/javascript; charset=utf-8");
     assert.equal(missing.status, 404);
@@ -49,9 +52,9 @@ test("dashboard dev proxy rejects absolute-form targets before contacting dev or
   let devHits = 0;
   const dev = createServer((req, res) => {
     devHits += 1;
-    assert.equal(req.url, "/__molenkopf/dashboard/");
+    assert.ok(req.url === "/__molenkopf/dashboard/" || req.url === "/__molenkopf/dashboard/favicon.png");
     res.writeHead(200, { "content-type": "text/html" });
-    res.end("<div>dev dashboard</div>");
+    res.end(req.url?.endsWith("favicon.png") ? "icon" : "<div>dev dashboard</div>");
   });
   const previous = process.env.MOLENKOPF_DASHBOARD_DEV_ORIGIN;
   let proxy: Awaited<ReturnType<typeof startProxy>> | undefined;
@@ -62,11 +65,13 @@ test("dashboard dev proxy rejects absolute-form targets before contacting dev or
     proxy = await startProxy({ port: 0, target: "http://127.0.0.1:1/v1" });
     const base = `http://127.0.0.1:${proxy.port}`;
     const ok = await fetch(`${base}/__molenkopf/dashboard`);
+    const icon = await fetch(`${base}/favicon.ico?secret=hidden`);
     const blocked = await raw(proxy.port, "http://attacker.test/__molenkopf/dashboard");
 
     assert.equal(await ok.text(), "<div>dev dashboard</div>");
+    assert.equal(await icon.text(), "icon");
     assert.equal(blocked.status, 400);
-    assert.equal(devHits, 1);
+    assert.equal(devHits, 2);
   } finally {
     if (previous === undefined) delete process.env.MOLENKOPF_DASHBOARD_DEV_ORIGIN;
     else process.env.MOLENKOPF_DASHBOARD_DEV_ORIGIN = previous;

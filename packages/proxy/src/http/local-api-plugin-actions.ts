@@ -10,9 +10,9 @@ import { readJson, writeJson } from "./local-api-io.ts";
 import { persistRuntimeSettings } from "./runtime-settings.ts";
 import { canManage, type AuthUser } from "./auth-state.ts";
 import type { PluginHost } from "./plugin-host.ts";
-import type { RuntimeState } from "./runtime-state.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 import { safePluginOutput } from "./plugin-output-safety.ts";
-import { resolveEffectivePluginPolicy } from "./runtime-state.ts";
+import { resolveEffectivePluginPolicy } from "./runtime-plugin-policy.ts";
 
 export async function togglePlugin(req: IncomingMessage, res: ServerResponse, state: RuntimeState, pluginHost?: PluginHost) {
   const body = await readJson(req);

@@ -3,7 +3,7 @@ import { costEur } from "../../../core/src/identity/pricing.ts";
 import { budgetPeriodKey } from "../../../core/src/identity/budget.ts";
 import type { BudgetPeriod } from "../../../core/src/identity/types.ts";
 import { clientIdForAgent } from "./client-identity.ts";
-import type { RuntimeState, UsagePeriodTotals, UsageTotals } from "./runtime-state.ts";
+import type { RuntimeState, UsagePeriodTotals, UsageTotals } from "./runtime-types.ts";
 
 export function recordUsage(state: RuntimeState, manifest: AuditManifest): void {
   const cost = costEur(state.identity?.data.pricing?.[manifest.providerId ?? ""], manifest.upstreamInputTokens ?? 0, manifest.upstreamOutputTokens ?? 0);

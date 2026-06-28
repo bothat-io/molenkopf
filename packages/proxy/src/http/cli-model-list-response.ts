@@ -6,7 +6,7 @@ import { cliModelList } from "../runtime/cli-provider.ts";
 import type { ClientIdentity } from "./client-identity.ts";
 import { buildManifest, finishRequest } from "./request-finish.ts";
 import type { PluginHost } from "./plugin-host.ts";
-import type { RuntimeState } from "./runtime-state.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 
 export async function handleCliModelListResponse(input: {
   res: ServerResponse;

@@ -5,7 +5,7 @@ import type { ProviderConfig } from "../../../core/src/providers/provider-catalo
 import { validateProviderTarget } from "../../../core/src/security/target-policy.ts";
 import { defaultDataDir } from "../../../core/src/storage/local-paths.ts";
 import { ensurePrivateDir, writePrivateFile } from "../../../core/src/storage/private-state.ts";
-import { CONTROL_PLANE_LIMITS, type AgentDraftMetadata, type RoutingMode, type RuntimeState } from "./runtime-state.ts";
+import { CONTROL_PLANE_LIMITS, type AgentDraftMetadata, type RoutingMode, type RuntimeState } from "./runtime-types.ts";
 export type RuntimeSettings = {
   activeProviderId?: string;
   routingMode?: RoutingMode;
@@ -21,7 +21,6 @@ export type RuntimeSettingsLoad = { settings: RuntimeSettings; warning?: string 
 type PersistedProvider = Pick<ProviderConfig, "id" | "name" | "kind" | "target" | "credentialEnv" | "credentialRef" | "authScheme" | "protocol" | "enabled" | "allowDistribution" | "runtime" | "cliCommand" | "cliArgs" | "cliInputMode" | "cliTimeoutMs">;
 const BUILT_IN_IDS = new Set(["default", "openai-env", "anthropic-env", "ollama-local", "lmstudio-local"]);
 const FILE = "runtime-settings.json";
-
 export function loadRuntimeSettings(dataDir: string | undefined): RuntimeSettingsLoad {
   const file = settingsFile(dataDir);
   if (!existsSync(file)) return { settings: {} };

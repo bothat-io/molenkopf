@@ -48,6 +48,30 @@ test("per-user budget blocks once exceeded and shows live usage + savings", asyn
   }
 });
 
+test("visible email user consumer budgets block API key owners", async () => {
+  const upstream = createServer((req, res) => { req.resume(); req.on("end", () => { res.writeHead(200, { "content-type": "application/json" }); res.end(JSON.stringify({ usage: { input_tokens: 900, output_tokens: 200 } })); }); });
+  const port = await listenOn(upstream);
+  const dir = await mkdtemp(join(tmpdir(), "molenkopf-email-budget-"));
+  const proxy = await startProxy({ port: 0, target: `http://127.0.0.1:${port}/v1`, dataDir: dir });
+  const base = `http://127.0.0.1:${proxy.port}`;
+  try {
+    const admin = cookieOf(await post(base, "/__molenkopf/setup-admin", { username: "admin@example.test", password: "admin-secret" }));
+    const keyBody = await post(base, "/__molenkopf/keys", { owner: "admin@example.test", project: "email-budget", teamId: "everyone" }, admin).then((r) => r.json());
+    const first = await fetch(`${base}/v1/messages`, { method: "POST", headers: auth(keyBody.secret, { "content-type": "application/json" }), body: "{}" });
+    assert.equal(first.status, 200);
+    await first.text();
+    const id = "user:admin@example.test";
+    await pollJson(`${base}/__molenkopf/consumers`, (c) => (c.items.find((i: any) => i.id === id)?.usage.inputTokens ?? 0) >= 900, 60, admin);
+    await post(base, "/__molenkopf/consumers/budget", { id, limit: 1000 }, admin);
+    const second = await fetch(`${base}/v1/messages`, { method: "POST", headers: auth(keyBody.secret, { "content-type": "application/json" }), body: "{}" });
+    assert.equal(second.status, 429);
+  } finally {
+    await proxy.close();
+    upstream.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("provider can be updated and removed at runtime", async () => {
   const upstream = createServer((req, res) => { req.resume(); res.writeHead(200, {}); res.end("{}"); });
   const port = await listenOn(upstream);

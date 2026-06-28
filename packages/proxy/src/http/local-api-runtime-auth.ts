@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { viewRuntimeProfile, type ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
 import { defaultDataDir } from "../../../core/src/storage/local-paths.ts";
 import { ensurePrivateDir } from "../../../core/src/storage/private-state.ts";
-import type { RuntimeState } from "./runtime-state.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 import { buildProviderStatus } from "./local-api-state.ts";
 import { readJson, writeJson } from "./local-api-io.ts";
 import { persistRuntimeAuthProvider, runtimeAuthProvider, writeRuntimeAuthFiles } from "./runtime-auth-registry.ts";

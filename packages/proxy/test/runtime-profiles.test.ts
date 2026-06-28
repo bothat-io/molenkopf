@@ -39,3 +39,13 @@ test("runtime profile env overrides are scoped by profile", () => {
   assert.match(profile.dataDir, /custom-test$/);
   assert.equal(profile.target, "http://127.0.0.1:11434/v1");
 });
+
+test("runtime profiles pass public bind only with explicit env opt in", () => {
+  const closed = resolveProfile("prod", { MOLENKOPF_PROD_HOST: "0.0.0.0" });
+  const opened = resolveProfile("prod", { MOLENKOPF_PROD_HOST: "0.0.0.0", MOLENKOPF_PROD_ALLOW_PUBLIC_BIND: "1" });
+
+  assert.equal(closed.allowPublicBind, false);
+  assert.equal(opened.allowPublicBind, true);
+  assert.equal(proxyArgs(closed).includes("--allow-public-bind"), false);
+  assert.equal(proxyArgs(opened).includes("--allow-public-bind"), true);
+});

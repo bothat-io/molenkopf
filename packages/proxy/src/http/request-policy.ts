@@ -1,5 +1,5 @@
 import { agentIdFromHeaders, type ClientIdentity } from "./client-identity.ts";
-import type { RuntimeState } from "./runtime-state.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 
 export type EffectiveRequestPolicy = {
   agentId?: string;
@@ -8,6 +8,7 @@ export type EffectiveRequestPolicy = {
 };
 
 export type ModelPolicyResult = { ok: true } | { ok: false; status: number; error: string };
+export type DefaultModelResult = { ok: true; body: string } | { ok: false; status: number; error: string };
 
 export function effectiveRequestPolicy(state: RuntimeState, headers: Headers, client: ClientIdentity): EffectiveRequestPolicy {
   const agentId = agentIdFromHeaders(headers);
@@ -28,6 +29,19 @@ export function enforceModelPolicy(policy: EffectiveRequestPolicy, body: string)
   if (model === undefined) return { ok: true };
   if (!policy.allowedModels.includes(model)) return { ok: false, status: 403, error: "model_forbidden" };
   return { ok: true };
+}
+
+export function applyDefaultModel(policy: EffectiveRequestPolicy, body: string): DefaultModelResult {
+  if (!policy.defaultModel) return { ok: true, body };
+  try {
+    const parsed = JSON.parse(body) as { model?: unknown };
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return { ok: true, body };
+    if (typeof parsed.model === "string" && parsed.model.trim()) return { ok: true, body };
+    parsed.model = policy.defaultModel;
+    return { ok: true, body: JSON.stringify(parsed) };
+  } catch {
+    return { ok: false, status: 400, error: "invalid_json" };
+  }
 }
 
 function modelFromBody(body: string): string | undefined | false {

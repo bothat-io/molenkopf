@@ -1,14 +1,14 @@
 import type { AuditStore, AuditManifest } from "../../../core/src/manifest/audit-store.ts";
 import { findPlugin } from "../../../core/src/plugins/plugin-catalog.ts";
 import { pluginView } from "./local-api-state.ts";
-import { type RuntimeState } from "./runtime-state.ts";
+import type { RuntimeState } from "./runtime-types.ts";
 import { auditViews } from "./audit-view.ts";
 import { auditFilterForUser } from "./local-api-scope.ts";
 import { canManage, type AuthUser } from "./auth-state.ts";
 import { auditPath } from "./request-path.ts";
 import type { PluginHost } from "./plugin-host.ts";
 import { safePluginOutput } from "./plugin-output-safety.ts";
-import { resolveEffectivePluginPolicy } from "./runtime-state.ts";
+import { resolveEffectivePluginPolicy } from "./runtime-plugin-policy.ts";
 
 type PluginDataResult = { status: number; payload: unknown };
 
@@ -35,7 +35,7 @@ export async function buildPluginData(id: string, audit: AuditStore, state: Runt
 
 async function scopedManifests(audit: AuditStore, state: RuntimeState, user?: AuthUser): Promise<AuditManifest[]> {
   const page = await audit.listPage({ limit: 200, newestFirst: true, filter: auditFilterForUser(state, user) });
-  return auditViews(page.items).filter(isAgentTraffic);
+  return auditViews(page.items).filter(isAgentTraffic).reverse();
 }
 
 function isAgentTraffic(manifest: AuditManifest): boolean {
