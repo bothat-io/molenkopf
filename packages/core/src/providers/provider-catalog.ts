@@ -2,6 +2,8 @@ import { validateProviderTarget } from "../security/target-policy.ts";
 
 export type ProviderKind = "api" | "local" | "cli";
 
+export const DEFAULT_CLI_PROVIDER_TIMEOUT_MS = 600000;
+
 export type RuntimeProfileConfig = {
   settingsRef?: string;
   configRef?: string;

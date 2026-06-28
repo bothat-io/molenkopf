@@ -18,7 +18,7 @@ import { withBudgetWarnings } from "./budget-warnings.ts";
 import { IdentityStore } from "../../../core/src/identity/identity-store.ts";
 import { UsageSnapshotStore } from "../../../core/src/identity/usage-snapshot.ts";
 import { isCliProvider, isModelListPath, runCliProvider } from "../runtime/cli-provider.ts";
-import { canStreamOpenAiCli, streamOpenAiCliProvider } from "./cli-stream-response.ts";
+import { canStreamCli, streamCliProvider } from "./cli-stream-response.ts";
 import { forwardStream } from "./streaming-proxy.ts";
 import { createResponseUsageScanner } from "./encoded-usage-meter.ts";
 import { auditPath } from "./request-path.ts";
@@ -153,22 +153,34 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
       await handleCliModelListResponse({ res, auditStore, events, state, pluginHost, requestPluginIds, requestId, method: req.method ?? "GET", path, target, provider, started, client });
       return;
     }
-    if (canStreamOpenAiCli(path, body)) {
-      const cli = await streamOpenAiCliProvider(provider, body, requestId, res);
+    if (canStreamCli(path, body)) {
+      const cli = await streamCliProvider(provider, body, requestId, path, res);
       const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, cli.status, Date.now() - started, client, audit, cli.usage);
       await finishRequest(manifest, auditStore, events, state, pluginHost, requestPluginIds);
       return;
     }
+    const abort = new AbortController();
+    let cliDone = false;
+    const abortCli = () => { if (!cliDone) abort.abort(); };
+    req.once("aborted", abortCli);
+    res.once("close", abortCli);
     try {
-      const cli = await runCliProvider(provider, body, requestId, path);
+      const cli = await runCliProvider(provider, body, requestId, path, { signal: abort.signal });
+      cliDone = true;
       const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, cli.status, Date.now() - started, client, audit, cli.usage);
       await finishRequest(manifest, auditStore, events, state, pluginHost, requestPluginIds);
       res.writeHead(cli.status, cli.headers);
       return res.end(cli.body);
     } catch (error) {
+      cliDone = true;
       const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, 502, Date.now() - started, client, audit);
       await finishRequest(manifest, auditStore, events, state, pluginHost, requestPluginIds);
+      if (res.destroyed) return;
       return writeJson(res, 502, { error: "proxy_error", requestId });
+    } finally {
+      cliDone = true;
+      req.off("aborted", abortCli);
+      res.off("close", abortCli);
     }
   }
   events.emit("request_forwarded", { requestId, data: { path } });

@@ -10,6 +10,8 @@ export type CliProviderResult = {
   usage?: { inputTokens?: number; outputTokens?: number };
 };
 
+export type CliProviderOptions = { signal?: AbortSignal };
+
 export function isCliProvider(provider: ProviderConfig): boolean {
   return provider.kind === "cli" && (provider.runtime === "claude" || provider.runtime === "codex");
 }
@@ -31,10 +33,10 @@ export function cliModelList(provider: ProviderConfig): CliProviderResult {
   };
 }
 
-export async function runCliProvider(provider: ProviderConfig, body: string, requestId: string, path = "/v1/responses"): Promise<CliProviderResult> {
+export async function runCliProvider(provider: ProviderConfig, body: string, requestId: string, path = "/v1/responses", options: CliProviderOptions = {}): Promise<CliProviderResult> {
   const request = cliRequest(body, provider);
   const prompt = request.prompt;
-  const output = await executeCliProvider(provider, prompt, request.runModel);
+  const output = await executeCliProvider(provider, prompt, request.runModel, { signal: options.signal });
   const usage = { inputTokens: estimateTokens(prompt), outputTokens: estimateTokens(output) };
   const model = request.responseModel;
   if (isAnthropicMessages(path) && wantsStream(body)) {

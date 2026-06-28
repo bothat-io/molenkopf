@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
+import { DEFAULT_CLI_PROVIDER_TIMEOUT_MS } from "../../../core/src/providers/provider-catalog.ts";
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
 import { defaultDataDir } from "../../../core/src/storage/local-paths.ts";
 import { ensurePrivateDir, writePrivateFile } from "../../../core/src/storage/private-state.ts";
@@ -13,7 +14,7 @@ type RuntimeAuthState = { activeProviderId?: string; routingMode?: RoutingMode }
 const ID_RE = /^[a-z0-9][a-z0-9._:-]{0,63}$/i;
 const META_FILE = "provider.json";
 const STATE_FILE = "state.json";
-export const DEFAULT_RUNTIME_AUTH_CLI_TIMEOUT_MS = 600000;
+export const DEFAULT_RUNTIME_AUTH_CLI_TIMEOUT_MS = DEFAULT_CLI_PROVIDER_TIMEOUT_MS;
 
 export function restoreRuntimeAuthProviders(dataDir: string | undefined): { providers: ProviderConfig[]; activeProviderId?: string; routingMode?: RoutingMode } {
   const root = runtimeAuthRoot(dataDir);

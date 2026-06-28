@@ -22,7 +22,8 @@ test("Codex CLI providers receive the imported auth directory as CODEX_HOME", as
       "process.stdin.on('data', (chunk) => input += chunk);",
       "process.stdin.on('end', () => {",
       "  const auth = JSON.parse(fs.readFileSync(path.join(process.env.CODEX_HOME, 'auth.json'), 'utf8'));",
-      "  process.stdout.write('fake codex ' + auth.account + ': ' + input.trim());",
+      "  const isolated = process.cwd() === path.join(process.env.CODEX_HOME, 'workspace');",
+      "  process.stdout.write('fake codex ' + auth.account + ' isolated=' + isolated + ': ' + input.trim());",
       "});"
     ].join("\n"));
     proxy = await startProxy({
@@ -43,7 +44,52 @@ test("Codex CLI providers receive the imported auth directory as CODEX_HOME", as
     });
     assert.equal(response.status, 200);
     const responseJson = await response.json() as { output_text: string };
-    assert.equal(responseJson.output_text, "fake codex work: hello imported session");
+    assert.equal(responseJson.output_text, "fake codex work isolated=true: hello imported session");
+  } finally {
+    if (proxy) await proxy.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("Claude CLI providers receive imported auth and run in an isolated workspace", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "molenkopf-claude-auth-"));
+  let proxy: Awaited<ReturnType<typeof startProxy>> | undefined;
+  try {
+    const authDir = join(dir, "runtime-auth", "claude-work");
+    await mkdir(authDir, { recursive: true });
+    await writeFile(join(authDir, ".credentials.json"), JSON.stringify({ account: "work" }));
+    const script = join(dir, "fake-claude.cjs");
+    await writeFile(script, [
+      "const fs = require('fs');",
+      "const path = require('path');",
+      "process.stdin.setEncoding('utf8');",
+      "let input = '';",
+      "process.stdin.on('data', (chunk) => input += chunk);",
+      "process.stdin.on('end', () => {",
+      "  const auth = JSON.parse(fs.readFileSync(path.join(process.env.CLAUDE_CONFIG_DIR, '.credentials.json'), 'utf8'));",
+      "  const isolated = process.cwd() === path.join(process.env.CLAUDE_CONFIG_DIR, 'workspace');",
+      "  process.stdout.write('fake claude ' + auth.account + ' isolated=' + isolated + ': ' + input.trim());",
+      "});"
+    ].join("\n"));
+    proxy = await startProxy({
+      port: 0,
+      target: "cli://claude-work",
+      providers: [{ id: "claude-work", name: "Claude Work", kind: "cli", target: "cli://claude-work", runtime: "claude", cliCommand: process.execPath, cliArgs: [script], cliInputMode: "stdin", runtimeAuthDir: authDir }],
+      activeProviderId: "claude-work",
+      providerCatalogMode: "explicit",
+      dataDir: dir
+    });
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const key = await setupKey(base, "claude-auth");
+
+    const response = await fetch(`${base}/v1/responses`, {
+      method: "POST",
+      headers: auth(key, { "content-type": "application/json" }),
+      body: JSON.stringify({ input: "hello imported session" })
+    });
+    assert.equal(response.status, 200);
+    const responseJson = await response.json() as { output_text: string };
+    assert.equal(responseJson.output_text, "fake claude work isolated=true: hello imported session");
   } finally {
     if (proxy) await proxy.close();
     await rm(dir, { recursive: true, force: true });
