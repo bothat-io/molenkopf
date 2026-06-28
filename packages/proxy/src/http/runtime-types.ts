@@ -77,6 +77,7 @@ export type RuntimeState = {
   usageByAgent: Record<string, UsageTotals>;
   usageByKey: Record<string, UsageTotals>;
   usageByTeam: Record<string, UsageTotals>;
+  usageSnapshotCursor?: string;
   consumerBudgets: Record<string, number>;
   configAgents: ResolvedAgent[];
   agentDrafts: AgentDraftMetadata[];

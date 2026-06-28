@@ -49,7 +49,7 @@ const requiredTest = [
 const requiredDockerSmoke = [
   /run\(\["build", "--pull"/,
   /--env-file/,
-  /MOLENKOPF_SESSION_SECRET=test-only-session-secret-please-change-123456/,
+  /MOLENKOPF_SESSION_SECRET=test-8f6e1a9d0c2b4f739ab15c6d8e029471/,
   /assertFailsWithoutSecret/,
   /__molenkopf\/health/,
   /__molenkopf\/dashboard/,

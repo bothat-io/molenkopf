@@ -135,6 +135,9 @@ test("selected provider with missing credential fails locally", async () => {
     assert.equal(response.status, 502);
     assert.deepEqual(await response.json(), { error: "missing_provider_credential" });
     assert.equal(upstreamHits, 0);
+    const latest = await fetch(`${base}/__molenkopf/requests/latest`, { headers: { cookie: admin } }).then((r) => r.json());
+    assert.equal(latest.statusCode, 502);
+    assert.equal(latest.providerId, "team-openai");
   } finally {
     if (proxy) await proxy.close();
     await rm(dir, { recursive: true, force: true });

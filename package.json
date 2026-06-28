@@ -1,6 +1,6 @@
 {
   "name": "@bothat-io/molenkopf",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Local gateway for API and CLI based coding agents with routing, redaction, compression, memory, audit, and dashboard controls.",
   "author": "Molenkopf contributors",
   "license": "MIT",
@@ -40,6 +40,7 @@
     "packages/dashboard/dist/",
     "packages/dashboard/public/molenkopf-logo.png",
     "packages/dashboard/public/favicon.png",
+    "packages/dashboard/public/favicon.ico",
     "docs/DEPLOYMENT.md",
     "docs/PLUGIN_DEVELOPMENT.md",
     "docs/PLUGIN_POLICY.md",

@@ -43,6 +43,8 @@ export function isIdentityUser(value: unknown): value is User {
   return isObject(user) && isUserId(user.id) && typeof user.displayName === "string" && ["admin", "manager", "member"].includes(user.role)
     && stringArray(user.teamIds) && typeof user.createdAt === "string" && (user.password === undefined || isPassword(user.password))
     && (user.loginDisabled === undefined || typeof user.loginDisabled === "boolean") && (user.budget === undefined || isBudget(user.budget))
+    && (user.disabled === undefined || typeof user.disabled === "boolean") && (user.keyPermissions === undefined || isKeyPermissions(user.keyPermissions))
+    && (user.createdBy === undefined || isUserId(user.createdBy))
     && (user.sessionVersion === undefined || (Number.isSafeInteger(user.sessionVersion) && user.sessionVersion >= 0));
 }
 
@@ -54,8 +56,10 @@ export function isIdentityTeam(value: unknown): value is Team {
 
 export function isIdentityApiKey(value: unknown): value is ApiKey {
   const key = value as ApiKey;
-  return isObject(key) && isSlugId(key.id) && typeof key.hash === "string" && typeof key.prefix === "string" && isUserId(key.ownerUserId)
+  return isObject(key) && isSlugId(key.id) && isSha256(key.hash) && isKeyPrefix(key.prefix) && isUserId(key.ownerUserId)
     && typeof key.createdAt === "string" && (key.teamId === undefined || isSlugId(key.teamId)) && (key.scopes === undefined || stringArray(key.scopes))
+    && (key.agentLabel === undefined || textField(key.agentLabel, 64)) && (key.project === undefined || textField(key.project, 80))
+    && (key.lastUsedAt === undefined || validDateString(key.lastUsedAt)) && (key.disabled === undefined || typeof key.disabled === "boolean")
     && (key.budget === undefined || isBudget(key.budget));
 }
 
@@ -71,6 +75,12 @@ function isPriceTable(value: unknown): value is PriceTable {
 function isPassword(value: unknown): boolean {
   const password = value as { salt?: unknown; hash?: unknown };
   return isObject(password) && typeof password.salt === "string" && typeof password.hash === "string";
+}
+
+function isKeyPermissions(value: unknown): boolean {
+  if (!isObject(value)) return false;
+  const allowed = new Set(["create", "revoke"]);
+  return Object.entries(value).every(([key, item]) => allowed.has(key) && typeof item === "boolean");
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -95,6 +105,22 @@ function isSlugId(value: unknown): value is string {
 
 function stringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function isSha256(value: unknown): value is string {
+  return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+}
+
+function isKeyPrefix(value: unknown): value is string {
+  return typeof value === "string" && /^mk_[a-z0-9_-]{1,5}$/i.test(value);
+}
+
+function textField(value: unknown, max: number): value is string {
+  return typeof value === "string" && value.length <= max && !/[\u0000-\u001f]/.test(value);
+}
+
+function validDateString(value: unknown): value is string {
+  return typeof value === "string" && Number.isFinite(Date.parse(value));
 }
 
 function nonNegativeNumber(value: unknown): value is number {

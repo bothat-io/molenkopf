@@ -5,6 +5,7 @@ import type { ProviderConfig } from "../../../core/src/providers/provider-catalo
 import { validateProviderTarget } from "../../../core/src/security/target-policy.ts";
 import { defaultDataDir } from "../../../core/src/storage/local-paths.ts";
 import { ensurePrivateDir, writePrivateFile } from "../../../core/src/storage/private-state.ts";
+import { isLocalProviderCredentialRef } from "./provider-credential-store.ts";
 import { CONTROL_PLANE_LIMITS, type AgentDraftMetadata, type RoutingMode, type RuntimeState } from "./runtime-types.ts";
 export type RuntimeSettings = {
   activeProviderId?: string;
@@ -54,12 +55,10 @@ export async function persistRuntimeSettings(state: RuntimeState): Promise<void>
   await rename(tmp, file);
 }
 
-function settingsFile(dataDir: string | undefined): string {
-  return join(dataDir ?? defaultDataDir(), FILE);
-}
+function settingsFile(dataDir: string | undefined): string { return join(dataDir ?? defaultDataDir(), FILE); }
 
 function persistableProvider(provider: ProviderConfig): boolean {
-  return !BUILT_IN_IDS.has(provider.id) && !provider.runtimeAuthDir && !provider.credentialValue;
+  return !BUILT_IN_IDS.has(provider.id) && !provider.runtimeAuthDir && (!provider.credentialValue || isLocalProviderCredentialRef(provider.credentialRef, provider.id));
 }
 
 function persistedProvider(provider: ProviderConfig): PersistedProvider {
@@ -122,9 +121,10 @@ function cleanProvider(value: unknown): PersistedProvider | undefined {
   if (!id || !kind || item.credentialValue !== undefined || item.credential !== undefined) return undefined;
   if (kind === "cli") return cleanCliProvider(id, item);
   try { validateProviderTarget(target, { path: "runtime provider target", allowPrivate: kind === "local" }); } catch { return undefined; }
-  const credentialEnv = cleanEnv(item.credentialEnv);
-  const credentialRef = credentialEnv ? `env:${credentialEnv}` : "none";
-  return cleanBaseProvider(id, item, kind, target, { credentialEnv, credentialRef, authScheme: cleanAuth(item.authScheme, target, credentialEnv), protocol: cleanProtocol(item.protocol) });
+  const localCredentialRef = isLocalProviderCredentialRef(item.credentialRef, id) ? item.credentialRef : undefined;
+  const credentialEnv = localCredentialRef ? undefined : cleanEnv(item.credentialEnv);
+  const credentialRef = localCredentialRef ?? (credentialEnv ? `env:${credentialEnv}` : "none");
+  return cleanBaseProvider(id, item, kind, target, { credentialEnv, credentialRef, authScheme: cleanAuth(item.authScheme, target, Boolean(credentialEnv || localCredentialRef)), protocol: cleanProtocol(item.protocol) });
 }
 
 function cleanCliProvider(id: string, item: Record<string, unknown>): PersistedProvider | undefined {
@@ -168,19 +168,15 @@ function cleanIdArray(value: unknown): string[] | undefined {
   return out.length ? [...new Set(out)] : undefined;
 }
 
-function cleanEnv(value: unknown): string | undefined {
-  return typeof value === "string" && /^[A-Z_][A-Z0-9_]*$/i.test(value) ? value : undefined;
-}
+function cleanEnv(value: unknown): string | undefined { return typeof value === "string" && /^[A-Z_][A-Z0-9_]*$/i.test(value) ? value : undefined; }
 
-function cleanAuth(value: unknown, target: string, credentialEnv?: string): ProviderConfig["authScheme"] {
+function cleanAuth(value: unknown, target: string, credentialConfigured?: boolean): ProviderConfig["authScheme"] {
   if (value === "bearer" || value === "x-api-key" || value === "none") return value;
-  if (!credentialEnv) return "none";
+  if (!credentialConfigured) return "none";
   return target.includes("anthropic") ? "x-api-key" : "bearer";
 }
 
-function cleanProtocol(value: unknown): ProviderConfig["protocol"] | undefined {
-  return value === "openai-responses" || value === "anthropic-messages" || value === "openai-chat" || value === "ollama-tags" ? value : undefined;
-}
+function cleanProtocol(value: unknown): ProviderConfig["protocol"] | undefined { return value === "openai-responses" || value === "anthropic-messages" || value === "openai-chat" || value === "ollama-tags" ? value : undefined; }
 
 function isDraft(value: unknown): value is AgentDraftMetadata {
   if (!value || typeof value !== "object") return false;
@@ -194,6 +190,4 @@ function persistedDraft(draft: AgentDraftMetadata): AgentDraftMetadata {
   return copy;
 }
 
-function idOk(value: unknown): value is string {
-  return typeof value === "string" && /^[a-z0-9][a-z0-9._:-]{0,63}$/i.test(value);
-}
+function idOk(value: unknown): value is string { return typeof value === "string" && /^[a-z0-9][a-z0-9._:-]{0,63}$/i.test(value); }

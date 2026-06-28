@@ -15,9 +15,14 @@ export function recordUsage(state: RuntimeState, manifest: AuditManifest): void 
     else if (client.source === "user") accumulate(state.usageByUser, client.id, manifest, cost, at);
     for (const id of agentUsageKeys(client)) accumulate(state.usageByAgent, id, manifest, cost, at);
     if (client.keyId) accumulate(state.usageByKey, client.keyId, manifest, cost, at);
-    for (const teamId of client.teamIds ?? []) accumulate(state.usageByTeam, teamId, manifest, cost, at);
+  for (const teamId of client.teamIds ?? []) accumulate(state.usageByTeam, teamId, manifest, cost, at);
   }
+  state.usageSnapshotCursor = auditCursor(manifest);
   state.usageSnapshot?.schedule(state);
+}
+
+export function auditCursor(manifest: AuditManifest): string {
+  return `${manifest.timestamp}\u0000${manifest.requestId}`;
 }
 
 export function userUsageKey(userId: string): string {

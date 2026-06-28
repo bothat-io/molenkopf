@@ -16,7 +16,7 @@ let server: Awaited<ReturnType<typeof createServer>> | undefined;
 
 try {
   dataDir = await mkdtemp(join(tmpdir(), "molenkopf-dashboard-e2e-"));
-  process.env.MOLENKOPF_SESSION_SECRET ??= "test-only-session-secret-please-change-123456";
+  process.env.MOLENKOPF_SESSION_SECRET ??= "test-8f6e1a9d0c2b4f739ab15c6d8e029471";
   proxy = await startProxy({ port: 0, target: "http://127.0.0.1:9/v1", dataDir });
   process.env.MOLENKOPF_DASHBOARD_API_ORIGIN = `http://${host}:${proxy.port}`;
   server = await createServer({

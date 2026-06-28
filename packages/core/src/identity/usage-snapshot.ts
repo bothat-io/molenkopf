@@ -11,9 +11,11 @@ export type UsageMaps = {
   usageByProvider: Record<string, unknown>;
   usageByKey: Record<string, unknown>;
   usageByTeam: Record<string, unknown>;
+  usageSnapshotCursor?: string;
 };
 
 const FIELDS: (keyof UsageMaps)[] = ["usageByAgent", "usageByUser", "usageByProvider", "usageByKey", "usageByTeam"];
+const META_ID = "__meta";
 
 export class UsageSnapshotError extends Error {
   constructor(message: string) {
@@ -46,12 +48,15 @@ export class UsageSnapshotStore {
     if (!rows.length) return undefined;
     const out: Partial<UsageMaps> = {};
     for (const row of rows) {
-      if ((FIELDS as string[]).includes(row.id)) {
-        try {
+      try {
+        if ((FIELDS as string[]).includes(row.id)) {
           (out as Record<string, unknown>)[row.id] = JSON.parse(row.json);
-        } catch {
-          throw new UsageSnapshotError(`invalid usage snapshot row: ${row.id}`);
+        } else if (row.id === META_ID) {
+          const meta = JSON.parse(row.json) as { auditCursor?: unknown };
+          if (typeof meta.auditCursor === "string") out.usageSnapshotCursor = meta.auditCursor;
         }
+      } catch {
+        throw new UsageSnapshotError(`invalid usage snapshot row: ${row.id}`);
       }
     }
     return out;
@@ -64,6 +69,7 @@ export class UsageSnapshotStore {
     try {
       const stmt = db.prepare("INSERT INTO usage(scope, id, json) VALUES('live', ?, ?) ON CONFLICT(scope, id) DO UPDATE SET json = excluded.json");
       for (const field of FIELDS) stmt.run(field, JSON.stringify(maps[field] ?? {}));
+      stmt.run(META_ID, JSON.stringify({ auditCursor: maps.usageSnapshotCursor }));
       db.exec("COMMIT");
     } catch (error) {
       db.exec("ROLLBACK");

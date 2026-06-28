@@ -32,14 +32,56 @@ test("source completeness reports a missing Dockerfile without throwing", async 
   }
 });
 
+test("source completeness checks JS and TS relative import forms", async () => {
+  const root = await fixtureRoot(["bin/"]);
+  try {
+    await mkdir(join(root, "packages", "core", "src", "lib"), { recursive: true });
+    await writeFile(join(root, "packages", "core", "src", "lib", "index.ts"), "export const ok = true;\n");
+    await writeFile(join(root, "scripts", "tool.js"), [
+      importText("const a = require('", "../packages/core/src/lib", "');"),
+      importText("import('", "../packages/core/src/lib/index.ts", "');"),
+      importText("export { ok } from '", "../packages/core/src/lib/index.ts", "';")
+    ].join("\n"));
+    await writeFile(join(root, "bin", "runner.js"), importText("import '", "../scripts/tool.js", "';\n"));
+
+    assert.deepEqual(sourceCompletenessFailures(root), []);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("source completeness rejects missing and wrong-case relative imports", async () => {
+  const root = await fixtureRoot(["bin/"]);
+  try {
+    await mkdir(join(root, "packages", "core", "src"), { recursive: true });
+    await writeFile(join(root, "packages", "core", "src", "Thing.ts"), "export const ok = true;\n");
+    await writeFile(join(root, "scripts", "bad.js"), [
+      importText("import '", "../packages/core/src/thing.ts", "';"),
+      importText("require('", "./missing.js", "');")
+    ].join("\n"));
+
+    const failures = sourceCompletenessFailures(root);
+    assert.ok(failures.includes("scripts/bad.js: missing relative import ../packages/core/src/thing.ts"));
+    assert.ok(failures.includes("scripts/bad.js: missing relative import ./missing.js"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 async function fixtureRoot(files, options = { dockerfile: true }) {
   const root = await mkdtemp(join(tmpdir(), "molenkopf-source-check-"));
   if (options.dockerfile) await writeFile(join(root, "Dockerfile"), "");
   await mkdir(join(root, "bin"), { recursive: true });
+  await mkdir(join(root, "scripts"), { recursive: true });
   await writeFile(join(root, "bin", "molenkopf.js"), "");
   await mkdir(join(root, "packages", "dashboard", "public"), { recursive: true });
   await writeFile(join(root, "packages", "dashboard", "public", "molenkopf-logo.png"), "");
   await writeFile(join(root, "packages", "dashboard", "public", "favicon.png"), "");
+  await writeFile(join(root, "packages", "dashboard", "public", "favicon.ico"), "");
   await writeFile(join(root, "package.json"), JSON.stringify({ bin: { molenkopf: "bin/molenkopf.js" }, files }));
   return root;
+}
+
+function importText(before, specifier, after) {
+  return `${before}${specifier}${after}`;
 }

@@ -27,7 +27,7 @@ export async function handleDashboardRequest(req: IncomingMessage, res: ServerRe
   }
   if (!path) return writeText(res, 400, "bad request");
   if (path.startsWith(`${routePrefix}/assets/`)) return serveDistPath(path.slice(routePrefix.length + 1), true, res);
-  if (path === `${routePrefix}/favicon.png` || path === `${routePrefix}/molenkopf-logo.png`) return serveDistPath(path.slice(routePrefix.length + 1), true, res);
+  if (path === `${routePrefix}/favicon.ico` || path === `${routePrefix}/favicon.png` || path === `${routePrefix}/molenkopf-logo.png`) return serveDistPath(path.slice(routePrefix.length + 1), true, res);
   if (hasExtension(path)) return writeText(res, 404, "not found");
   return serveIndex(res);
 }
@@ -35,8 +35,8 @@ export async function handleDashboardRequest(req: IncomingMessage, res: ServerRe
 export async function handleDashboardFaviconRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (req.method !== "GET" && req.method !== "HEAD") { writeText(res, 405, "method not allowed"); return; }
   const devOrigin = process.env.MOLENKOPF_DASHBOARD_DEV_ORIGIN;
-  if (devOrigin) { await proxyDevDashboard(req, res, devOrigin, `${routePrefix}/favicon.png`); return; }
-  serveDistPath("favicon.png", true, res);
+  if (devOrigin) { await proxyDevDashboard(req, res, devOrigin, `${routePrefix}/favicon.ico`); return; }
+  serveDistPath("favicon.ico", true, res);
 }
 
 async function serveIndex(res: ServerResponse) {

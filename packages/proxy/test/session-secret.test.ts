@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { requireSessionSecret } from "../src/http/session-secret.ts";
 import { startProxy } from "../src/http/server.ts";
 
-const VALID = "test-only-session-secret-please-change-123456";
+const VALID = "test-8f6e1a9d0c2b4f739ab15c6d8e029471";
 const INVALID = [
   undefined,
   "",
@@ -17,7 +17,11 @@ const INVALID = [
   "change-me",
   "secret",
   "password",
-  "short-secret"
+  "short-secret",
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+  "00000000000000000000000000000000",
+  "abcabcabcabcabcabcabcabcabcabcabcabc",
+  "test-only-session-secret-please-change-123456"
 ];
 
 test("session secret is required and rejects placeholders", () => {

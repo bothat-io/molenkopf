@@ -23,8 +23,9 @@ Product intent and non-negotiable plugin semantics live in
 
 ## Quickstart
 
-1. Install with Node.js 24 or newer, create a session secret, and start the
-   local proxy:
+### npm package
+
+Requires Node.js 24 or newer.
 
 ```bash
 npm install -g @bothat-io/molenkopf
@@ -32,52 +33,22 @@ node -e "require('node:fs').writeFileSync('.env','MOLENKOPF_SESSION_SECRET='+req
 molenkopf proxy
 ```
 
-2. Open `http://127.0.0.1:8787/`, create the first admin user, configure a
-   provider or imported runtime, and create a Molenkopf API key.
-
-3. Point an OpenAI-compatible client at Molenkopf:
-
-```text
-Base URL: http://127.0.0.1:8787/v1
-Authorization: Bearer mk_...
-```
-
-4. Or connect a local CLI runtime:
-
-```powershell
-$env:ANTHROPIC_BASE_URL = 'http://127.0.0.1:8787'
-$env:ANTHROPIC_API_KEY = '<molenkopf-api-key>'
-claude
-```
-
-Connect Codex CLI through the OpenAI-compatible endpoint:
-
-```powershell
-$env:OPENAI_BASE_URL = 'http://127.0.0.1:8787/v1'
-$env:OPENAI_API_KEY = '<molenkopf-api-key>'
-codex
-```
-
-If a client must also send its upstream provider credential in `Authorization`,
-send the Molenkopf key as `x-molenkopf-token: mk_...`; Molenkopf strips local
-headers before forwarding upstream.
-
-5. Docker on the host:
+### Docker
 
 ```bash
-cp .env.example .env
-# Edit .env and set a unique MOLENKOPF_SESSION_SECRET.
+node -e "require('node:fs').writeFileSync('.env','MOLENKOPF_SESSION_SECRET='+require('node:crypto').randomBytes(32).toString('hex')+'\n')"
 docker run --rm --env-file .env -p 127.0.0.1:8787:8787 -v molenkopf-data:/data ghcr.io/bothat-io/molenkopf:latest
 ```
 
-6. Source checkout for local development:
+### Source checkout
 
 ```bash
 npm run bootstrap
-cp .env.example .env
-# Edit .env and set a unique MOLENKOPF_SESSION_SECRET.
+node -e "require('node:fs').writeFileSync('.env','MOLENKOPF_SESSION_SECRET='+require('node:crypto').randomBytes(32).toString('hex')+'\n')"
 npm run dev
 ```
+
+Open `http://127.0.0.1:8787/` after startup.
 
 Use `docs/DEPLOYMENT.md` when you need a different port or non-loopback access.
 

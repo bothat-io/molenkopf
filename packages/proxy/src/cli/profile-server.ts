@@ -97,6 +97,7 @@ function runWatched(profile: Profile) {
     child.on("exit", (code, signal) => {
       if (restarting) { restarting = false; startChild(); return; }
       closeWatchers(watchers);
+      dashboard?.kill();
       process.exit(code ?? (signal ? 1 : 0));
     });
   };

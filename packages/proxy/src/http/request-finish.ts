@@ -20,6 +20,28 @@ export async function finishRequest(manifest: AuditManifest, auditStore: AuditSt
   events.emit("request_finished", { requestId: manifest.requestId, data: { statusCode: manifest.statusCode, durationMs: manifest.durationMs } });
 }
 
+export async function finishProxyRequest(input: {
+  auditStore: AuditStore;
+  events: EventBus;
+  state: RuntimeState;
+  pluginHost?: PluginHost;
+  pluginIds?: readonly string[];
+  requestId: string;
+  method: string;
+  path: string;
+  target: string;
+  providerId: string;
+  started: number;
+  client: ClientIdentity;
+  statusCode: number;
+  audit?: RewriteAudit;
+  usage?: UsageTotals;
+  requestModel?: RequestModelMetadata;
+}): Promise<void> {
+  const manifest = buildManifest(input.requestId, input.method, input.path, input.target, input.providerId, input.statusCode, Date.now() - input.started, input.client, input.audit, input.usage, input.requestModel);
+  await finishRequest(manifest, input.auditStore, input.events, input.state, input.pluginHost, input.pluginIds);
+}
+
 export function buildManifest(requestId: string, method: string, path: string, target: string, providerId: string, statusCode: number, durationMs: number, client: ClientIdentity, audit?: RewriteAudit, usage?: UsageTotals, requestModel?: RequestModelMetadata): AuditManifest {
   return {
     requestId, timestamp: new Date().toISOString(), method, path, targetHost: new URL(target).host, providerId,

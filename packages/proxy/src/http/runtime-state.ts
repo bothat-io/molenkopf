@@ -5,6 +5,7 @@ import { createCommunicationGraph } from "./communication-graph.ts";
 import { createMemoryGraph } from "../../../core/src/memory/memory-graph.ts";
 import { restoreRuntimeAuthProviders } from "./runtime-auth-registry.ts";
 import { loadRuntimeSettings } from "./runtime-settings.ts";
+import { attachLocalProviderCredentials } from "./provider-credential-store.ts";
 import { requireSessionSecret } from "./session-secret.ts";
 import { buildRuntimePluginPolicyState, resolveRequestPluginIds as resolvePolicyPluginIds } from "./runtime-plugin-policy.ts";
 import { CONTROL_PLANE_LIMITS, type RuntimeOptions, type RuntimeState, type RoutingMode, type UsageTotals } from "./runtime-types.ts";
@@ -21,6 +22,7 @@ export function createRuntimeState(options: RuntimeOptions, host: string): Runti
   const settings = loadedSettings.settings;
   const persistedProviders = explicit ? [] : settings.providers ?? [];
   const providers = buildProviderCatalog(options.target, [...(options.providers ?? []), ...persistedProviders, ...restored.providers], process.env, { includeBuiltIns: !explicit, includeEnvProviders: !explicit });
+  attachLocalProviderCredentials(options.dataDir, providers);
   const weights = Object.fromEntries(providers.map((provider) => [provider.id, 1]));
   const requestedActive = options.activeProviderId ?? settings.activeProviderId ?? restored.activeProviderId ?? (explicit ? providers[0]?.id : "default") ?? "default";
   const builtPolicy = buildRuntimePluginPolicyState(settings.pluginPolicy);

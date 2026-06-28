@@ -14,7 +14,7 @@ const hostPort = smokeHostPort();
 const baseUrl = `http://${host}:${hostPort}`;
 const hostProbe = dockerHost().startsWith("ssh://") ? "docker-host" : "local-host";
 
-writeFileSync(envFile, "MOLENKOPF_SESSION_SECRET=test-only-session-secret-please-change-123456\n");
+writeFileSync(envFile, "MOLENKOPF_SESSION_SECRET=test-8f6e1a9d0c2b4f739ab15c6d8e029471\n");
 
 try {
   if (!skipBuild) run(["build", "--pull", "-t", image, "."]);
