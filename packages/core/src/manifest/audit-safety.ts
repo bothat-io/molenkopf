@@ -24,6 +24,7 @@ export function normalizedManifest(manifest: AuditManifest): AuditManifest {
   const upstreamOutputTokens = finiteOptional(manifest.upstreamOutputTokens);
 
   if (manifest.providerId) safe.providerId = redactedToken(manifest.providerId, "provider");
+  if (manifest.requestedModel) safe.requestedModel = redactedToken(manifest.requestedModel, "model");
   if (manifest.client) safe.client = safeClient(manifest.client);
   if (statusCode !== undefined) safe.statusCode = statusCode;
   if (durationMs !== undefined) safe.durationMs = durationMs;

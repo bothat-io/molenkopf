@@ -1,4 +1,5 @@
-export type UsageTotals = { requests?: number; inputTokens?: number; outputTokens?: number; costEur?: number };
+export type ModelUsageTotals = { requests?: number; inputTokens?: number; outputTokens?: number; costEur?: number };
+export type UsageTotals = { requests?: number; inputTokens?: number; outputTokens?: number; costEur?: number; models?: Record<string, ModelUsageTotals> };
 export type KeyPermissions = { create?: boolean; revoke?: boolean };
 export type UserView = { id: string; displayName?: string; role: "admin" | "manager" | "member"; teamIds?: string[]; keyPermissions?: KeyPermissions; canManage?: boolean; usage?: UsageTotals; budget?: Budget; disabled?: boolean; loginDisabled?: boolean; hasPassword?: boolean };
 export type TeamView = { id: string; name: string; members?: number; budget?: Budget; usage?: UsageTotals; allowedProviders?: "*" | string[]; managerIds?: string[] };

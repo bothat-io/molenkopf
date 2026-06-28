@@ -38,11 +38,16 @@ test("records real upstream token usage from the provider response", async () =>
   try {
     const admin = await setupAdmin(base);
     const key = await issueKey(base, admin, "usage");
-    const res = await fetch(`${base}/v1/messages`, { method: "POST", headers: auth(key, { "content-type": "application/json" }), body: "{}" });
+    const res = await fetch(`${base}/v1/messages`, { method: "POST", headers: auth(key, { "content-type": "application/json" }), body: JSON.stringify({ model: "gpt-live-test" }) });
     await res.text();
     const latest = await pollJson(`${base}/__molenkopf/requests/latest`, (m) => m.upstreamInputTokens === 1234, 50, admin);
     assert.equal(latest.upstreamInputTokens, 1234);
     assert.equal(latest.upstreamOutputTokens, 567);
+    assert.equal(latest.requestedModel, "gpt-live-test");
+    const usage = await fetch(`${base}/__molenkopf/usage`, { headers: { cookie: admin } }).then((r) => r.json());
+    const user = usage.users.find((item: any) => item.id === "admin");
+    assert.equal(user.usage.models["gpt-live-test"].inputTokens, 1234);
+    assert.equal(user.usage.models["gpt-live-test"].outputTokens, 567);
   } finally {
     await proxy.close();
     upstream.close();

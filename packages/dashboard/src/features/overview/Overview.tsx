@@ -24,6 +24,7 @@ export function OverviewTab({ usage, currentUser, keys, config, selectedSecret, 
       <UsageGauge usage={summary} budget={user?.budget?.tokenLimit} />
       <TokenBars usage={summary} />
     </div>
+    <ModelUsage usage={summary} />
     <OverviewDetails usage={usage} currentUser={user} />
     <SelfServiceKeys keys={ownKeys} currentUser={user} config={config} selectedSecret={selectedSecret} onNewKey={onNewKey} onRevoke={onRevoke} />
   </>;
@@ -48,8 +49,33 @@ function Bar({ label, value, max }: { label: string; value: number; max: number 
   return <div className="bar-row"><span>{label}</span><div className="meter"><span style={{ width: `${Math.max(2, Math.round((value / max) * 100))}%` }} /></div><b>{num(value)}</b></div>;
 }
 
+function ModelUsage({ usage }: { usage: UsageTotals }) {
+  const items = topModels(usage);
+  if (!items.length) return null;
+  return <DashboardSection title="Models used"><div className="status-panel model-list">
+    {items.map((item) => <div className="model-row" key={item.id}>
+      <span>{item.id}</span>
+      <b>{num(tokensOf(item.usage))} tokens</b>
+      <small>{num(item.usage.requests)} requests</small>
+    </div>)}
+  </div></DashboardSection>;
+}
+
+function topModels(usage: UsageTotals): { id: string; usage: UsageTotals }[] {
+  return Object.entries(usage.models || {})
+    .map(([id, modelUsage]) => ({ id, usage: modelUsage }))
+    .sort((a, b) => tokensOf(b.usage) - tokensOf(a.usage) || Number(b.usage.requests || 0) - Number(a.usage.requests || 0) || a.id.localeCompare(b.id))
+    .slice(0, 5);
+}
+
 function sumUsage(items: (UsageTotals | undefined)[]): UsageTotals {
-  return items.reduce<UsageTotals>((sum, item) => ({ requests: (sum.requests || 0) + (item?.requests || 0), inputTokens: (sum.inputTokens || 0) + (item?.inputTokens || 0), outputTokens: (sum.outputTokens || 0) + (item?.outputTokens || 0), costEur: (sum.costEur || 0) + (item?.costEur || 0) }), {});
+  return items.reduce<UsageTotals>((sum, item) => mergeUsage(sum, item), {});
+}
+
+function mergeUsage(sum: UsageTotals, item: UsageTotals | undefined): UsageTotals {
+  const merged = { requests: (sum.requests || 0) + (item?.requests || 0), inputTokens: (sum.inputTokens || 0) + (item?.inputTokens || 0), outputTokens: (sum.outputTokens || 0) + (item?.outputTokens || 0), costEur: (sum.costEur || 0) + (item?.costEur || 0), models: { ...(sum.models || {}) } };
+  for (const [id, model] of Object.entries(item?.models || {})) merged.models[id] = mergeUsage(merged.models[id], model);
+  return merged;
 }
 
 function teamList(ids: string[] | undefined, teams: TeamView[]): string {

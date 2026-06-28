@@ -88,7 +88,18 @@ function addUsage(usage: UsagePeriodTotals, manifest: AuditManifest, cost: numbe
   usage.inputTokens += manifest.upstreamInputTokens ?? 0;
   usage.outputTokens += manifest.upstreamOutputTokens ?? 0;
   usage.costEur = (usage.costEur ?? 0) + cost;
+  if (manifest.requestedModel) addModelUsage(usage, manifest.requestedModel, manifest, cost);
   return usage;
+}
+
+function addModelUsage(usage: UsagePeriodTotals, model: string, manifest: AuditManifest, cost: number): void {
+  usage.models ??= {};
+  const current = usage.models[model] ?? { requests: 0, inputTokens: 0, outputTokens: 0, costEur: 0 };
+  current.requests++;
+  current.inputTokens += manifest.upstreamInputTokens ?? 0;
+  current.outputTokens += manifest.upstreamOutputTokens ?? 0;
+  current.costEur = (current.costEur ?? 0) + cost;
+  usage.models[model] = current;
 }
 
 function tokensOf(usage: UsageTotals | undefined): number {

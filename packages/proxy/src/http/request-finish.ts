@@ -18,9 +18,10 @@ export async function finishRequest(manifest: AuditManifest, auditStore: AuditSt
   events.emit("request_finished", { requestId: manifest.requestId, data: { statusCode: manifest.statusCode, durationMs: manifest.durationMs } });
 }
 
-export function buildManifest(requestId: string, method: string, path: string, target: string, providerId: string, statusCode: number, durationMs: number, client: ClientIdentity, audit?: RewriteAudit, usage?: UsageTotals): AuditManifest {
+export function buildManifest(requestId: string, method: string, path: string, target: string, providerId: string, statusCode: number, durationMs: number, client: ClientIdentity, audit?: RewriteAudit, usage?: UsageTotals, requestedModel?: string): AuditManifest {
   return {
     requestId, timestamp: new Date().toISOString(), method, path, targetHost: new URL(target).host, providerId,
+    requestedModel,
     client,
     compressedItems: audit?.compressedItems ?? 0,
     estimatedOriginalTokens: audit?.estimatedOriginalTokens ?? 0,
