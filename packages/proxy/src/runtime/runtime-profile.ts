@@ -66,6 +66,8 @@ function profileFields(body: Body, runtime: Runtime): RuntimeProfileConfig | und
     allowedTools: list(source.allowedTools),
     disallowedTools: list(source.disallowedTools),
     addDirs: safeAddDirs(list(source.addDirs)),
+    model: runtime === "codex" ? text(field(source, "model")).slice(0, 96) || undefined : undefined,
+    modelReasoningEffort: runtime === "codex" ? text(field(source, "modelReasoningEffort", "model_reasoning_effort", "reasoningEffort", "reasoning_effort")).slice(0, 32) || undefined : undefined,
     sandbox: runtime === "codex" ? enumValue(field(source, "sandbox", "sandboxMode", "sandbox_mode"), CODEX_SANDBOX, "invalid_sandbox") : undefined,
     approval: runtime === "codex" ? enumValue(field(source, "approval", "approvalPolicy", "approval_policy"), CODEX_APPROVAL, "invalid_approval") : undefined
   };

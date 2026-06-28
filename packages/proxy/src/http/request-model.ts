@@ -30,7 +30,16 @@ function providerModel(provider: ProviderConfig | undefined): string | undefined
 function requestedReasoning(parsed: Record<string, unknown>): string | undefined {
   const reasoning = objectValue(parsed.reasoning);
   const thinking = objectValue(parsed.thinking);
-  return cleanToken(reasoning?.effort ?? parsed.reasoning_effort ?? thinking?.type ?? parsed.thinking, 32);
+  return cleanToken(
+    reasoning?.effort
+      ?? parsed.reasoning_effort
+      ?? parsed.model_reasoning_effort
+      ?? thinking?.effort
+      ?? thinking?.type
+      ?? thinking?.budget_tokens
+      ?? parsed.thinking,
+    32
+  );
 }
 
 function objectValue(value: unknown): Record<string, unknown> | undefined {

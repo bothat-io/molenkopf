@@ -1,19 +1,19 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState } from "react";
 import { DashboardSection } from "../../components/layout/DashboardSection";
 import { num, shortDate, tokensOf } from "../../app/format";
 import { OverviewDetails } from "./OverviewDetails";
 import { SelfServiceKeys } from "../keys/SelfServiceKeys";
-import { BudgetMeter } from "./widgets";
 import { UsageSummary } from "../../components/usage/UsageSummary";
 import type { UsageVariant } from "../../components/usage/UsageVariantFilter";
-import type { ApiKeyView, ConfigView, ModelUsageTotals, TeamView, UsageTotals, UsageView, UserView } from "../../app/types";
+import type { ApiKeyView, ConfigView, ModelUsageTotals, ProviderView, TeamView, UsageTotals, UsageView, UserView } from "../../app/types";
 import "./Overview.css";
 
-export function OverviewTab({ usage, currentUser, keys, config, selectedSecret, onNewKey, onRevoke }: { usage: UsageView; currentUser?: UserView; keys: ApiKeyView[]; config: ConfigView; selectedSecret: string; onNewKey: () => void; onRevoke: (id: string) => void }) {
+export function OverviewTab({ usage, currentUser, keys, config, providers = [], selectedSecret, onNewKey, onRevoke }: { usage: UsageView; currentUser?: UserView; keys: ApiKeyView[]; config: ConfigView; providers?: ProviderView[]; selectedSecret: string; onNewKey: () => void; onRevoke: (id: string) => void }) {
   const user = currentUser ? { ...currentUser, ...usage.users?.find((item) => item.id === currentUser.id) } : usage.users?.[0];
   const userTeams = teamList(user?.teamIds, usage.teams || []);
   const allSummary = user?.usage || sumUsage(keys.filter((key) => key.ownerUserId === user?.id).map((key) => key.usage));
-  const variants = useMemo(() => usageVariants(allSummary), [allSummary]);
+  const profileThinking = activeProfileThinking(providers);
+  const variants = useMemo(() => usageVariants(allSummary, profileThinking), [allSummary, profileThinking]);
   const [activeVariantId, setActiveVariantId] = useState("all");
   const activeVariant = variants.find((variant) => variant.id === activeVariantId);
   const summary = activeVariant?.usage || allSummary;
@@ -31,44 +31,23 @@ export function OverviewTab({ usage, currentUser, keys, config, selectedSecret, 
         variants={variants}
         activeVariantId={activeVariantId}
         onVariantChange={setActiveVariantId}
+        budget={user?.budget}
       />
     </DashboardSection>
-    <div className="overview-panels">
-      <UsageGauge usage={summary} budget={user?.budget?.tokenLimit} />
-      <TokenBars usage={summary} />
-    </div>
     <OverviewDetails usage={usage} currentUser={user} />
     <SelfServiceKeys keys={ownKeys} currentUser={user} config={config} selectedSecret={selectedSecret} onNewKey={onNewKey} onRevoke={onRevoke} />
   </>;
 }
 
-function UsageGauge({ usage, budget }: { usage: UsageTotals; budget?: number }) {
-  const used = tokensOf(usage);
-  const pct = budget ? Math.min(100, Math.round((used / budget) * 100)) : 0;
-  return <DashboardSection title={budget ? "Budget gauge" : "Usage gauge"}><div className="status-panel"><div className="gauge-row"><div className="gauge" style={{ "--pct": `${pct}%` } as CSSProperties}><b>{budget ? `${pct}%` : "usage"}</b></div><div><div className="n">{num(used)}</div><div className="t">tokens used</div><BudgetMeter used={used} limit={budget} period="total" /></div></div></div></DashboardSection>;
-}
-
-function TokenBars({ usage }: { usage: UsageTotals }) {
-  const input = Number(usage.inputTokens || 0), output = Number(usage.outputTokens || 0);
-  const max = Math.max(input, output, 1);
-  return <DashboardSection title="Token mix"><div className="status-panel"><div className="bar-list">
-    <Bar label="Input" value={input} max={max} />
-    <Bar label="Output" value={output} max={max} />
-  </div></div></DashboardSection>;
-}
-
-function Bar({ label, value, max }: { label: string; value: number; max: number }) {
-  return <div className="bar-row"><span>{label}</span><div className="meter"><span style={{ width: `${Math.max(2, Math.round((value / max) * 100))}%` }} /></div><b>{num(value)}</b></div>;
-}
-
-function usageVariants(usage: UsageTotals): UsageVariant[] {
+function usageVariants(usage: UsageTotals, profileThinking?: string): UsageVariant[] {
   return Object.entries(usage.models || {})
-    .flatMap(([model, modelUsage]) => modelVariants(model, modelUsage))
+    .flatMap(([model, modelUsage]) => modelVariants(model, modelUsage, profileThinking))
     .sort((a, b) => tokensOf(b.usage) - tokensOf(a.usage) || a.label.localeCompare(b.label));
 }
 
-function modelVariants(model: string, usage: ModelUsageTotals): UsageVariant[] {
-  const reasoning = Object.entries(usage.reasoning || {}).map(([effort, effortUsage]) => ({
+function modelVariants(model: string, usage: ModelUsageTotals, profileThinking?: string): UsageVariant[] {
+  const reasoningSource = usage.reasoning && Object.keys(usage.reasoning).length ? usage.reasoning : fallbackReasoning(profileThinking, usage);
+  const reasoning = Object.entries(reasoningSource || {}).map(([effort, effortUsage]) => ({
     id: `model:${model}:reasoning:${effort}`,
     label: model,
     detail: effort,
@@ -76,6 +55,16 @@ function modelVariants(model: string, usage: ModelUsageTotals): UsageVariant[] {
     usage: effortUsage
   }));
   return [{ id: `model:${model}`, label: model, model, usage }, ...reasoning];
+}
+
+function fallbackReasoning(profileThinking: string | undefined, usage: ModelUsageTotals): Record<string, ModelUsageTotals> | undefined {
+  return profileThinking ? { [profileThinking]: usage } : undefined;
+}
+
+function activeProfileThinking(providers: ProviderView[]): string | undefined {
+  const active = providers.find((provider) => provider.active) || providers[0];
+  const value = active?.runtimeProfile?.diagnostics?.modelReasoningEffort;
+  return typeof value === "string" && value ? value : undefined;
 }
 
 function sumUsage(items: (UsageTotals | undefined)[]): UsageTotals {

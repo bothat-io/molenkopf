@@ -190,7 +190,7 @@ export function DashboardApp() {
   if (!user) return <LoginView onDone={(next) => { setUser(next); openOverview(); reload(); }} />;
   return <Shell user={user} canManage={canManage} activeTab={tab} connection={connectionStatus(refresh)} onTab={setTab} onLogout={logout}>
     {message ? <DashboardNotice tone={noticeTone(message)} onDismiss={() => setMessage("")}>{message}</DashboardNotice> : null}
-    {tab === "overview" ? <OverviewTab usage={data.usage} currentUser={user} keys={data.keys.items || []} config={data.config} selectedSecret={selectedSecret} onNewKey={() => setModal({ kind: "key" })} onRevoke={(id) => { if (confirmDestructive("revoke-key", id)) mutate("/__molenkopf/keys/revoke", { id }); }} /> : null}
+    {tab === "overview" ? <OverviewTab usage={data.usage} currentUser={user} keys={data.keys.items || []} config={data.config} providers={providers} selectedSecret={selectedSecret} onNewKey={() => setModal({ kind: "key" })} onRevoke={(id) => { if (confirmDestructive("revoke-key", id)) mutate("/__molenkopf/keys/revoke", { id }); }} /> : null}
     {tab === "admin" && canManage ? <AdminTab {...adminProps} /> : null}
     <Dialogs modal={modal} close={() => setModal({ kind: null })} reload={reload} providers={providers} users={data.identity?.users || data.usage.users || []} teams={data.identity?.teams || data.usage.teams || []} apiKeys={data.keys.items || data.usage.keys || []} currentUser={user} onKeyCreated={setSelectedSecret} onAddProvider={(body) => mutate("/__molenkopf/providers/add", body, "", { rethrow: true })} onImportAuth={(body) => mutate("/__molenkopf/providers/import-auth", body, "Runtime account imported", { rethrow: true })} onRuntimeTest={testRuntimeProvider} />
   </Shell>;
