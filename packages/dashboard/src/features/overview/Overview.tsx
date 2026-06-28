@@ -13,18 +13,19 @@ export function OverviewTab({ usage, currentUser, keys, config, selectedSecret, 
   const userTeams = teamList(user?.teamIds, usage.teams || []);
   const summary = user?.usage || sumUsage(keys.filter((key) => key.ownerUserId === user?.id).map((key) => key.usage));
   const ownKeys = keys.filter((key) => key.ownerUserId === user?.id);
+  const models = topModels(summary);
   const keyCount = ownKeys.filter((key) => !key.disabled).length;
   const lastUsed = latestKeyUse(ownKeys);
   return <>
     <DashboardSection title="Quick status">
       <div className="overview-hero"><div><h2>{displayUser(user)}</h2><p>{userTeams || "No team assigned"} - {config.bindHost || "127.0.0.1"}:{config.port || 8787}</p></div><div className="scope-tags"><span className="pill">{keyCount} active keys</span><span className="pill off">last used {lastUsed}</span></div></div>
     </DashboardSection>
-    <DashboardSection title="Usage summary"><MetricStrip items={[{ label: "Requests", value: summary.requests || 0 }, { label: "Tokens", value: tokensOf(summary) }, { label: "Cost", value: eur(summary.costEur) }, { label: "Teams", value: user?.teamIds?.length || 0 }]} /></DashboardSection>
+    <DashboardSection title="Usage summary"><MetricStrip items={[{ label: "Requests", value: summary.requests || 0 }, { label: "Tokens", value: tokensOf(summary) }, { label: "Cost", value: eur(summary.costEur) }, { label: "Teams", value: user?.teamIds?.length || 0 }, { label: "Top model", value: models[0]?.id || "none" }]} /></DashboardSection>
     <div className="overview-panels">
       <UsageGauge usage={summary} budget={user?.budget?.tokenLimit} />
       <TokenBars usage={summary} />
+      <ModelUsage items={models} />
     </div>
-    <ModelUsage usage={summary} />
     <OverviewDetails usage={usage} currentUser={user} />
     <SelfServiceKeys keys={ownKeys} currentUser={user} config={config} selectedSecret={selectedSecret} onNewKey={onNewKey} onRevoke={onRevoke} />
   </>;
@@ -49,8 +50,7 @@ function Bar({ label, value, max }: { label: string; value: number; max: number 
   return <div className="bar-row"><span>{label}</span><div className="meter"><span style={{ width: `${Math.max(2, Math.round((value / max) * 100))}%` }} /></div><b>{num(value)}</b></div>;
 }
 
-function ModelUsage({ usage }: { usage: UsageTotals }) {
-  const items = topModels(usage);
+function ModelUsage({ items }: { items: { id: string; usage: UsageTotals }[] }) {
   if (!items.length) return null;
   return <DashboardSection title="Models used"><div className="status-panel model-list">
     {items.map((item) => <div className="model-row" key={item.id}>
