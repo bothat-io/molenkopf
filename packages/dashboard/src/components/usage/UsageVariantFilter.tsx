@@ -1,4 +1,3 @@
-import { num, tokensOf } from "../../app/format";
 import type { UsageTotals } from "../../app/types";
 
 export type UsageVariant = {
@@ -13,23 +12,24 @@ export function UsageVariantFilter({ variants, activeId, onChange }: { variants:
   if (!variants.length) return null;
   const grouped = groupVariants(variants);
   return <div className="usage-filter" aria-label="Usage filter">
-    <button type="button" className={activeId === "all" ? "active" : ""} onClick={() => onChange("all")}>
-      <span>All</span>
-    </button>
+    <TextChoice label="All" active={activeId === "all"} onClick={() => onChange("all")} />
     {grouped.map((group) => <div className="usage-filter-group" key={group.model}>
-      <VariantButton variant={group.modelVariant} activeId={activeId} onChange={onChange} />
-      {group.children.length ? <div className="usage-filter-children">
-        {group.children.map((variant) => <VariantButton key={variant.id} variant={variant} activeId={activeId} onChange={onChange} compact />)}
-      </div> : null}
+      <TextChoice label={group.modelVariant.label} active={activeId === group.modelVariant.id} onClick={() => onChange(group.modelVariant.id)} />
+      {group.children.length ? <span className="usage-filter-children" aria-label={`${group.model} variants`}>
+        [
+        {group.children.map((variant, index) => <span className="usage-filter-child" key={variant.id}>
+          {index ? <span className="usage-filter-separator"> / </span> : null}
+          <TextChoice label={variant.detail || variant.label} active={activeId === variant.id} onClick={() => onChange(variant.id)} title={`${variant.model} ${variant.detail}`} />
+        </span>)}
+        ]
+      </span> : null}
     </div>)}
   </div>;
 }
 
-function VariantButton({ variant, activeId, onChange, compact }: { variant: UsageVariant; activeId: string; onChange: (id: string) => void; compact?: boolean }) {
-  return <button type="button" className={[activeId === variant.id ? "active" : "", compact ? "compact" : ""].filter(Boolean).join(" ")} onClick={() => onChange(variant.id)} title={variant.detail || variant.label}>
-    <span>{variant.detail || variant.label}</span>
-    {!compact && variant.detail ? <small>{variant.detail}</small> : null}
-    {!compact ? <b>{num(tokensOf(variant.usage))}</b> : null}
+function TextChoice({ label, active, onClick, title }: { label: string; active: boolean; onClick: () => void; title?: string }) {
+  return <button type="button" className={active ? "active" : ""} onClick={onClick} title={title || label}>
+    {label}
   </button>;
 }
 

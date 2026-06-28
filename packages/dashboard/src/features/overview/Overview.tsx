@@ -18,7 +18,6 @@ export function OverviewTab({ usage, currentUser, keys, config, selectedSecret, 
   const activeVariant = variants.find((variant) => variant.id === activeVariantId);
   const summary = activeVariant?.usage || allSummary;
   const ownKeys = keys.filter((key) => key.ownerUserId === user?.id);
-  const models = topModels(allSummary);
   const keyCount = ownKeys.filter((key) => !key.disabled).length;
   const lastUsed = latestKeyUse(ownKeys);
   return <>
@@ -32,7 +31,6 @@ export function OverviewTab({ usage, currentUser, keys, config, selectedSecret, 
     <div className="overview-panels">
       <UsageGauge usage={summary} budget={user?.budget?.tokenLimit} />
       <TokenBars usage={summary} />
-      <ModelUsage items={models} />
     </div>
     <OverviewDetails usage={usage} currentUser={user} />
     <SelfServiceKeys keys={ownKeys} currentUser={user} config={config} selectedSecret={selectedSecret} onNewKey={onNewKey} onRevoke={onRevoke} />
@@ -56,24 +54,6 @@ function TokenBars({ usage }: { usage: UsageTotals }) {
 
 function Bar({ label, value, max }: { label: string; value: number; max: number }) {
   return <div className="bar-row"><span>{label}</span><div className="meter"><span style={{ width: `${Math.max(2, Math.round((value / max) * 100))}%` }} /></div><b>{num(value)}</b></div>;
-}
-
-function ModelUsage({ items }: { items: { id: string; usage: ModelUsageTotals }[] }) {
-  if (!items.length) return null;
-  return <DashboardSection title="Models used"><div className="status-panel model-list">
-    {items.map((item) => <div className="model-row" key={item.id}>
-      <span>{item.id}</span>
-      <b>{num(tokensOf(item.usage))} tokens</b>
-      <small>{num(item.usage.requests)} requests</small>
-    </div>)}
-  </div></DashboardSection>;
-}
-
-function topModels(usage: UsageTotals): { id: string; usage: ModelUsageTotals }[] {
-  return Object.entries(usage.models || {})
-    .map(([id, modelUsage]) => ({ id, usage: modelUsage }))
-    .sort((a, b) => tokensOf(b.usage) - tokensOf(a.usage) || Number(b.usage.requests || 0) - Number(a.usage.requests || 0) || a.id.localeCompare(b.id))
-    .slice(0, 5);
 }
 
 function usageVariants(usage: UsageTotals): UsageVariant[] {

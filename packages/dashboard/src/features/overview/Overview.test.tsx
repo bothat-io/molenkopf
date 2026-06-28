@@ -19,7 +19,7 @@ describe("OverviewTab", () => {
     expect(html).toContain("unlimited");
     expect(html).not.toContain("no budget");
     expect(html).toContain("Token mix");
-    expect(html).toContain("Models used");
+    expect(html).not.toContain("Models used");
     expect(html).toContain("gpt-live-test");
     expect(html).toContain("xhigh");
     expect(html).not.toContain("Saved");
