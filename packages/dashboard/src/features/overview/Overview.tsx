@@ -1,7 +1,6 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { DashboardSection } from "../../components/layout/DashboardSection";
 import { eur, num, shortDate, tokensOf } from "../../app/format";
-import { MetricStrip } from "../../components/layout/MetricStrip";
 import { OverviewDetails } from "./OverviewDetails";
 import { SelfServiceKeys } from "../keys/SelfServiceKeys";
 import { BudgetMeter } from "./widgets";
@@ -25,8 +24,13 @@ export function OverviewTab({ usage, currentUser, keys, config, selectedSecret, 
       <div className="overview-hero"><div><h2>{displayUser(user)}</h2><p>{userTeams || "No team assigned"} - {config.bindHost || "127.0.0.1"}:{config.port || 8787}</p></div><div className="scope-tags"><span className="pill">{keyCount} active keys</span><span className="pill off">last used {lastUsed}</span></div></div>
     </DashboardSection>
     <DashboardSection title="Usage summary">
-      <UsageVariantFilter variants={variants} activeId={activeVariantId} onChange={setActiveVariantId} />
-      <MetricStrip items={[{ label: "Requests", value: summary.requests || 0 }, { label: "Tokens", value: tokensOf(summary) }, { label: "Cost", value: eur(summary.costEur) }, { label: "Teams", value: user?.teamIds?.length || 0 }, { label: "Scope", value: activeVariant?.label || "All" }]} />
+      <UsageSummaryCard
+        summary={summary}
+        teamCount={user?.teamIds?.length || 0}
+        variants={variants}
+        activeVariantId={activeVariantId}
+        onVariantChange={setActiveVariantId}
+      />
     </DashboardSection>
     <div className="overview-panels">
       <UsageGauge usage={summary} budget={user?.budget?.tokenLimit} />
@@ -35,6 +39,22 @@ export function OverviewTab({ usage, currentUser, keys, config, selectedSecret, 
     <OverviewDetails usage={usage} currentUser={user} />
     <SelfServiceKeys keys={ownKeys} currentUser={user} config={config} selectedSecret={selectedSecret} onNewKey={onNewKey} onRevoke={onRevoke} />
   </>;
+}
+
+function UsageSummaryCard({ summary, teamCount, variants, activeVariantId, onVariantChange }: { summary: UsageTotals; teamCount: number; variants: UsageVariant[]; activeVariantId: string; onVariantChange: (id: string) => void }) {
+  return <div className="usage-summary-card">
+    <UsageVariantFilter variants={variants} activeId={activeVariantId} onChange={onVariantChange} />
+    <div className="usage-summary-grid">
+      <SummaryMetric label="Requests" value={num(summary.requests || 0)} />
+      <SummaryMetric label="Tokens" value={num(tokensOf(summary))} />
+      <SummaryMetric label="Cost" value={eur(summary.costEur)} />
+      <SummaryMetric label="Teams" value={num(teamCount)} />
+    </div>
+  </div>;
+}
+
+function SummaryMetric({ label, value }: { label: string; value: string }) {
+  return <div className="usage-summary-metric"><div>{value}</div><span>{label}</span></div>;
 }
 
 function UsageGauge({ usage, budget }: { usage: UsageTotals; budget?: number }) {

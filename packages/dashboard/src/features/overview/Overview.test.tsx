@@ -21,7 +21,7 @@ describe("OverviewTab", () => {
     expect(html).toContain("Token mix");
     expect(html).not.toContain("Models used");
     expect(html).toContain("gpt-live-test");
-    expect(html).toContain("xhigh");
+    expect(html).toContain("thinking: xhigh");
     expect(html).not.toContain("Saved");
     expect(html).toContain("My teams");
     expect(html).toContain("Team members");

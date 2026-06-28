@@ -9,9 +9,9 @@ export type UsageVariant = {
 };
 
 export function UsageVariantFilter({ variants, activeId, onChange }: { variants: UsageVariant[]; activeId: string; onChange: (id: string) => void }) {
-  if (!variants.length) return null;
   const grouped = groupVariants(variants);
   return <div className="usage-filter" aria-label="Usage filter">
+    <span className="usage-filter-label">Filter</span>
     <TextChoice label="All" active={activeId === "all"} onClick={() => onChange("all")} />
     {grouped.map((group) => <div className="usage-filter-group" key={group.model}>
       <TextChoice label={group.modelVariant.label} active={activeId === group.modelVariant.id} onClick={() => onChange(group.modelVariant.id)} />
@@ -19,7 +19,7 @@ export function UsageVariantFilter({ variants, activeId, onChange }: { variants:
         [
         {group.children.map((variant, index) => <span className="usage-filter-child" key={variant.id}>
           {index ? <span className="usage-filter-separator"> / </span> : null}
-          <TextChoice label={variant.detail || variant.label} active={activeId === variant.id} onClick={() => onChange(variant.id)} title={`${variant.model} ${variant.detail}`} />
+          <TextChoice label={`thinking: ${variant.detail || variant.label}`} active={activeId === variant.id} onClick={() => onChange(variant.id)} title={`${variant.model} thinking ${variant.detail}`} />
         </span>)}
         ]
       </span> : null}
@@ -28,7 +28,7 @@ export function UsageVariantFilter({ variants, activeId, onChange }: { variants:
 }
 
 function TextChoice({ label, active, onClick, title }: { label: string; active: boolean; onClick: () => void; title?: string }) {
-  return <button type="button" className={active ? "active" : ""} onClick={onClick} title={title || label}>
+  return <button type="button" className={active ? "active" : ""} onClick={onClick} title={title || label} aria-current={active ? "true" : undefined}>
     {label}
   </button>;
 }
