@@ -12,14 +12,14 @@ export function executeCliProvider(provider: ProviderConfig, prompt: string, run
     const spec = cliSpawnSpec(provider.cliCommand ?? "claude", args);
     const timeoutMs = provider.cliTimeoutMs ?? 120000;
     const lifecycle = newLifecycle(provider);
-    const child = spawn(spec.command, spec.args, { stdio: ["pipe", "pipe", "pipe"], windowsHide: true, env: cliEnv(provider) });
+    const child = spawn(spec.command, spec.args, { stdio: ["pipe", "pipe", "pipe"], windowsHide: true, env: cliEnv(provider), detached: process.platform !== "win32" });
     const stdout: Buffer[] = [], stderr: Buffer[] = [];
     const limits = outputLimits();
     let settled = false, killTimer: NodeJS.Timeout | undefined, stdoutSeen = false, stderrSeen = false;
     const timer = setTimeout(() => {
       lifecycle.add(`timeout ${timeoutMs}ms`);
-      lifecycle.add(`kill SIGTERM ${child.kill("SIGTERM") ? "sent" : "failed"}`);
-      killTimer = setTimeout(() => lifecycle.add(`kill SIGKILL ${child.kill("SIGKILL") ? "sent" : "failed"}`), 250);
+      terminateProcessTree(child.pid, "SIGTERM", lifecycle);
+      killTimer = setTimeout(() => terminateProcessTree(child.pid, "SIGKILL", lifecycle), 250);
       killTimer.unref?.();
       fail(new Error(`local cli provider timed out after ${timeoutMs}ms${detail(lifecycle.items, stdout, stderr)}`), false);
     }, timeoutMs);
@@ -69,6 +69,31 @@ function newLifecycle(provider: ProviderConfig) {
   const started = Date.now();
   const items = [`0ms spawn runtime=${provider.runtime ?? "cli"}`];
   return { items, add: (event: string) => items.push(`${Date.now() - started}ms ${event}`) };
+}
+
+function terminateProcessTree(pid: number | undefined, signal: NodeJS.Signals, lifecycle: ReturnType<typeof newLifecycle>): void {
+  if (!pid) return void lifecycle.add(`kill ${signal} failed missing pid`);
+  if (process.platform === "win32") {
+    try {
+      const taskkill = spawn("taskkill.exe", ["/pid", String(pid), "/t", "/f"], { stdio: "ignore", windowsHide: true });
+      taskkill.once("error", () => lifecycle.add(`kill tree ${signal} failed`));
+      lifecycle.add(`kill tree ${signal} sent`);
+    } catch {
+      lifecycle.add(`kill tree ${signal} failed`);
+    }
+    return;
+  }
+  try {
+    process.kill(-pid, signal);
+    lifecycle.add(`kill group ${signal} sent`);
+  } catch {
+    try {
+      process.kill(pid, signal);
+      lifecycle.add(`kill ${signal} sent`);
+    } catch {
+      lifecycle.add(`kill ${signal} failed`);
+    }
+  }
 }
 
 function exitMessage(code: number | null, stdout: Buffer[], stderr: Buffer[], events: string[]): string {

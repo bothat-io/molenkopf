@@ -13,6 +13,7 @@ type RuntimeAuthState = { activeProviderId?: string; routingMode?: RoutingMode }
 const ID_RE = /^[a-z0-9][a-z0-9._:-]{0,63}$/i;
 const META_FILE = "provider.json";
 const STATE_FILE = "state.json";
+export const DEFAULT_RUNTIME_AUTH_CLI_TIMEOUT_MS = 600000;
 
 export function restoreRuntimeAuthProviders(dataDir: string | undefined): { providers: ProviderConfig[]; activeProviderId?: string; routingMode?: RoutingMode } {
   const root = runtimeAuthRoot(dataDir);
@@ -69,7 +70,7 @@ export function runtimeAuthProvider(id: string, name: string, runtime: "claude" 
     cliCommand: runtime,
     cliArgs: runtimeCliArgs(runtime, authDir, profile),
     cliInputMode: "stdin",
-    cliTimeoutMs: 120000,
+    cliTimeoutMs: DEFAULT_RUNTIME_AUTH_CLI_TIMEOUT_MS,
     authScheme: "none",
     credentialRef: "none",
     runtimeAuthDir: authDir,
