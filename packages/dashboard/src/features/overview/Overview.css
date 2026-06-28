@@ -4,7 +4,7 @@
 .overview-hero p{margin:4px 0 0;color:var(--muted)}
 .scope-tags{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
 .usage-summary-card{overflow:hidden}
-.usage-summary-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start;padding:13px 16px 11px;background:color-mix(in srgb,var(--card) 90%,var(--accent) 10%);border-bottom:1px solid var(--line)}
+.usage-summary-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start;padding:13px 16px 11px;background:var(--surface);border-bottom:1px solid var(--line)}
 .usage-summary-copy{min-width:0}
 .usage-summary-title{font:700 18px Georgia,serif}
 .usage-summary-kicker{margin-top:2px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
@@ -31,7 +31,7 @@
 .usage-filter button{max-width:260px;border:0;background:transparent;color:inherit;padding:0 1px 1px;font:inherit;font-weight:600;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;border-bottom:1px solid transparent}
 .usage-filter button:hover,.usage-filter button:focus-visible{color:var(--text)}
 .usage-filter button.active{color:var(--text);border-bottom-color:var(--accent)}
-.gauge{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--accent) var(--pct),#e6dfd3 0);position:relative}
+.gauge{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--accent) var(--pct),var(--surface-2) 0);position:relative}
 .gauge::after{content:"";position:absolute;inset:10px;border-radius:50%;background:var(--card)}
 .gauge b{position:relative;z-index:1;font:700 14px Georgia,serif}
 .bar-list{display:grid;gap:10px}
