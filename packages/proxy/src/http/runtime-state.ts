@@ -51,7 +51,7 @@ export type AgentDraftMetadata = {
 };
 export type AgentDraftView = Omit<AgentDraftMetadata, "tokenHash"> & { tokenHashPresent: boolean; tokenFingerprint?: string; usage: UsageTotals };
 
-export type ModelUsageTotals = { requests: number; inputTokens: number; outputTokens: number; costEur?: number };
+export type ModelUsageTotals = { requests: number; inputTokens: number; outputTokens: number; costEur?: number; reasoning?: Record<string, ModelUsageTotals> };
 export type UsagePeriodTotals = { requests: number; inputTokens: number; outputTokens: number; costEur?: number; models?: Record<string, ModelUsageTotals> };
 export type UsageTotals = UsagePeriodTotals & { periods?: Record<string, UsagePeriodTotals> };
 export type RoutingMode = "manual" | "distribute";

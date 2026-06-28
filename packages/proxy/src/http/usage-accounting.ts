@@ -99,7 +99,18 @@ function addModelUsage(usage: UsagePeriodTotals, model: string, manifest: AuditM
   current.inputTokens += manifest.upstreamInputTokens ?? 0;
   current.outputTokens += manifest.upstreamOutputTokens ?? 0;
   current.costEur = (current.costEur ?? 0) + cost;
+  if (manifest.requestedReasoning) addReasoningUsage(current, manifest.requestedReasoning, manifest, cost);
   usage.models[model] = current;
+}
+
+function addReasoningUsage(usage: NonNullable<UsagePeriodTotals["models"]>[string], reasoning: string, manifest: AuditManifest, cost: number): void {
+  usage.reasoning ??= {};
+  const current = usage.reasoning[reasoning] ?? { requests: 0, inputTokens: 0, outputTokens: 0, costEur: 0 };
+  current.requests++;
+  current.inputTokens += manifest.upstreamInputTokens ?? 0;
+  current.outputTokens += manifest.upstreamOutputTokens ?? 0;
+  current.costEur = (current.costEur ?? 0) + cost;
+  usage.reasoning[reasoning] = current;
 }
 
 function tokensOf(usage: UsageTotals | undefined): number {

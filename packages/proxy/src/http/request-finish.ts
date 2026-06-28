@@ -5,6 +5,7 @@ import type { UsageTotals } from "../../../core/src/manifest/usage-meter.ts";
 import { recordUsage, type RuntimeState } from "./runtime-state.ts";
 import { safeSubjectId, type ClientIdentity } from "./client-identity.ts";
 import type { PluginHost } from "./plugin-host.ts";
+import type { RequestModelMetadata } from "./request-model.ts";
 
 export async function finishRequest(manifest: AuditManifest, auditStore: AuditStore, events: EventBus, state: RuntimeState, pluginHost?: PluginHost, pluginIds?: readonly string[]): Promise<void> {
   const stored = auditSafeManifest(manifest);
@@ -18,10 +19,11 @@ export async function finishRequest(manifest: AuditManifest, auditStore: AuditSt
   events.emit("request_finished", { requestId: manifest.requestId, data: { statusCode: manifest.statusCode, durationMs: manifest.durationMs } });
 }
 
-export function buildManifest(requestId: string, method: string, path: string, target: string, providerId: string, statusCode: number, durationMs: number, client: ClientIdentity, audit?: RewriteAudit, usage?: UsageTotals, requestedModel?: string): AuditManifest {
+export function buildManifest(requestId: string, method: string, path: string, target: string, providerId: string, statusCode: number, durationMs: number, client: ClientIdentity, audit?: RewriteAudit, usage?: UsageTotals, requestModel?: RequestModelMetadata): AuditManifest {
   return {
     requestId, timestamp: new Date().toISOString(), method, path, targetHost: new URL(target).host, providerId,
-    requestedModel,
+    requestedModel: requestModel?.model,
+    requestedReasoning: requestModel?.reasoning,
     client,
     compressedItems: audit?.compressedItems ?? 0,
     estimatedOriginalTokens: audit?.estimatedOriginalTokens ?? 0,

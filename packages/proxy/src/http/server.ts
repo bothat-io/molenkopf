@@ -22,7 +22,7 @@ import { canStreamCli, streamCliProvider } from "./cli-stream-response.ts";
 import { forwardStream } from "./streaming-proxy.ts";
 import { createResponseUsageScanner } from "./encoded-usage-meter.ts";
 import { auditPath } from "./request-path.ts";
-import { requestedModelFromBody } from "./request-model.ts";
+import { requestModelMetadataFromBody } from "./request-model.ts";
 import { inputError, listen, readBody, writeJson, writeRedirect } from "./server-io.ts";
 import { requirePublicBindFlag } from "./public-bind.ts";
 import { providerAllowedForClient } from "./provider-access.ts";
@@ -99,7 +99,7 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
   events.emit("request_started", { requestId, data: { method: req.method, path } });
   const originalBody = await readBody(req);
   const jsonRequest = (inbound.get("content-type") ?? "").includes("application/json");
-  const requestedModel = jsonRequest ? requestedModelFromBody(originalBody) : undefined;
+  const requestModel = jsonRequest ? requestModelMetadataFromBody(originalBody) : undefined;
   if (jsonRequest && originalBody) {
     const modelPolicy = enforceModelPolicy(policy, originalBody);
     if (modelPolicy.ok === false) { events.emit("request_failed", { requestId, data: { error: modelPolicy.error } }); return writeJson(res, modelPolicy.status, { error: modelPolicy.error }); }
@@ -149,7 +149,7 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
     }
     if (canStreamCli(path, body)) {
       const cli = await streamCliProvider(provider, body, requestId, path, res);
-      const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, cli.status, Date.now() - started, client, audit, cli.usage, requestedModel);
+      const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, cli.status, Date.now() - started, client, audit, cli.usage, requestModel);
       await finishRequest(manifest, auditStore, events, state, pluginHost, requestPluginIds);
       return;
     }
@@ -161,13 +161,13 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
     try {
       const cli = await runCliProvider(provider, body, requestId, path, { signal: abort.signal });
       cliDone = true;
-      const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, cli.status, Date.now() - started, client, audit, cli.usage, requestedModel);
+      const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, cli.status, Date.now() - started, client, audit, cli.usage, requestModel);
       await finishRequest(manifest, auditStore, events, state, pluginHost, requestPluginIds);
       res.writeHead(cli.status, cli.headers);
       return res.end(cli.body);
     } catch (error) {
       cliDone = true;
-      const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, 502, Date.now() - started, client, audit, undefined, requestedModel);
+      const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, 502, Date.now() - started, client, audit, undefined, requestModel);
       await finishRequest(manifest, auditStore, events, state, pluginHost, requestPluginIds);
       if (res.destroyed) return;
       return writeJson(res, 502, { error: "proxy_error", requestId });
@@ -187,12 +187,12 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
     });
     statusCode = result.statusCode;
   } catch (error) {
-    const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, 502, Date.now() - started, client, audit, undefined, requestedModel);
+    const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, 502, Date.now() - started, client, audit, undefined, requestModel);
     await finishRequest(manifest, auditStore, events, state, pluginHost, requestPluginIds);
     if (!res.headersSent) return writeJson(res, 502, { error: "proxy_error", requestId });
     return res.end();
   }
-  const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, statusCode, Date.now() - started, client, audit, await scanner.finish(), requestedModel);
+  const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, statusCode, Date.now() - started, client, audit, await scanner.finish(), requestModel);
   await finishRequest(manifest, auditStore, events, state, pluginHost, requestPluginIds);
 }
 const headerValue = (value: number | string | string[] | undefined) => Array.isArray(value) ? value[0] : typeof value === "string" ? value : undefined;

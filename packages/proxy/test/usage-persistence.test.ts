@@ -89,6 +89,7 @@ test("missing usage snapshot rebuilds from audit manifests", async () => {
     compressedItems: 1, estimatedOriginalTokens: 100, estimatedCompressedTokens: 25, estimatedSavedTokens: 0,
     redactedSecrets: 0, retrievalIds: [], compressorsUsed: [], warnings: [], statusCode: 200, durationMs: 1,
     requestedModel: "claude-audit-model",
+    requestedReasoning: "extended",
     upstreamInputTokens: 5, upstreamOutputTokens: 7
   });
 
@@ -99,6 +100,7 @@ test("missing usage snapshot rebuilds from audit manifests", async () => {
     const usage = await fetch(`${base}/__molenkopf/usage`, { headers: { cookie: admin } }).then((r) => r.json());
     assert.equal(usage.users.find((x: any) => x.id === "bob").usage.inputTokens, 5);
     assert.equal(usage.users.find((x: any) => x.id === "bob").usage.models["claude-audit-model"].requests, 1);
+    assert.equal(usage.users.find((x: any) => x.id === "bob").usage.models["claude-audit-model"].reasoning.extended.outputTokens, 7);
     assert.equal(usage.keys.find((x: any) => x.id === "key_a").usage.outputTokens, 7);
     assert.equal("savedTokens" in usage.teams.find((x: any) => x.id === "alpha").usage, false);
   } finally {
