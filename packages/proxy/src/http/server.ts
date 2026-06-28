@@ -4,11 +4,8 @@ import { AuditStore } from "../../../core/src/manifest/audit-store.ts";
 import { EventBus } from "../../../core/src/events/event-bus.ts";
 import { type RewriteAudit } from "../../../core/src/pipeline/openai-request-rewriter.ts";
 import { estimateTokens } from "../../../core/src/utils/tokens.ts";
-import { redactSecrets } from "../../../core/src/security/secret-redactor.ts";
 import { builtinMiddlewares, runRequestPipeline, type PluginContext } from "./plugin-pipeline.ts";
 import { orderIndex } from "./local-api-pipeline.ts";
-import { extractConcepts } from "../../../core/src/memory/memory-extractor.ts";
-import { recordConcepts } from "../../../core/src/memory/memory-graph.ts";
 import { RetrievalStore } from "../../../core/src/store/retrieval-store.ts";
 import { buildForwardHeaders, missingProviderCredential } from "./header-utils.ts";
 import { handleLocalRequest } from "./local-api.ts";
@@ -112,9 +109,6 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
   if (jsonRequest && originalBody) {
     const modelPolicy = enforceModelPolicy(policy, originalBody);
     if (modelPolicy.ok === false) { events.emit("request_failed", { requestId, data: { error: modelPolicy.error } }); return writeJson(res, modelPolicy.status, { error: modelPolicy.error }); }
-  }
-  if (requestPluginIds.includes("obsidian-graph-plugin") && originalBody) {
-    recordConcepts(state.memoryGraph, extractConcepts(redactSecrets(originalBody).text), new Date().toISOString());
   }
   let body = originalBody;
   let audit: RewriteAudit | undefined;

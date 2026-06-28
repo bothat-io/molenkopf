@@ -6,7 +6,7 @@ import { builtinPluginDescriptors } from "../src/plugins/plugin-descriptor.ts";
 import { pluginCatalog } from "../src/plugins/plugin-catalog.ts";
 import { staticPluginPipeline } from "../src/plugins/static-pipeline.ts";
 
-const optionalPluginIds = ["context-compressor-plugin", "obsidian-graph-plugin", "project-graph-plugin", "token-optimizer-plugin"];
+const optionalPluginIds = ["context-compressor-plugin", "project-graph-plugin", "token-optimizer-plugin"];
 
 test("builtin plugin descriptors are unique and expose explicit runtime contracts", () => {
   const ids = builtinPluginDescriptors.map((plugin) => plugin.id);
@@ -43,7 +43,6 @@ test("plugin traffic contracts model optional plugin mutation rights explicitly"
   const byId = new Map(pluginCatalog.map((plugin) => [plugin.id, plugin]));
   assert.equal(byId.get("context-compressor-plugin")?.type, "transformer");
   assert.deepEqual(byId.get("context-compressor-plugin")?.traffic.mutates, ["transform"]);
-  assert.deepEqual(byId.get("obsidian-graph-plugin")?.traffic.mutates, ["none"]);
   assert.deepEqual(byId.get("project-graph-plugin")?.traffic.mutates, ["none"]);
   assert.deepEqual(byId.get("token-optimizer-plugin")?.traffic.mutates, ["none"]);
 });
@@ -52,7 +51,6 @@ test("registered plugins are optional and toggleable", () => {
   const byId = new Map(pluginCatalog.map((plugin) => [plugin.id, plugin]));
   assert.deepEqual(pluginCatalog.filter((plugin) => plugin.canToggle).map((plugin) => plugin.id).sort(), optionalPluginIds);
   assert.equal(byId.get("context-compressor-plugin")?.canToggle, true);
-  assert.equal(byId.get("obsidian-graph-plugin")?.canToggle, true);
   assert.equal(byId.get("project-graph-plugin")?.canToggle, true);
   assert.equal(byId.get("token-optimizer-plugin")?.canToggle, true);
   assert.equal(pluginCatalog.every((plugin) => plugin.canToggle), true);

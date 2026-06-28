@@ -40,16 +40,6 @@ test("serves a plugin's own page from its plugin folder", async () => {
     assert.match(html, /Plugin data unavailable/);
     assert.doesNotMatch(html, /catch\(\(\) => \(\{\}\)\)/);
     assert.doesNotMatch(html, /setInterval/);
-    const graph = await pluginFetch(base, "obsidian-graph-plugin", cookie);
-    assert.equal(graph.status, 200);
-    const graphHtml = await graph.text();
-    assert.match(graphHtml, /Memory graph/);
-    assert.match(graphHtml, /Input tokens/);
-    assert.match(graphHtml, /Output tokens/);
-    assert.match(graphHtml, /Projects/);
-    assert.match(graphHtml, /Plugin data unavailable/);
-    assert.doesNotMatch(graphHtml, /catch\(\(\) => \(\{\}\)\)/);
-    assert.doesNotMatch(graphHtml, /setInterval/);
     const optimizer = await pluginFetch(base, "token-optimizer-plugin", cookie);
     assert.equal(optimizer.status, 200);
     const optimizerHtml = await optimizer.text();

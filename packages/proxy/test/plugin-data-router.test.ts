@@ -12,12 +12,12 @@ test("generic plugin data route returns contract errors for missing plugins and 
     assert.deepEqual(await missing.json(), { error: "plugin_not_found" });
 
     await putAuth(env.base, "/__molenkopf/plugin-policies/global", {
-      globalPluginPolicy: { "obsidian-graph-plugin": { enabled: false } }
+      globalPluginPolicy: { "token-optimizer-plugin": { enabled: false } }
     }, admin);
-    const disabled = await getAuth(env.base, "/__molenkopf/plugins/obsidian-graph-plugin/data", admin);
+    const disabled = await getAuth(env.base, "/__molenkopf/plugins/token-optimizer-plugin/data", admin);
     assert.equal(disabled.status, 200);
     const payload = await disabled.json();
-    assert.equal(payload.plugin.id, "obsidian-graph-plugin");
+    assert.equal(payload.plugin.id, "token-optimizer-plugin");
   } finally {
     await env.close();
   }

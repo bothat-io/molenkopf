@@ -13,7 +13,7 @@ This is the binding inventory for the current local built-in plugin platform.
 - Built-ins: `packages/core/src/plugins/builtin-plugin-descriptors.ts`
 - Built-in descriptors/modules:
   - `context-compressor-plugin` -> `packages/plugins/context-compressor-plugin/descriptor-v2.ts`, `plugin.ts`, `page.html`
-  - `obsidian-graph-plugin` -> `packages/plugins/obsidian-graph-plugin/descriptor-v2.ts`, `plugin.ts`, `page.html`
+  - `project-graph-plugin` -> `packages/plugins/project-graph-plugin/descriptor-v2.ts`, `plugin.ts`, `page.html`
   - `token-optimizer-plugin` -> `packages/plugins/token-optimizer-plugin/descriptor-v2.ts`, `plugin.ts`, `page.html`
 
 ## 2. Hardcoded plugin routes and request decisions
@@ -38,10 +38,7 @@ This is the binding inventory for the current local built-in plugin platform.
 ### Proxy/request path
 - `server.ts`:
   - policy input from `effectiveRequestPolicy(...)`
-  - request plugin gate in `pluginActive`
-  - graph extraction for obsidian path
-- `request-finish.ts`:
-  - `obsidian-graph-plugin` gate before `recordCommunicationGraph(...)`
+  - request plugin IDs resolved from effective policy before middleware execution
 - `plugin-host.ts`:
   - plugin event/audit iteration and note/emit handling
 
@@ -81,10 +78,9 @@ This is the binding inventory for the current local built-in plugin platform.
   - `packages/core/test/plugin-descriptor.test.ts`
 - Proxy
   - `packages/proxy/test/plugin-action-router.test.ts`
-  - `packages/proxy/test/plugin-host.test.ts`
+- `packages/proxy/test/plugin-host.test.ts`
   - `packages/proxy/test/plugin-folder-pages.test.ts`
   - `packages/proxy/test/proxy-plugin-data.test.ts`
-  - `packages/proxy/test/proxy-graph-failure.test.ts`
   - `packages/proxy/test/container-command-smoke.test.ts`
   - `packages/proxy/test/proxy-e2e.test.ts`
 
@@ -93,7 +89,6 @@ This is the binding inventory for the current local built-in plugin platform.
 - Replace legacy helper usage with request-policy-aware checks (or explicit source-of-truth flags) in:
   - `server.ts` request plugin gate
   - `plugin-host.ts` lifecycle/event/audit iteration filters
-  - `request-finish.ts` communication-graph gate
 - Keep route shape (`/__molenkopf/plugins/:id/page`, `/__molenkopf/plugins/:id/data`) in phase 0
 - Keep behavior unchanged until phase 1 validation is complete, except for explicit preparatory cleanup already in place.
 

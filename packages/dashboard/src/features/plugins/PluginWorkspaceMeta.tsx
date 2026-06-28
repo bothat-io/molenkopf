@@ -35,7 +35,7 @@ export function pluginEffect(plugin: PluginView): string {
 
 export function pluginMetric(id: string, savedTokens: number | undefined, category: string | undefined): string {
   if (id === "context-compressor-plugin") return `${num(savedTokens)} tokens saved`;
-  if (id === "obsidian-graph-plugin") return "memory graph";
+  if (id === "project-graph-plugin") return "project graph";
   if (id === "token-optimizer-plugin") return "recommendations";
   return category || "none";
 }

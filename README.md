@@ -7,8 +7,8 @@
 Molenkopf is a local gateway for API and CLI based coding agents. It is not
 only an OpenAI-compatible API proxy: it also supports Anthropic/Claude API
 traffic and local CLI runtimes such as Claude CLI and Codex CLI. It should
-reduce real transferred context, redact secrets, build local derived memory,
-and write audit manifests without full prompts or responses.
+reduce real transferred context, redact secrets, build local derived project
+structure, and write audit manifests without full prompts or responses.
 
 Molenkopf has a fixed core safety pipeline for secret redaction, content classification, safe compression for logs, JSON and stacktraces, local retrieval storage, audit manifests, and redacted SSE events. Optional plugins extend this pipeline; core safety behavior is not toggleable.
 
@@ -37,8 +37,8 @@ Built now:
 - Per-agent multi-account routing: each agent (`x-molenkopf-agent`) routes to its bound provider/account; config `profiles`/`agents` resolve to providers.
 - Real token accounting: upstream `usage` is read from the provider response and recorded as
   real input/output tokens (not only a chars/4 estimate).
-- Text-derived memory graph: concepts (files, symbols, error types) are extracted from the
-  real redacted transferred text into a bounded co-occurrence graph.
+- Project Graph plugin: scans explicitly configured source roots and stores structural metadata
+  for files, symbols, imports, routes, tests, plugin facts, storage usage, and events.
 - Static pipeline with request IDs, redaction, classification, compression, retrieval, audit, SSE events, and upstream routing.
 - Local API under `/__molenkopf/*`: bootstrap endpoints for health, session
   status, and first-run admin creation, user-scoped usage/key endpoints, and admin-only
@@ -46,7 +46,7 @@ Built now:
 - Dashboard shell served at `/__molenkopf/dashboard` with Overview and Admin
   views backed by an isolated React/Vite dashboard package. Dedicated Providers,
   Plugins, Requests, Audit, Agents, and Settings views are planned.
-- Plugin pages are local HTML surfaces under `/__molenkopf/plugins/:id/page`; context compression and memory graph pages read scoped plugin data endpoints and show explicit load errors instead of fake empty workspaces.
+- Plugin pages are local HTML surfaces under `/__molenkopf/plugins/:id/page`; context compression, token optimization, and project graph pages read scoped plugin data endpoints and show explicit load errors instead of fake empty workspaces.
 - The context compression plugin must expose safe token accounting for real transferred context only. Empty states must not show placeholder pressure or fake savings. Usage notes: `docs/CONTEXT_COMPRESSION_PLUGIN_README.md`.
 - Practical dashboard and proxy connection guide: `docs/MOLENKOPF_USAGE.md`.
 - JSON config startup target for providers, agents, and plugin policies:
@@ -119,7 +119,7 @@ Agent drafts are stored as local proxy metadata through `/__molenkopf/agents/dra
 
 For a step-by-step local setup and test flow, read `docs/MOLENKOPF_USAGE.md`.
 
-Plugin pages open in standalone windows from `/__molenkopf/plugins/context-compressor-plugin/page` and `/__molenkopf/plugins/obsidian-graph-plugin/page`. The graph workspace is derived from safe request metadata and redacted transferred text. Context and graph pages group by project/key where available and surface plugin-data failures explicitly.
+Plugin pages open in standalone windows from `/__molenkopf/plugins/context-compressor-plugin/page`, `/__molenkopf/plugins/token-optimizer-plugin/page`, and `/__molenkopf/plugins/project-graph-plugin/page`. The Project Graph workspace is derived from explicitly scanned source roots, not request metadata or raw prompts. Plugin pages group by project/key where available and surface plugin-data failures explicitly.
 
 ## Commands
 Install from npm with Node.js 24 or newer:

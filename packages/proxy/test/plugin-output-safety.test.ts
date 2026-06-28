@@ -36,7 +36,7 @@ test("safePluginOutput defaults to strict and accepts explicit scope mode", () =
 
 test("buildPluginData sanitizes successful plugin data payloads", async () => {
   const state = createRuntimeState({ target: "http://127.0.0.1:1/v1" }, "127.0.0.1");
-  const result = await buildPluginData("obsidian-graph-plugin", fakeAudit(), state, undefined, {
+  const result = await buildPluginData("token-optimizer-plugin", fakeAudit(), state, undefined, {
     data: async () => ({ ok: true, payload: { responseBody: "raw response", public: "ok" } })
   } as any);
   assert.equal(result.status, 200);

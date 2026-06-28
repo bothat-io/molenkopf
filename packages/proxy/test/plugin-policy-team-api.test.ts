@@ -18,13 +18,13 @@ test("team plugin policy API stores team overrides and rejects global expansion"
     assert.equal((await rejected.json()).error, "plugin_policy_exceeds_global");
 
     const accepted = await putAuth(env.base, "/__molenkopf/plugin-policies/teams/alpha", {
-      pluginPolicies: { "obsidian-graph-plugin": { enabled: false } }
+      pluginPolicies: { "token-optimizer-plugin": { enabled: false } }
     }, admin);
     assert.equal(accepted.status, 200);
 
     const team = await getAuth(env.base, "/__molenkopf/plugin-policies/teams/alpha", admin).then((res) => res.json());
     assert.equal(team.teamId, "alpha");
-    assert.equal(team.pluginPolicies["obsidian-graph-plugin"].enabled, false);
+    assert.equal(team.pluginPolicies["token-optimizer-plugin"].enabled, false);
     assert.equal(team.pluginPolicies["context-compressor-plugin"], undefined);
   } finally {
     await env.close();

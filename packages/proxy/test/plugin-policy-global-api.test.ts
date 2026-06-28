@@ -12,13 +12,13 @@ test("global plugin policy API reads and writes validated global defaults", asyn
     const update = await putAuth(env.base, "/__molenkopf/plugin-policies/global", {
       globalPluginPolicy: {
         "context-compressor-plugin": { enabled: true },
-        "obsidian-graph-plugin": { enabled: true }
+        "token-optimizer-plugin": { enabled: true }
       }
     }, admin);
     assert.equal(update.status, 200);
     const after = await update.json();
     assert.equal(after.globalPluginPolicy["context-compressor-plugin"].enabled, true);
-    assert.equal(after.globalPluginPolicy["obsidian-graph-plugin"].enabled, true);
+    assert.equal(after.globalPluginPolicy["token-optimizer-plugin"].enabled, true);
   } finally {
     await env.close();
   }

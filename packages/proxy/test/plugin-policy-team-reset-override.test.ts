@@ -8,20 +8,20 @@ test("resetting team plugin overrides restores inheritance from global", async (
     const admin = await setupAdmin(env.base);
     await postAuth(env.base, "/__molenkopf/identity/teams", { id: "alpha", name: "Alpha" }, admin);
     await putAuth(env.base, "/__molenkopf/plugin-policies/global", {
-      globalPluginPolicy: { "obsidian-graph-plugin": { enabled: true } }
+      globalPluginPolicy: { "token-optimizer-plugin": { enabled: true } }
     }, admin);
     await putAuth(env.base, "/__molenkopf/plugin-policies/teams/alpha", {
-      pluginPolicies: { "obsidian-graph-plugin": { enabled: false } }
+      pluginPolicies: { "token-optimizer-plugin": { enabled: false } }
     }, admin);
 
-    const overridden = await getAuth(env.base, "/__molenkopf/plugin-policies/effective/alpha/obsidian-graph-plugin", admin).then((res) => res.json());
+    const overridden = await getAuth(env.base, "/__molenkopf/plugin-policies/effective/alpha/token-optimizer-plugin", admin).then((res) => res.json());
     assert.equal(overridden.policy.enabled, false);
     assert.equal(overridden.teamOverrideExists, true);
 
     const reset = await putAuth(env.base, "/__molenkopf/plugin-policies/teams/alpha", { pluginPolicies: {} }, admin);
     assert.equal(reset.status, 200);
 
-    const inherited = await getAuth(env.base, "/__molenkopf/plugin-policies/effective/alpha/obsidian-graph-plugin", admin).then((res) => res.json());
+    const inherited = await getAuth(env.base, "/__molenkopf/plugin-policies/effective/alpha/token-optimizer-plugin", admin).then((res) => res.json());
     assert.equal(inherited.policy.enabled, true);
     assert.equal(inherited.teamOverrideExists, false);
   } finally {

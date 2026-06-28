@@ -16,10 +16,10 @@ test("member plugin data is scoped to the member team traffic", async () => {
     await fetch(`${env.base}/v1/messages`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${anaKey.secret}` }, body: "{}" });
 
     const bob = cookieFrom(await post(env.base, "/__molenkopf/login", { username: "bob", password: "bob-secret" }));
-    const response = await getAuth(env.base, "/__molenkopf/plugins/obsidian-graph-plugin/data", bob);
+    const response = await getAuth(env.base, "/__molenkopf/plugins/context-compressor-plugin/data", bob);
     assert.equal(response.status, 200);
     const payload = await response.json();
-    assert.equal(payload.plugin.id, "obsidian-graph-plugin");
+    assert.equal(payload.plugin.id, "context-compressor-plugin");
     assert.equal(payload.metrics.projects.some((item: { id: string }) => item.id === "project-one"), true);
     assert.equal(payload.metrics.projects.some((item: { id: string }) => item.id === "project-two"), false);
   } finally {

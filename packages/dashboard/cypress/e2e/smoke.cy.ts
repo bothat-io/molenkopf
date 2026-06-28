@@ -114,7 +114,7 @@ describe("dashboard smoke", () => {
     cy.contains("section", "Plugins").within(() => {
       cy.get(".collapsible-panel details").should("have.length", 3);
       cy.contains("details", "context-compressor-plugin").should("be.visible");
-      cy.contains("details", "obsidian-graph-plugin").should("be.visible");
+      cy.contains("details", "project-graph-plugin").should("be.visible");
       cy.contains("details", "token-optimizer-plugin").should("be.visible");
     });
   });

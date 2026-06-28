@@ -5,7 +5,7 @@ import { pluginPolicySchemaVersion } from "../../core/src/plugins/plugin-policy.
 
 test("request plugin selection never relies on legacy pluginEnabled as source-of-truth", () => {
   const state = {
-    pluginEnabled: { "context-compressor-plugin": false, "obsidian-graph-plugin": false },
+    pluginEnabled: { "context-compressor-plugin": false, "token-optimizer-plugin": false },
     pluginPolicyState: {
       pluginPolicySchemaVersion,
       globalPluginPolicy: {},
@@ -14,6 +14,6 @@ test("request plugin selection never relies on legacy pluginEnabled as source-of
   } as any;
 
   const plugins = resolveRequestPluginIds(state, ["team-a"]);
-  assert.equal(plugins.includes("obsidian-graph-plugin"), true);
+  assert.equal(plugins.includes("token-optimizer-plugin"), true);
   assert.equal(plugins.includes("context-compressor-plugin"), false);
 });

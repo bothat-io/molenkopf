@@ -107,7 +107,6 @@ expect((await get('/__molenkopf/setup-admin', { method: 'POST', headers: { 'cont
 const plugins = await get('/__molenkopf/plugins', { headers: { cookie } }).then((r) => r.json());
 const ids = (plugins.items || []).map((item) => item.id).sort();
 expect(ids.includes('context-compressor-plugin'), 'missing context-compressor-plugin');
-expect(ids.includes('obsidian-graph-plugin'), 'missing obsidian-graph-plugin');
 expect(ids.includes('project-graph-plugin'), 'missing project-graph-plugin');
 expect(ids.includes('token-optimizer-plugin'), 'missing token-optimizer-plugin');
 for (const plugin of plugins.items) {

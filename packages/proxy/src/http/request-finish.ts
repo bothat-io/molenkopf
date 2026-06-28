@@ -2,8 +2,7 @@ import type { AuditManifest, AuditStore } from "../../../core/src/manifest/audit
 import type { EventBus } from "../../../core/src/events/event-bus.ts";
 import type { RewriteAudit } from "../../../core/src/pipeline/openai-request-rewriter.ts";
 import type { UsageTotals } from "../../../core/src/manifest/usage-meter.ts";
-import { isPluginEnabled, recordUsage, type RuntimeState } from "./runtime-state.ts";
-import { recordCommunicationGraph } from "./communication-graph.ts";
+import { recordUsage, type RuntimeState } from "./runtime-state.ts";
 import { safeSubjectId, type ClientIdentity } from "./client-identity.ts";
 import type { PluginHost } from "./plugin-host.ts";
 
@@ -14,8 +13,6 @@ export async function finishRequest(manifest: AuditManifest, auditStore: AuditSt
   state.compressedItems += manifest.compressedItems;
   recordUsage(state, manifest);
   state.latest = stored;
-  const pluginActive = (id: string) => pluginIds ? pluginIds.includes(id) : isPluginEnabled(state, id);
-  if (pluginActive("obsidian-graph-plugin")) recordCommunicationGraph(state.communicationGraph, stored);
   if (pluginIds) pluginHost?.setRequestPlugins(manifest.requestId, pluginIds);
   await pluginHost?.audit(stored, pluginIds);
   events.emit("request_finished", { requestId: manifest.requestId, data: { statusCode: manifest.statusCode, durationMs: manifest.durationMs } });

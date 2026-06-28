@@ -5,8 +5,8 @@ import { pluginDescriptorVersion, type PluginDescriptorV2 } from "../src/plugins
 
 const descriptor: PluginDescriptorV2 = {
   descriptorVersion: pluginDescriptorVersion,
-  id: "obsidian-graph-plugin",
-  name: "Obsidian Graph",
+  id: "sample-observer-plugin",
+  name: "Sample Observer",
   category: "visualization",
   risk: "green",
   capabilities: ["metadata:read", "audit:read:scoped", "settings:read"],
@@ -44,7 +44,7 @@ test("Restrictive merge strategies produce expected per-setting outcomes", () =>
   const state = parsePluginPolicyState({
     pluginPolicySchemaVersion: 1,
     globalPluginPolicy: {
-      "obsidian-graph-plugin": {
+      "sample-observer-plugin": {
         settings: {
           useNewAlgo: true,
           keep: 50,
@@ -57,7 +57,7 @@ test("Restrictive merge strategies produce expected per-setting outcomes", () =>
     teamPluginPolicies: [
       {
         teamId: "team-a",
-        pluginId: "obsidian-graph-plugin",
+        pluginId: "sample-observer-plugin",
         overrides: {
           settings: {
             useNewAlgo: false,

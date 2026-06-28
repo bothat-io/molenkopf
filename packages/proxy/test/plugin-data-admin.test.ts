@@ -15,7 +15,7 @@ test("admin plugin data includes cross-team aggregated plugin data", async () =>
     await fetch(`${env.base}/v1/messages`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${bobKey.secret}` }, body: "{}" });
     await fetch(`${env.base}/v1/messages`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${anaKey.secret}` }, body: "{}" });
 
-    const response = await getAuth(env.base, "/__molenkopf/plugins/obsidian-graph-plugin/data", admin);
+    const response = await getAuth(env.base, "/__molenkopf/plugins/context-compressor-plugin/data", admin);
     assert.equal(response.status, 200);
     const payload = await response.json();
     assert.equal(payload.metrics.projects.some((item: { id: string }) => item.id === "project-one"), true);

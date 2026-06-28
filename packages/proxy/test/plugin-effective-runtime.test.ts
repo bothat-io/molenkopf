@@ -7,12 +7,12 @@ import { builtinPluginDescriptorV2 } from "../src/http/plugin-platform.ts";
 test("resolveRequestPluginIds is policy-driven with team overrides", async () => {
   const descriptors = builtinPluginDescriptorV2();
   const state = {
-    pluginEnabled: { "context-compressor-plugin": true, "obsidian-graph-plugin": true },
+    pluginEnabled: { "context-compressor-plugin": true, "token-optimizer-plugin": true },
     pluginPolicyState: {
       pluginPolicySchemaVersion,
       globalPluginPolicy: {
         "context-compressor-plugin": { enabled: false },
-        "obsidian-graph-plugin": { enabled: true }
+        "token-optimizer-plugin": { enabled: true }
       },
       teamPluginPolicies: []
     }
@@ -20,13 +20,13 @@ test("resolveRequestPluginIds is policy-driven with team overrides", async () =>
 
   const ids = resolveRequestPluginIds(state, ["team-a"]);
   assert.ok(!ids.includes("context-compressor-plugin"));
-  assert.ok(ids.includes("obsidian-graph-plugin"));
+  assert.ok(ids.includes("token-optimizer-plugin"));
 });
 
 test("request-time policy ignores legacy pluginEnabled flags when global policy is absent", () => {
   const descriptors = builtinPluginDescriptorV2();
   const state = {
-    pluginEnabled: { "obsidian-graph-plugin": false },
+    pluginEnabled: { "token-optimizer-plugin": false },
     pluginPolicyState: {
       pluginPolicySchemaVersion,
       globalPluginPolicy: {},
@@ -35,7 +35,7 @@ test("request-time policy ignores legacy pluginEnabled flags when global policy 
   } as any;
 
   const ids = resolveRequestPluginIds(state, ["team-a"]);
-  assert.ok(ids.includes("obsidian-graph-plugin"));
+  assert.ok(ids.includes("token-optimizer-plugin"));
   assert.ok(!ids.includes("context-compressor-plugin"));
 });
 

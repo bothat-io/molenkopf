@@ -18,13 +18,13 @@ test("plugin host runs lifecycle, event, audit, and data hooks", async () => {
       onEnable: () => { calls.push("context:enable"); },
       onStop: () => { calls.push("context:stop"); }
     },
-    "obsidian-graph-plugin": {
-      onBoot: () => { calls.push("graph:boot"); },
-      onStart: (ctx) => { calls.push(`graph:start:${ctx.port}`); },
-      onDisable: () => { calls.push("graph:disable"); },
-      onStop: () => { calls.push("graph:stop"); },
-      onEvent: (ctx) => { calls.push(`graph:event:${ctx.event}`); },
-      onAudit: (ctx) => { calls.push(`graph:audit:${ctx.requestId}`); },
+    "token-optimizer-plugin": {
+      onBoot: () => { calls.push("optimizer:boot"); },
+      onStart: (ctx) => { calls.push(`optimizer:start:${ctx.port}`); },
+      onDisable: () => { calls.push("optimizer:disable"); },
+      onStop: () => { calls.push("optimizer:stop"); },
+      onEvent: (ctx) => { calls.push(`optimizer:event:${ctx.event}`); },
+      onAudit: (ctx) => { calls.push(`optimizer:audit:${ctx.requestId}`); },
       getData: (ctx) => ({ plugin: ctx.plugin, requests: ctx.manifests.length })
     }
   });
@@ -39,18 +39,18 @@ test("plugin host runs lifecycle, event, audit, and data hooks", async () => {
     estimatedCompressedTokens: 0, estimatedSavedTokens: 0, redactedSecrets: 0, retrievalIds: [],
     compressorsUsed: [], warnings: [], statusCode: 200, durationMs: 1
   });
-  const data = await host.data("obsidian-graph-plugin", {
-    canManage: true, teamIds: [], scope: "data", plugin: { id: "obsidian-graph-plugin" },
+  const data = await host.data("token-optimizer-plugin", {
+    canManage: true, teamIds: [], scope: "data", plugin: { id: "token-optimizer-plugin" },
     scopes: ["metrics"], manifests: [{ requestId: "r1", timestamp: "", method: "POST", path: "/v1/responses", targetHost: "127.0.0.1", compressedItems: 0, estimatedOriginalTokens: 0, estimatedCompressedTokens: 0, estimatedSavedTokens: 0, redactedSecrets: 0, retrievalIds: [], compressorsUsed: [], warnings: [] }]
   });
   await host.enable("context-compressor-plugin");
-  await host.disable("obsidian-graph-plugin");
+  await host.disable("token-optimizer-plugin");
   await host.stop();
 
-  assert.deepEqual(data, { ok: true, payload: { plugin: { id: "obsidian-graph-plugin" }, requests: 1 } });
+  assert.deepEqual(data, { ok: true, payload: { plugin: { id: "token-optimizer-plugin" }, requests: 1 } });
   assert.deepEqual(calls, [
-    "context:boot", "graph:boot", "graph:start:8787", "graph:event:request_started",
-    "graph:audit:r1", "context:enable", "graph:disable", "context:stop", "graph:stop"
+    "context:boot", "optimizer:boot", "optimizer:start:8787", "optimizer:event:request_started",
+    "optimizer:audit:r1", "context:enable", "optimizer:disable", "context:stop", "optimizer:stop"
   ]);
 });
 
@@ -60,7 +60,7 @@ test("plugin host records sanitized lifecycle failures and serializes event hook
   const order: string[] = [], warnings: any[] = [];
   events.subscribe((event) => { if (event.type === "warning") warnings.push(event.data); });
   const host = createPluginHost(state, { store: new RetrievalStore(), events }, {
-    "obsidian-graph-plugin": {
+    "token-optimizer-plugin": {
       onStart: () => { throw new Error("sk-secret raw prompt"); },
       onEvent: async (ctx) => {
         if (ctx.data.index === undefined) return;
@@ -74,8 +74,8 @@ test("plugin host records sanitized lifecycle failures and serializes event hook
   events.emit("request_started", { data: { index: 1 } });
   events.emit("request_finished", { data: { index: 2 } });
   await new Promise((resolve) => setTimeout(resolve, 30));
-  assert.deepEqual(state.pluginLifecycle["obsidian-graph-plugin"], { status: "error", hook: "onStart", error: "plugin_hook_failed" });
-  const plugin = pluginCatalog.find((item) => item.id === "obsidian-graph-plugin");
+  assert.deepEqual(state.pluginLifecycle["token-optimizer-plugin"], { status: "error", hook: "onStart", error: "plugin_hook_failed" });
+  const plugin = pluginCatalog.find((item) => item.id === "token-optimizer-plugin");
   assert.ok(plugin);
   assert.equal(pluginView(plugin, state).lifecycleStatus, "error");
   assert.equal(pluginView(plugin, state).lifecycleError, "plugin_hook_failed");
@@ -83,12 +83,12 @@ test("plugin host records sanitized lifecycle failures and serializes event hook
   assert.deepEqual(order, ["start:1", "end:1", "start:2", "end:2"]);
 });
 
-test("request plugin policy gates event audit and graph observation", async () => {
+test("request plugin policy gates event and audit hooks", async () => {
   const calls: string[] = [];
   const state = createRuntimeState({ target: "http://127.0.0.1:1/v1" }, "127.0.0.1");
   const events = new EventBus();
   const host = createPluginHost(state, { store: new RetrievalStore(), events }, {
-    "obsidian-graph-plugin": {
+    "token-optimizer-plugin": {
       onEvent: (ctx) => { calls.push(`event:${ctx.event}`); },
       onAudit: (ctx) => { calls.push(`audit:${ctx.requestId}`); }
     }
@@ -100,19 +100,17 @@ test("request plugin policy gates event audit and graph observation", async () =
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.deepEqual(calls, []);
   await finishRequest(manifest("blocked-graph"), fakeAuditStore(), events, state, host, []);
-  assert.equal(state.communicationGraph.nodes.length, 0);
 
-  host.setRequestPlugins("allowed", ["obsidian-graph-plugin"]);
+  host.setRequestPlugins("allowed", ["token-optimizer-plugin"]);
   events.emit("request_started", { requestId: "allowed", data: { path: "/v1/responses" } });
-  await host.audit(manifest("allowed"), ["obsidian-graph-plugin"]);
+  await host.audit(manifest("allowed"), ["token-optimizer-plugin"]);
   await new Promise((resolve) => setTimeout(resolve, 0));
-  await finishRequest(manifest("allowed-graph"), fakeAuditStore(), events, state, host, ["obsidian-graph-plugin"]);
+  await finishRequest(manifest("allowed-graph"), fakeAuditStore(), events, state, host, ["token-optimizer-plugin"]);
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.ok(calls.includes("event:request_started"));
   assert.ok(calls.includes("audit:allowed"));
   assert.ok(calls.includes("audit:allowed-graph"));
   assert.ok(calls.includes("event:request_finished"));
-  assert.ok(state.communicationGraph.nodes.length > 0);
   await host.stop();
 });
 

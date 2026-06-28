@@ -5,8 +5,8 @@ import { pluginDescriptorVersion, type PluginDescriptorV2 } from "../src/plugins
 
 const descriptor: PluginDescriptorV2 = {
   descriptorVersion: pluginDescriptorVersion,
-  id: "obsidian-graph-plugin",
-  name: "Obsidian Graph",
+  id: "sample-observer-plugin",
+  name: "Sample Observer",
   category: "visualization",
   risk: "green",
   capabilities: ["metadata:read", "audit:read:scoped", "settings:read"],
@@ -19,7 +19,7 @@ const descriptor: PluginDescriptorV2 = {
     settings: { type: "object", properties: { enabled: { type: "boolean", default: true } } },
     actions: []
   },
-  workspace: { pagePath: "/__molenkopf/plugins/obsidian-graph-plugin/page", dataPath: "/__molenkopf/plugins/obsidian-graph-plugin/data" },
+  workspace: { pagePath: "/__molenkopf/plugins/sample-observer-plugin/page", dataPath: "/__molenkopf/plugins/sample-observer-plugin/data" },
   dataScopes: ["metrics"],
   modulePath: "plugin.ts"
 };
@@ -28,7 +28,7 @@ test("Team policy absent means team receives global effective policy", () => {
   const state = parsePluginPolicyState({
     pluginPolicySchemaVersion: 1,
     globalPluginPolicy: {
-      "obsidian-graph-plugin": { maxRisk: "green", enabled: true }
+      "sample-observer-plugin": { maxRisk: "green", enabled: true }
     },
     teamPluginPolicies: []
   }, [descriptor]);

@@ -35,7 +35,7 @@ test("control plane stores agent draft metadata without raw tokens", async () =>
       kind: "CI agent",
       providerId: "default",
       tokenHash: "a".repeat(64),
-      enabledPluginIds: ["context-compressor-plugin", "obsidian-graph-plugin"]
+      enabledPluginIds: ["context-compressor-plugin", "token-optimizer-plugin"]
     }, admin);
     assert.equal(accepted.status, 200);
     const saved = await accepted.json();

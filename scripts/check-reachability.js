@@ -14,7 +14,8 @@ const required = [
   "packages/proxy/src/http/local-api-provider-actions.ts",
   "packages/proxy/src/http/local-api-plugin-actions.ts",
   "packages/plugins/context-compressor-plugin/plugin.ts",
-  "packages/plugins/obsidian-graph-plugin/plugin.ts",
+  "packages/plugins/project-graph-plugin/plugin.ts",
+  "packages/plugins/token-optimizer-plugin/plugin.ts",
   "packages/plugins/shared/audit-projects.ts"
 ];
 const retainedUtilities = new Map([

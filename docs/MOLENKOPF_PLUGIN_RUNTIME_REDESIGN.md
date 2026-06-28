@@ -71,8 +71,8 @@ Plugin workspaces:
 
 - Context Compression owns before/after tokens, saved tokens, skip reasons,
   compressors used, retrieval IDs, and compression artifacts.
-- Memory/Obsidian owns derived text-memory nodes, links, write/apply state, and
-  vault export state.
+- Project Graph owns explicit-root source graph nodes, links, scan state, and
+  deferred export state.
 - Core owns redaction counters and leak-prevention diagnostics.
 - Audit owns manifest write/read state and retention diagnostics.
 

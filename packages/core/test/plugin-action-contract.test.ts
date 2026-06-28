@@ -38,10 +38,10 @@ const contextCompressorV2: PluginDescriptorV2 = {
   modulePath: "plugin.ts"
 };
 
-const obsidianGraphV2: PluginDescriptorV2 = {
+const observerV2: PluginDescriptorV2 = {
   descriptorVersion: pluginDescriptorVersion,
-  id: "obsidian-graph-plugin",
-  name: "Obsidian Graph",
+  id: "sample-observer-plugin",
+  name: "Sample Observer",
   category: "visualization",
   risk: "green",
   capabilities: ["metadata:read", "audit:read:scoped", "settings:read"],
@@ -54,14 +54,14 @@ const obsidianGraphV2: PluginDescriptorV2 = {
     settings: { type: "object", properties: {} },
     actions: []
   },
-  workspace: { pagePath: "/__molenkopf/plugins/obsidian-graph-plugin/page", dataPath: "/__molenkopf/plugins/obsidian-graph-plugin/data" },
-  dataScopes: ["metrics", "memory-graph"],
+  workspace: { pagePath: "/__molenkopf/plugins/sample-observer-plugin/page", dataPath: "/__molenkopf/plugins/sample-observer-plugin/data" },
+  dataScopes: ["metrics"],
   modulePath: "plugin.ts"
 };
 
 test("v2 descriptors pass the contract validator", () => {
   assert.equal(validatePluginDescriptorV2(contextCompressorV2).ok, true);
-  assert.equal(validatePluginDescriptorV2(obsidianGraphV2).ok, true);
+  assert.equal(validatePluginDescriptorV2(observerV2).ok, true);
 });
 
 test("action outputSafety only accepts strict/adminSafe", () => {
@@ -79,4 +79,3 @@ test("action none side-effect cannot be combined", () => {
   assert.equal(result.ok, false);
   assert.ok(result.errors.includes("action:sideEffect-none-combination"));
 });
-

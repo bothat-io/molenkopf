@@ -5,8 +5,8 @@ import { pluginDescriptorVersion, type PluginDescriptorV2 } from "../src/plugins
 
 const descriptor: PluginDescriptorV2 = {
   descriptorVersion: pluginDescriptorVersion,
-  id: "obsidian-graph-plugin",
-  name: "Obsidian Graph",
+  id: "sample-observer-plugin",
+  name: "Sample Observer",
   category: "visualization",
   risk: "green",
   capabilities: ["metadata:read", "audit:read:scoped", "settings:read"],
@@ -40,13 +40,13 @@ function sourcePolicy(): ResolvedPluginPolicy {
   const state = parsePluginPolicyState({
     pluginPolicySchemaVersion: 1,
     globalPluginPolicy: {
-      "obsidian-graph-plugin": {
+      "sample-observer-plugin": {
         enabled: false,
         settings: { keep: 8, labels: ["a", "b"] }
       }
     },
     teamPluginPolicies: [
-      { teamId: "team-a", pluginId: "obsidian-graph-plugin", overrides: { settings: { keep: 6 } } }
+      { teamId: "team-a", pluginId: "sample-observer-plugin", overrides: { settings: { keep: 6 } } }
   ]}, [descriptor]);
   return resolveEffectivePluginPolicy(descriptor, state.state, "team-a");
 }
