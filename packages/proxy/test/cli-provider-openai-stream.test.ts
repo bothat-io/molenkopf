@@ -111,12 +111,62 @@ test("Codex CLI JSON events stream visible steps and text deltas", async () => {
 
     assert.equal(response.status, 200);
     const text = await response.text();
-    assert.match(text, /event: molenkopf\.cli\.step/);
+    assert.match(text, /event: response\.in_progress/);
+    assert.match(text, /molenkopf_cli_step/);
     assert.match(text, /exec_command_begin: shell/);
     assert.match(text, /event: response\.output_text\.delta/);
     assert.match(text, /part one /);
     assert.match(text, /part two/);
     assert.match(text, /event: response\.completed/);
+    assert.match(text, /data: \[DONE\]/);
+  } finally {
+    if (proxy) await proxy.close();
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("failed Codex CLI streams still complete the OpenAI Responses stream", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "molenkopf-cli-openai-failed-stream-"));
+  let proxy: Awaited<ReturnType<typeof startProxy>> | undefined;
+  try {
+    const script = join(dir, "fake-codex-fail.cjs");
+    await writeFile(script, [
+      "process.stderr.write('local failure');",
+      "process.stdin.resume();",
+      "process.stdin.on('end', () => process.exit(1));"
+    ].join("\n"));
+    proxy = await startProxy({
+      port: 0,
+      target: "cli://codex-local",
+      providers: [{
+        id: "codex-local",
+        name: "Codex Local",
+        kind: "cli",
+        target: "cli://codex-local",
+        runtime: "codex",
+        cliCommand: process.execPath,
+        cliArgs: [script],
+        cliInputMode: "stdin"
+      }],
+      activeProviderId: "codex-local",
+      providerCatalogMode: "explicit",
+      dataDir: dir
+    });
+    const base = `http://127.0.0.1:${proxy.port}`;
+    const admin = cookieOf(await fetch(`${base}/__molenkopf/setup-admin`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "admin", password: "admin-secret" }) }));
+    const key = await issueKey(base, admin, "cli-openai-failed-stream");
+
+    const response = await fetch(`${base}/v1/responses`, {
+      method: "POST",
+      headers: auth(key, { "content-type": "application/json" }),
+      body: JSON.stringify({ stream: true, model: "codex-client-model", input: "fail stream" })
+    });
+
+    assert.equal(response.status, 200);
+    const text = await response.text();
+    assert.match(text, /Local CLI provider failed before producing a complete response/);
+    assert.match(text, /event: response\.completed/);
+    assert.doesNotMatch(text, /event: response\.failed/);
     assert.match(text, /data: \[DONE\]/);
   } finally {
     if (proxy) await proxy.close();

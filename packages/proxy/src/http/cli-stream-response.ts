@@ -4,7 +4,7 @@ import { estimateTokens } from "../../../core/src/utils/tokens.ts";
 import { executeCliProvider } from "../runtime/cli-executor.ts";
 import { cliRequest } from "../runtime/cli-request.ts";
 import { isOpenAiResponses, wantsStream } from "../runtime/cli-provider.ts";
-import { anthropicStep, anthropicStreamDone, anthropicStreamStart, anthropicTextDelta, openAiFailure, openAiStep, openAiStreamDone, openAiStreamStart, openAiTextDelta, streamError } from "./cli-sse-format.ts";
+import { anthropicStep, anthropicStreamDone, anthropicStreamStart, anthropicTextDelta, openAiProgress, openAiStep, openAiStreamDone, openAiStreamStart, openAiTextDelta, streamError } from "./cli-sse-format.ts";
 
 export type CliStreamResult = {
   status: number;
@@ -35,7 +35,7 @@ async function streamOpenAiCliProvider(provider: ProviderConfig, body: string, r
     connection: "keep-alive"
   });
   res.write(openAiStreamStart(requestId, request.responseModel));
-  const keepAlive = setInterval(() => res.write(": keep-alive\n\n"), 10000);
+  const keepAlive = setInterval(() => res.write(openAiProgress(requestId, request.responseModel)), 10000);
   keepAlive.unref?.();
   const abort = new AbortController();
   let clientClosed = false;
@@ -48,7 +48,7 @@ async function streamOpenAiCliProvider(provider: ProviderConfig, body: string, r
       onEvent: (event) => {
         if (clientClosed || res.destroyed) return;
         if (event.kind === "text_delta") { streamedText += event.text; res.write(openAiTextDelta(requestId, event.text)); }
-        else res.write(openAiStep(event.label));
+        else res.write(openAiStep(requestId, request.responseModel, event.label));
       }
     });
     const usage = { inputTokens: estimateTokens(request.prompt), outputTokens: estimateTokens(output) };
@@ -57,8 +57,10 @@ async function streamOpenAiCliProvider(provider: ProviderConfig, body: string, r
     return { status: 200, usage };
   } catch {
     if (!clientClosed && !res.destroyed) {
-      res.write(openAiFailure(requestId, request.responseModel));
-      res.end();
+      const output = streamedText || "Local CLI provider failed before producing a complete response.";
+      if (!streamedText) res.write(openAiTextDelta(requestId, output));
+      const usage = { inputTokens: estimateTokens(request.prompt), outputTokens: estimateTokens(output) };
+      res.end(openAiStreamDone(requestId, request.responseModel, output, usage));
     }
     return { status: 502 };
   } finally {

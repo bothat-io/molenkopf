@@ -1,21 +1,24 @@
 export type CliStreamUsage = { inputTokens?: number; outputTokens?: number };
 
 export function openAiStreamStart(requestId: string, model: string): string {
-  const base = { id: requestId, object: "response", model, output: [] };
   return [
-    sse("response.created", { type: "response.created", response: { ...base, status: "in_progress" } }),
-    sse("response.in_progress", { type: "response.in_progress", response: { ...base, status: "in_progress" } }),
+    sse("response.created", { type: "response.created", response: openAiResponse(requestId, model, "in_progress") }),
+    openAiProgress(requestId, model),
     sse("response.output_item.added", { type: "response.output_item.added", output_index: 0, item: { ...messageItem(requestId, ""), status: "in_progress", content: [] } }),
     sse("response.content_part.added", { type: "response.content_part.added", item_id: itemId(requestId), output_index: 0, content_index: 0, part: { type: "output_text", text: "", annotations: [] } })
   ].join("");
+}
+
+export function openAiProgress(requestId: string, model: string, metadata?: Record<string, string>): string {
+  return sse("response.in_progress", { type: "response.in_progress", response: openAiResponse(requestId, model, "in_progress", metadata) });
 }
 
 export function openAiTextDelta(requestId: string, text: string): string {
   return sse("response.output_text.delta", { type: "response.output_text.delta", item_id: itemId(requestId), output_index: 0, content_index: 0, delta: text });
 }
 
-export function openAiStep(label: string): string {
-  return sse("molenkopf.cli.step", { type: "molenkopf.cli.step", label });
+export function openAiStep(requestId: string, model: string, label: string): string {
+  return openAiProgress(requestId, model, { molenkopf_cli_step: label });
 }
 
 export function openAiStreamDone(requestId: string, model: string, text: string, usage: CliStreamUsage): string {
@@ -53,7 +56,7 @@ export function anthropicTextDelta(text: string): string {
 }
 
 export function anthropicStep(label: string): string {
-  return sse("molenkopf.cli.step", { type: "molenkopf.cli.step", label });
+  return sse("ping", { type: "ping", molenkopf_cli_step: label });
 }
 
 export function anthropicStreamDone(usage: CliStreamUsage): string {
@@ -70,6 +73,10 @@ export function streamError(message = "Local CLI provider failed."): string {
 
 function messageItem(requestId: string, text: string) {
   return { id: itemId(requestId), type: "message", status: "completed", role: "assistant", content: [{ type: "output_text", text, annotations: [] }] };
+}
+
+function openAiResponse(requestId: string, model: string, status: "in_progress" | "completed", metadata?: Record<string, string>) {
+  return { id: requestId, object: "response", model, status, output: [], ...(metadata ? { metadata } : {}) };
 }
 
 function itemId(requestId: string): string {
