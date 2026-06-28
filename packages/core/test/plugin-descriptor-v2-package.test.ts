@@ -13,5 +13,5 @@ test("built-in plugin descriptors are real v2 descriptors with declared files pr
     assert.equal(existsSync(`${pluginDir}/${descriptor.modulePath}`), true, `${descriptor.id} module exists`);
     if (descriptor.workspace?.pagePath) assert.equal(existsSync(`${pluginDir}/page.html`), true, `${descriptor.id} page exists`);
   }
-  assert.equal(builtinPluginDescriptorsV2.some((item) => item.id === "token-optimizer-plugin"), true);
+  assert.equal(builtinPluginDescriptorsV2.some((item) => item.id === "project-graph-plugin"), true);
 });

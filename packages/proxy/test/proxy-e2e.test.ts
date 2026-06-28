@@ -81,7 +81,7 @@ test("local roadmap endpoints expose status, plugins, config, and dashboard entr
 
     const plugins = await fetch(`${base}/__molenkopf/plugins`, { headers: { cookie: admin } }).then((r) => r.json());
     assert.deepEqual(plugins.staticPipeline.map((item: { name: string }) => item.name), staticPluginPipeline);
-    assert.deepEqual(plugins.items.map((item: { id: string }) => item.id).sort(), ["context-compressor-plugin", "obsidian-graph-plugin", "token-optimizer-plugin"]);
+    assert.deepEqual(plugins.items.map((item: { id: string }) => item.id).sort(), ["context-compressor-plugin", "obsidian-graph-plugin", "project-graph-plugin", "token-optimizer-plugin"]);
     assert.equal(plugins.remotePlugins.enabled, false);
 
     const config = await fetch(`${base}/__molenkopf/config`, { headers: { cookie: admin } }).then((r) => r.json());

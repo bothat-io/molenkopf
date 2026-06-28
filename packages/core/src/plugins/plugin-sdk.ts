@@ -7,7 +7,11 @@ export type PluginPermission =
   | "audit:read"
   | "audit:write"
   | "events:write"
-  | "provider:write";
+  | "provider:write"
+  | "project:files:discover"
+  | "project:files:read"
+  | "project:graph:read"
+  | "project:graph:write";
 
 export type LocalPlugin = {
   name: string;

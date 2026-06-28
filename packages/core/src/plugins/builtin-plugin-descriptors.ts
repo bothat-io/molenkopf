@@ -1,15 +1,18 @@
 import { descriptorV2 as contextCompressorDescriptorV2, runtimeMetadata as contextCompressorRuntime } from "../../../plugins/context-compressor-plugin/descriptor-v2.ts";
 import { descriptorV2 as obsidianGraphDescriptorV2, runtimeMetadata as obsidianGraphRuntime } from "../../../plugins/obsidian-graph-plugin/descriptor-v2.ts";
+import { descriptorV2 as projectGraphDescriptorV2, runtimeMetadata as projectGraphRuntime } from "../../../plugins/project-graph-plugin/descriptor-v2.ts";
 import { descriptorV2 as tokenOptimizerDescriptorV2, runtimeMetadata as tokenOptimizerRuntime } from "../../../plugins/token-optimizer-plugin/descriptor-v2.ts";
 import type { PluginDataScope, PluginDescriptor } from "./plugin-descriptor.ts";
 
 export const contextCompressorDescriptor: PluginDescriptor = toLegacyDescriptor(contextCompressorDescriptorV2, contextCompressorRuntime);
 export const obsidianGraphDescriptor: PluginDescriptor = toLegacyDescriptor(obsidianGraphDescriptorV2, obsidianGraphRuntime);
+export const projectGraphDescriptor: PluginDescriptor = toLegacyDescriptor(projectGraphDescriptorV2, projectGraphRuntime);
 export const tokenOptimizerDescriptor: PluginDescriptor = toLegacyDescriptor(tokenOptimizerDescriptorV2, tokenOptimizerRuntime);
 
 export const builtinPluginDescriptors: PluginDescriptor[] = [
   contextCompressorDescriptor,
   obsidianGraphDescriptor,
+  projectGraphDescriptor,
   tokenOptimizerDescriptor
 ];
 

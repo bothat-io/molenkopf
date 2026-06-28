@@ -17,10 +17,12 @@ const PLUGIN_CATEGORIES: PluginDescriptorV2["category"][] = ["safety", "compress
 const PLUGIN_CATEGORY_SET = new Set<PluginCategory>(PLUGIN_CATEGORIES);
 const PLUGIN_CAPABILITIES = new Set<PluginCapability>([
   "metadata:read", "body:redacted:read", "body:write", "audit:read:scoped", "audit:read:all", "audit:write",
-  "events:write", "settings:read", "settings:write", "policy:recommend", "policy:write", "action:execute"
+  "events:write", "settings:read", "settings:write", "policy:recommend", "policy:write",
+  "project:roots:read", "project:files:discover", "project:files:read", "project:graph:read",
+  "project:graph:write", "project:graph:export", "action:execute"
 ]);
 const PLUGIN_RISK_SET = new Set<PluginRisk>(["green", "yellow", "orange", "red"]);
-const PLUGIN_DATA_SCOPES = new Set<PluginDataScope>(["metrics", "audit-summary", "requests", "memory-graph"]);
+const PLUGIN_DATA_SCOPES = new Set<PluginDataScope>(["metrics", "audit-summary", "requests", "memory-graph", "project-graph", "routes", "symbols"]);
 const PLUGIN_ACTION_SIDE_EFFECTS = new Set<PluginActionSideEffect>(["settings", "policy", "storage", "event", "traffic", "none"]);
 const PLUGIN_ACTION_CONFIRMATIONS = new Set<PluginActionConfirmation>(["none", "required", "typed"]);
 const PLUGIN_ACTION_OUTPUT_SAFETY = new Set<PluginActionOutputSafety>(["strict", "adminSafe"]);

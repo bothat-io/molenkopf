@@ -14,7 +14,14 @@ test("imports a supplied runtime auth JSON without exposing the secret", async (
   try {
     await installFakeCodex(dir);
     restorePath = withPath(dir);
-    proxy = await startProxy({ port: 0, target: "http://127.0.0.1:1/v1", dataDir: dir });
+    proxy = await startProxy({
+      port: 0,
+      target: "http://127.0.0.1:1/v1",
+      providers: [{ id: "base", name: "Base", kind: "api", target: "http://127.0.0.1:1/v1", allowDistribution: false }],
+      activeProviderId: "base",
+      providerCatalogMode: "explicit",
+      dataDir: dir
+    });
     const base = `http://127.0.0.1:${proxy.port}`;
     const admin = await setupAdmin(base);
     const authJson = JSON.stringify({ refresh_token: "codex-session-secret", account: "work" });

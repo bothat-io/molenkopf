@@ -6,6 +6,8 @@ import { builtinPluginDescriptors } from "../src/plugins/plugin-descriptor.ts";
 import { pluginCatalog } from "../src/plugins/plugin-catalog.ts";
 import { staticPluginPipeline } from "../src/plugins/static-pipeline.ts";
 
+const optionalPluginIds = ["context-compressor-plugin", "obsidian-graph-plugin", "project-graph-plugin", "token-optimizer-plugin"];
+
 test("builtin plugin descriptors are unique and expose explicit runtime contracts", () => {
   const ids = builtinPluginDescriptors.map((plugin) => plugin.id);
   assert.equal(new Set(ids).size, ids.length);
@@ -13,7 +15,7 @@ test("builtin plugin descriptors are unique and expose explicit runtime contract
   assert.equal(pluginCatalog.every((plugin) => plugin.permissions.length > 0), true);
   assert.equal(pluginCatalog.every((plugin) => plugin.hooks.length > 0), true);
   assert.equal(pluginCatalog.every((plugin) => plugin.type && plugin.traffic.reads.length > 0 && plugin.traffic.mutates.length > 0), true);
-  assert.deepEqual(pluginCatalog.map((plugin) => plugin.id).sort(), ["context-compressor-plugin", "obsidian-graph-plugin", "token-optimizer-plugin"]);
+  assert.deepEqual(pluginCatalog.map((plugin) => plugin.id).sort(), optionalPluginIds);
 });
 
 test("descriptor registry does not import executable plugin modules", () => {
@@ -42,14 +44,16 @@ test("plugin traffic contracts model optional plugin mutation rights explicitly"
   assert.equal(byId.get("context-compressor-plugin")?.type, "transformer");
   assert.deepEqual(byId.get("context-compressor-plugin")?.traffic.mutates, ["transform"]);
   assert.deepEqual(byId.get("obsidian-graph-plugin")?.traffic.mutates, ["none"]);
+  assert.deepEqual(byId.get("project-graph-plugin")?.traffic.mutates, ["none"]);
   assert.deepEqual(byId.get("token-optimizer-plugin")?.traffic.mutates, ["none"]);
 });
 
 test("registered plugins are optional and toggleable", () => {
   const byId = new Map(pluginCatalog.map((plugin) => [plugin.id, plugin]));
-  assert.deepEqual(pluginCatalog.filter((plugin) => plugin.canToggle).map((plugin) => plugin.id).sort(), ["context-compressor-plugin", "obsidian-graph-plugin", "token-optimizer-plugin"]);
+  assert.deepEqual(pluginCatalog.filter((plugin) => plugin.canToggle).map((plugin) => plugin.id).sort(), optionalPluginIds);
   assert.equal(byId.get("context-compressor-plugin")?.canToggle, true);
   assert.equal(byId.get("obsidian-graph-plugin")?.canToggle, true);
+  assert.equal(byId.get("project-graph-plugin")?.canToggle, true);
   assert.equal(byId.get("token-optimizer-plugin")?.canToggle, true);
   assert.equal(pluginCatalog.every((plugin) => plugin.canToggle), true);
 });
@@ -67,7 +71,7 @@ test("hooks and permissions stay compatible", () => {
 
 test("plugin workspaces publish paired page and data paths", () => {
   const workspaces = pluginCatalog.filter((plugin) => plugin.pagePath || plugin.dataPath);
-  assert.deepEqual(workspaces.map((plugin) => plugin.id).sort(), ["context-compressor-plugin", "obsidian-graph-plugin", "token-optimizer-plugin"]);
+  assert.deepEqual(workspaces.map((plugin) => plugin.id).sort(), optionalPluginIds);
   assert.equal(workspaces.every((plugin) => plugin.pagePath?.endsWith("/page") && plugin.dataPath?.endsWith("/data")), true);
   assert.equal(workspaces.every((plugin) => (plugin.dataScopes ?? []).length > 0), true);
 });

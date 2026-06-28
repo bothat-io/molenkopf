@@ -14,6 +14,7 @@ test("provider weight batches ignore providers excluded from distribution", asyn
       { id: "manual-only", name: "Manual Only", kind: "api", target: "http://127.0.0.1:2/v1", allowDistribution: false },
       { id: "weighted", name: "Weighted", kind: "api", target: "http://127.0.0.1:3/v1" }
     ],
+    providerCatalogMode: "explicit",
     dataDir: dir
   });
   const base = `http://127.0.0.1:${proxy.port}`;

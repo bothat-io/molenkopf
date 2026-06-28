@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Project Graph</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;margin:0;background:#f7f7f4;color:#1b1d1f}
+    main{max-width:1120px;margin:0 auto;padding:28px}
+    h1{font-size:24px;margin:0 0 6px}
+    p{color:#5c6268}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:20px 0}
+    .box{background:white;border:1px solid #deded8;border-radius:8px;padding:14px}
+    .value{font-size:24px;font-weight:700}
+    .empty{border:1px dashed #b8b8af;border-radius:8px;padding:24px;background:#fff}
+    .small{font-size:13px;color:#6a7076}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Project Graph</h1>
+    <p>Local code-structure graph from explicitly configured project roots.</p>
+    <section class="grid">
+      <div class="box"><div class="small">Graphs</div><div id="graphs" class="value">0</div></div>
+      <div class="box"><div class="small">Routes</div><div id="routes" class="value">0</div></div>
+      <div class="box"><div class="small">Warnings</div><div id="warnings" class="value">0</div></div>
+    </section>
+    <section class="empty" id="state">No project graph scanned yet.</section>
+    <p class="small">Safety: graph storage is for structural metadata only, not full source files.</p>
+  </main>
+  <script>
+    fetch("/__molenkopf/plugins/project-graph-plugin/data").then(r=>r.json()).then(data=>{
+      document.getElementById("graphs").textContent=String(data.graphSummaries?.length||0);
+      document.getElementById("routes").textContent=String(data.routes?.length||0);
+      document.getElementById("warnings").textContent=String(data.latestWarnings?.length||0);
+      if(data.graphSummaries?.length) document.getElementById("state").textContent="Project graph data is available.";
+    }).catch(()=>{document.getElementById("state").textContent="Project graph data could not be loaded.";});
+  </script>
+</body>
+</html>

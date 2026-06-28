@@ -20,7 +20,7 @@ import { checkBudgets } from "./budget-gate.ts";
 import { withBudgetWarnings } from "./budget-warnings.ts";
 import { IdentityStore } from "../../../core/src/identity/identity-store.ts";
 import { UsageSnapshotStore } from "../../../core/src/identity/usage-snapshot.ts";
-import { isCliProvider, runCliProvider } from "../runtime/cli-provider.ts";
+import { isCliProvider, isModelListPath, runCliProvider } from "../runtime/cli-provider.ts";
 import { canStreamOpenAiCli, streamOpenAiCliProvider } from "./cli-stream-response.ts";
 import { forwardStream } from "./streaming-proxy.ts";
 import { createResponseUsageScanner } from "./encoded-usage-meter.ts";
@@ -32,6 +32,8 @@ import { restoreUsage } from "./usage-restore.ts";
 import { handleDashboardRequest, isDashboardRequest } from "./dashboard-assets.ts";
 import { createPluginHost, type PluginHost } from "./plugin-host.ts";
 import { effectiveRequestPolicy, enforceModelPolicy } from "./request-policy.ts";
+import { rejectBudget } from "./budget-response.ts";
+import { handleCliModelListResponse } from "./cli-model-list-response.ts";
 import type { ProxyOptions, RunningProxy } from "./server-types.ts";
 export async function startProxy(options: ProxyOptions): Promise<RunningProxy> {
   const host = options.host ?? "127.0.0.1";
@@ -153,6 +155,10 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
   if (body) headers.set("content-length", String(Buffer.byteLength(body)));
   if (isCliProvider(provider)) {
     events.emit("request_forwarded", { requestId, data: { path } });
+    if (isModelListPath(path)) {
+      await handleCliModelListResponse({ res, auditStore, events, state, pluginHost, requestPluginIds, requestId, method: req.method ?? "GET", path, target, provider, started, client });
+      return;
+    }
     if (canStreamOpenAiCli(path, body)) {
       const cli = await streamOpenAiCliProvider(provider, body, requestId, res);
       const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, cli.status, Date.now() - started, client, audit, cli.usage);
@@ -189,5 +195,4 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
 const manifest = buildManifest(requestId, req.method ?? "GET", path, target, provider.id, statusCode, Date.now() - started, client, audit, await scanner.finish());
   await finishRequest(manifest, auditStore, events, state, pluginHost, requestPluginIds);
 }
-function rejectBudget(res: ServerResponse, events: EventBus, requestId: string, budget: Exclude<ReturnType<typeof checkBudgets>, { ok: true }>) { events.emit("request_failed", { requestId, data: { error: budget.error } }); res.writeHead(budget.status, { "content-type": "application/json", "retry-after": "60" }); return res.end(JSON.stringify({ error: budget.error, tier: budget.tier, scope: budget.scopeId, metric: budget.metric })); }
 const headerValue = (value: number | string | string[] | undefined) => Array.isArray(value) ? value[0] : typeof value === "string" ? value : undefined;

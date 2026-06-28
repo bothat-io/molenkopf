@@ -44,5 +44,8 @@ function isAgentTraffic(manifest: AuditManifest): boolean {
 }
 
 function canReadPluginData(capabilities: readonly string[]): boolean {
-  return capabilities.includes("audit:read:scoped") || capabilities.includes("audit:read:all") || capabilities.includes("metadata:read");
+  return capabilities.includes("audit:read:scoped")
+    || capabilities.includes("audit:read:all")
+    || capabilities.includes("metadata:read")
+    || capabilities.includes("project:graph:read");
 }

@@ -16,9 +16,15 @@ export type PluginCapability =
   | "settings:write"
   | "policy:recommend"
   | "policy:write"
+  | "project:roots:read"
+  | "project:files:discover"
+  | "project:files:read"
+  | "project:graph:read"
+  | "project:graph:write"
+  | "project:graph:export"
   | "action:execute";
 export type PluginCategory = "safety" | "compression" | "storage" | "events" | "routing" | "visualization";
-export type PluginDataScope = "metrics" | "audit-summary" | "requests" | "memory-graph";
+export type PluginDataScope = "metrics" | "audit-summary" | "requests" | "memory-graph" | "project-graph" | "routes" | "symbols";
 export type PluginActionSideEffect = "settings" | "policy" | "storage" | "event" | "traffic" | "none";
 export type PluginActionOutputSafety = "strict" | "adminSafe";
 export type PluginActionConfirmation = "none" | "required" | "typed";
