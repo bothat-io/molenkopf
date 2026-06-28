@@ -4,7 +4,7 @@ import { loadDashboardData, loadSession, postJson, putJson } from "./api";
 import { AuthLoadingView, LoginView, SetupView } from "../features/auth/AuthViews";
 import { DashboardNotice } from "../components/feedback/DashboardNotice";
 import { Dialogs, type ModalState } from "../features/identity/Dialogs";
-import { tabFromPath, tabPath, useDevRevisionReload, type DashboardTab } from "./hooks";
+import { tabFromPath, tabPath, useDashboardEventRefresh, useDevRevisionReload, type DashboardTab } from "./hooks";
 import { OverviewTab } from "../features/overview/Overview";
 import { Shell } from "./Shell";
 import { noticeTone, providerTestFailure } from "./messages";
@@ -62,8 +62,10 @@ export function DashboardApp() {
       setMessage(text);
     }
   }, [clearSessionState, user?.id]);
+  const eventRefresh = useCallback(() => reload({ quiet: true }), [reload]);
   useEffect(() => { reload(); }, [reload]);
   useEffect(() => () => loadAbort.current?.abort(), []);
+  useDashboardEventRefresh(eventRefresh, Boolean(user || needsSetup));
   useEffect(() => {
     const tick = () => { if ((user || needsSetup) && shouldPollDashboard(document.visibilityState)) reload({ quiet: true }); };
     const timer = window.setInterval(tick, 5000);
