@@ -53,8 +53,8 @@ function mergeParent(descriptor: PluginDescriptorV2, global: PluginPolicyOverrid
   return {
     enabled: global?.enabled ?? base.enabled,
     maxRisk: clampRisk(base.maxRisk, global?.maxRisk),
-    capabilities: global?.capabilities ? base.capabilities.filter((item) => global.capabilities?.includes(item)) : [...base.capabilities],
-    actions: global?.actions ? base.actions.filter((item) => global.actions?.includes(item)) : [...base.actions],
+    capabilities: global?.capabilities !== undefined ? base.capabilities.filter((item) => global.capabilities?.includes(item)) : [...base.capabilities],
+    actions: global?.actions !== undefined ? base.actions.filter((item) => global.actions?.includes(item)) : [...base.actions],
     settings: mergeSettingsParent(descriptor.settingsSchema, base.settings, global?.settings)
   };
 }

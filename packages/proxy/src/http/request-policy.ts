@@ -5,6 +5,7 @@ export type EffectiveRequestPolicy = {
   agentId?: string;
   allowedModels?: string[];
   defaultModel?: string;
+  enabledPluginIds?: string[];
 };
 
 export type ModelPolicyResult = { ok: true } | { ok: false; status: number; error: string };
@@ -15,10 +16,12 @@ export function effectiveRequestPolicy(state: RuntimeState, headers: Headers, cl
   if (!agentId || client.source !== "api_key" || client.keyAgentLabel !== agentId) return {};
   const configAgent = state.configAgents.find((item) => item.id === agentId);
   const draft = state.agentDrafts.find((item) => item.id === agentId);
+  const enabledPluginIds = draft?.enabledPluginIds ?? configAgent?.enabledPluginIds;
   return {
     agentId,
     allowedModels: configAgent?.allowedModels,
-    defaultModel: configAgent?.defaultModel
+    defaultModel: configAgent?.defaultModel,
+    enabledPluginIds: enabledPluginIds === undefined ? undefined : [...enabledPluginIds]
   };
 }
 

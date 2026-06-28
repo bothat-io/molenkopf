@@ -26,6 +26,7 @@ export function resolveEffectivePluginPolicy(descriptor: PluginDescriptorV2, sta
 
 export function resolveActionPermission(action: PolicyActionCheck, policy: ResolvedPluginPolicy): { ok: boolean; code?: string } {
   if (!policy.enabled) return { ok: false, code: "plugin_disabled" };
+  if (!policy.actions.includes(action.id)) return { ok: false, code: "plugin_action_forbidden" };
   if (!isRisk(action.risk) || RISK_INDEX.get(action.risk)! > RISK_INDEX.get(policy.maxRisk)!) return { ok: false, code: "plugin_risk_violation" };
   return action.requiredCapabilities.some((capability) => !policy.capabilities.includes(capability))
     ? { ok: false, code: "plugin_capability_violation" }
@@ -78,8 +79,8 @@ function resolveArrayPolicy(
   source: ResolvedPolicySource,
   blocked: string[]
 ): string[] {
-  const afterGlobal = global ? defaultValue.filter((item) => global.includes(item)) : [...defaultValue];
-  if (!team) return afterGlobal;
+  const afterGlobal = global !== undefined ? defaultValue.filter((item) => global.includes(item)) : [...defaultValue];
+  if (team === undefined) return afterGlobal;
   const next = afterGlobal.filter((item) => team.includes(item));
   source[field] = "team";
   if (team.some((item) => !afterGlobal.includes(item))) blocked.push(`team_${field}_exceeds_global`);

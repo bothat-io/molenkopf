@@ -47,7 +47,7 @@ export type ResolvedPluginPolicy = {
 };
 
 export type ParseResult = { ok: boolean; state: PluginPolicyStore; warnings: string[] };
-export type PolicyActionCheck = { requiredCapabilities: readonly string[]; risk: PluginRisk };
+export type PolicyActionCheck = { id: string; requiredCapabilities: readonly string[]; risk: PluginRisk };
 export type RoleCheck = { requiredRole: "member" | "manager" | "admin" };
 export type SettingsContext = {
   descriptors: readonly PluginDescriptorV2[];

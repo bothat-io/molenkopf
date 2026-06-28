@@ -25,7 +25,7 @@ export function createRuntimeState(options: RuntimeOptions, host: string): Runti
   attachLocalProviderCredentials(options.dataDir, providers);
   const weights = Object.fromEntries(providers.map((provider) => [provider.id, 1]));
   const requestedActive = options.activeProviderId ?? settings.activeProviderId ?? restored.activeProviderId ?? (explicit ? providers[0]?.id : "default") ?? "default";
-  const builtPolicy = buildRuntimePluginPolicyState(settings.pluginPolicy);
+  const builtPolicy = buildRuntimePluginPolicyState(settings.pluginPolicy, settings.pluginEnabled);
   const settingWarnings = [...(loadedSettings.warning ? [loadedSettings.warning] : []), ...builtPolicy.warnings];
   const settingsLoadWarning = settingWarnings.length ? settingWarnings.join("; ") : undefined;
   return {
@@ -79,8 +79,8 @@ export function distributionEligible(provider: ProviderConfig): boolean {
   return provider.kind !== "cli" || provider.allowDistribution === true || Boolean(provider.runtimeAuthDir);
 }
 
-export function resolveRequestPluginIds(state: RuntimeState, teamIds?: readonly string[]): string[] {
-  return resolvePolicyPluginIds(state, teamIds);
+export function resolveRequestPluginIds(state: RuntimeState, teamIds?: readonly string[], agentEnabledPluginIds?: readonly string[]): string[] {
+  return resolvePolicyPluginIds(state, teamIds, agentEnabledPluginIds);
 }
 
 export function emptyUsage(): UsageTotals {

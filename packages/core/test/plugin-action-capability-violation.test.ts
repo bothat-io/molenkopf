@@ -4,8 +4,8 @@ import { resolveActionPermission } from "../src/plugins/plugin-policy.ts";
 
 test("Action requiring missing capability is blocked", () => {
   const result = resolveActionPermission(
-    { requiredCapabilities: ["audit:read:all"], risk: "yellow" },
-    { pluginId: "sample-observer-plugin", enabled: true, maxRisk: "yellow", capabilities: ["metadata:read"], actions: [], settings: {}, source: { enabled: "global", maxRisk: "global", capabilities: "global", actions: "global", settings: {} }, blockedReasons: [] }
+    { id: "observer.inspect", requiredCapabilities: ["audit:read:all"], risk: "yellow" },
+    { pluginId: "sample-observer-plugin", enabled: true, maxRisk: "yellow", capabilities: ["metadata:read"], actions: ["observer.inspect"], settings: {}, source: { enabled: "global", maxRisk: "global", capabilities: "global", actions: "global", settings: {} }, blockedReasons: [] }
   );
   assert.equal(result.ok, false);
   assert.equal(result.code, "plugin_capability_violation");

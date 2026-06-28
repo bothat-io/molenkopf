@@ -84,7 +84,7 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
   }
   const client = resolved.client;
   const policy = effectiveRequestPolicy(state, inbound, client);
-  const requestPluginIds = resolveRequestPluginIds(state, client.teamIds);
+  const requestPluginIds = resolveRequestPluginIds(state, client.teamIds, policy.enabledPluginIds);
   pluginHost?.setRequestPlugins(requestId, requestPluginIds);
   stripMolenkopfAuthHeaders(inbound);
   const budget = checkBudgets(state, client);
