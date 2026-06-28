@@ -37,15 +37,18 @@ export function createCliOutputCollector(onEvent?: (event: CliOutputEvent) => vo
       if (!streamedText) emitText(final);
       return;
     }
+    const agentMessage = codexAgentMessageText(event);
+    if (agentMessage) emitText(agentMessage, true);
     const delta = deltaText(event);
     if (delta) emitText(delta);
     const step = stepLabel(event);
     if (step) onEvent?.({ kind: "step", label: step });
   }
 
-  function emitText(text: string): void {
-    streamedText += text;
-    onEvent?.({ kind: "text_delta", text });
+  function emitText(text: string, block = false): void {
+    const output = block && streamedText ? `\n\n${text}` : text;
+    streamedText += output;
+    onEvent?.({ kind: "text_delta", text: output });
   }
 }
 
@@ -65,7 +68,6 @@ function finalOutputText(event: Record<string, unknown>): string {
 function deltaText(event: Record<string, unknown>): string {
   const type = text(event.type ?? event.event).toLowerCase();
   return firstText(
-    codexAgentMessageText(event),
     nested(event, "delta", "text"),
     event.delta,
     type.includes("message") || type.includes("text") ? event.text : undefined,

@@ -86,3 +86,25 @@ test("imported Codex providers run in an isolated read-only workspace", () => {
     join("runtime-auth", "codex-work", "workspace")
   ]);
 });
+
+test("imported Codex providers respect explicit imported sandbox profiles", () => {
+  assert.deepEqual(cliArgs({
+    ...codexProvider,
+    runtimeAuthDir: "runtime-auth/codex-work",
+    runtimeProfile: { sandbox: "danger-full-access", approval: "never" },
+    cliArgs: ["exec", "--sandbox", "danger-full-access", "-c", 'approval_policy="never"']
+  }), [
+    "exec",
+    "-c",
+    'approval_policy="never"',
+    "--ephemeral",
+    "--json",
+    "--ignore-user-config",
+    "--ignore-rules",
+    "--skip-git-repo-check",
+    "--sandbox",
+    "danger-full-access",
+    "--cd",
+    join("runtime-auth", "codex-work", "workspace")
+  ]);
+});

@@ -35,7 +35,7 @@ export function cliArgs(provider: ProviderConfig, runModel?: string): string[] {
       ensureFlag(args, "--ignore-user-config");
       ensureFlag(args, "--ignore-rules");
       ensureFlag(args, "--skip-git-repo-check");
-      setOptionValue(args, "--sandbox", "read-only");
+      setOptionValue(args, "--sandbox", provider.runtimeProfile?.sandbox ?? "read-only");
       setOptionValue(args, "--cd", runtimeProviderWorkspace(provider));
     }
     if (runModel && !hasModelFlag(args)) args.push("-m", runModel);

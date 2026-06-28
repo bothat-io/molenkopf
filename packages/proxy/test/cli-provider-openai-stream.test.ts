@@ -135,7 +135,8 @@ test("Codex CLI item events stream assistant text without raw JSONL", async () =
       "process.stdin.on('end', () => {",
       "  console.log(JSON.stringify({ type: 'thread.started', thread_id: 'thread-1' }));",
       "  console.log(JSON.stringify({ type: 'turn.started' }));",
-      "  console.log(JSON.stringify({ type: 'item.completed', item: { id: 'item_0', type: 'agent_message', text: 'visible assistant text' } }));",
+      "  console.log(JSON.stringify({ type: 'item.completed', item: { id: 'item_0', type: 'agent_message', text: 'first assistant text' } }));",
+      "  console.log(JSON.stringify({ type: 'item.completed', item: { id: 'item_1', type: 'agent_message', text: 'second assistant text' } }));",
       "  console.log(JSON.stringify({ type: 'item.started', item: { id: 'item_1', type: 'command_execution', command: 'Get-Secret sk-test-secret', status: 'in_progress' } }));",
       "  console.log(JSON.stringify({ type: 'item.completed', item: { id: 'item_1', type: 'command_execution', command: 'Get-Secret sk-test-secret', aggregated_output: 'secret output', exit_code: 0, status: 'completed' } }));",
       "  console.log(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 10, output_tokens: 2 } }));",
@@ -170,7 +171,8 @@ test("Codex CLI item events stream assistant text without raw JSONL", async () =
 
     assert.equal(response.status, 200);
     const text = await response.text();
-    assert.match(text, /visible assistant text/);
+    assert.match(text, /first assistant text/);
+    assert.match(text, /first assistant text\\n\\nsecond assistant text/);
     assert.match(text, /event: response\.completed/);
     assert.doesNotMatch(text, /thread\.started/);
     assert.doesNotMatch(text, /item\.completed/);
