@@ -14,7 +14,7 @@ export function classifyContent(text: string, filename = ""): ContentKind {
   if (/\.(ts|tsx|js|mjs|cjs|json|lock|sql|py|go|rs)$/i.test(filename)) return "source_code";
   if (/\b(import|export|function|class|interface|type)\b|=>|[{;]\s*$/m.test(text)) return "source_code";
   if (/^\s{0,3}#{1,6}\s|^\s*[-*]\s|\|.+\|/m.test(text)) return "markdown";
-  if (/\b(npm|pnpm|yarn|pytest|cargo|go test|FAIL|PASS|exit code)\b/i.test(text)) return "shell_output";
+  if (isShellOutput(text)) return "shell_output";
   const lines = text.split("\n");
   const logHits = lines.filter((line) => /\d{4}-\d{2}-\d{2}|^\[[^\]]+\]\s+(ERROR|WARN|INFO|DEBUG|TRACE|FATAL)\b|\b(ERROR|WARN|FATAL)\b/i.test(line)).length;
   const requiredHits = Math.max(1, Math.ceil(lines.length * 0.2));
@@ -22,4 +22,13 @@ export function classifyContent(text: string, filename = ""): ContentKind {
   if (logHits >= 1 && numberedOutputHits >= Math.ceil(lines.length * 0.5)) return "log";
   if (logHits >= requiredHits) return "log";
   return "plain_text";
+}
+
+function isShellOutput(text: string): boolean {
+  const command = /^\s*(?:\$|>)?\s*(?:npm|pnpm|yarn|pytest|cargo\s+test|go\s+test|vitest|jest|tsc|eslint|docker\s+build|mvn|gradle|dotnet\s+test)\b/im;
+  if (command.test(text)) return true;
+  if (/\bexit code\b/i.test(text)) return true;
+  const testStatus = /^\s*(?:PASS|FAIL|FAILED)\s+\S+/im.test(text);
+  const failureSignal = /\b(?:AssertionError|Traceback|panic|failed tests?|test failed|Error:)\b/i.test(text);
+  return testStatus && failureSignal;
 }

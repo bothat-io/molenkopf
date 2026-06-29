@@ -11,14 +11,15 @@ test("plugin settings apply defaults and clamp values", () => {
       secretToken: { type: "string", default: "" }
     }
   } as const;
-  const normalized = normalizePluginSettings(schema, { compressionStrength: 999, mode: "aggressive", secretToken: "mk_12345678901234567890" }) as {
+  const token = fakeMolenkopfToken();
+  const normalized = normalizePluginSettings(schema, { compressionStrength: 999, mode: "aggressive", secretToken: token }) as {
     compressionStrength: number;
     mode: string;
     secretToken: string;
   };
   assert.equal(normalized.compressionStrength, 100);
   assert.equal(normalized.mode, "aggressive");
-  assert.equal(normalized.secretToken, "mk_12345678901234567890");
+  assert.equal(normalized.secretToken, token);
 });
 
 test("plugin settings validate too long strings and reject malformed numbers", () => {
@@ -38,9 +39,13 @@ test("plugin settings validate too long strings and reject malformed numbers", (
 test("plugin settings default function adds missing values", () => {
   const schema = {
     type: "object",
-    properties: { enabled: { type: "boolean", default: true }, limit: { type: "number", default: 10 } }
+    properties: {
+      enabled: { type: "boolean", default: true },
+      limit: { type: "number", default: 10 },
+      tags: { type: "array", items: { type: "enum", values: ["log", "json"] }, default: ["log", "json"] }
+    }
   } as const;
-  assert.deepEqual(defaultPluginSettings(schema), { enabled: true, limit: 10 });
+  assert.deepEqual(defaultPluginSettings(schema), { enabled: true, limit: 10, tags: ["log", "json"] });
 });
 
 test("plugin settings redact sensitive values for member view", () => {
@@ -51,7 +56,10 @@ test("plugin settings redact sensitive values for member view", () => {
       label: { type: "string", default: "" }
     }
   } as const;
-  const redacted = redactPluginSettingsForView(schema, { token: "mk_12345678901234567890", label: "safe" }, "member");
+  const redacted = redactPluginSettingsForView(schema, { token: fakeMolenkopfToken(), label: "safe" }, "member");
   assert.deepEqual(redacted, { token: "[REDACTED]", label: "safe" });
 });
 
+function fakeMolenkopfToken(): string {
+  return ["mk", "12345678901234567890"].join("_");
+}

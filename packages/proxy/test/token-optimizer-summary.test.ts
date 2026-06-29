@@ -4,17 +4,38 @@ import { observeTokenTraffic } from "../../plugins/token-optimizer-plugin/observ
 
 test("token optimizer summarizes request and token observations", () => {
   const summary = observeTokenTraffic([
-    manifest(120, 40, 30),
-    manifest(80, 20, 10)
+    manifest(120, 40, 180, 120, 60),
+    manifest(80, 20, 90, 90, 0)
   ]);
   assert.deepEqual(summary, {
     requests: 2,
     inputTokens: 200,
     outputTokens: 60,
-    savedTokens: 40
+    providerReportedInputTokens: 200,
+    providerReportedOutputTokens: 60,
+    originalTokens: 270,
+    forwardedTokens: 210,
+    cachedTokens: 50,
+    cacheReadTokens: 40,
+    cacheCreationTokens: 10,
+    reasoningTokens: 7,
+    savedTokens: 60,
+    potentialSavedTokens: 25
   });
 });
 
-function manifest(input: number, output: number, saved: number) {
-  return { upstreamInputTokens: input, upstreamOutputTokens: output, estimatedSavedTokens: saved } as any;
+function manifest(input: number, output: number, original: number, forwarded: number, saved: number) {
+  return {
+    upstreamInputTokens: input,
+    upstreamOutputTokens: output,
+    compressedItems: saved > 0 ? 1 : 0,
+    estimatedOriginalTokens: original,
+    estimatedCompressedTokens: forwarded,
+    estimatedSavedTokens: saved,
+    potentialSavedTokens: saved > 0 ? 25 : 0,
+    cachedTokens: saved > 0 ? 50 : 0,
+    cacheReadTokens: saved > 0 ? 40 : 0,
+    cacheCreationTokens: saved > 0 ? 10 : 0,
+    reasoningTokens: saved > 0 ? 7 : 0
+  } as any;
 }

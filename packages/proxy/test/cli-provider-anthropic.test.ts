@@ -122,7 +122,8 @@ test("Claude CLI stream-json events stream visible steps and text deltas", async
     const text = await stream.text();
     assert.match(text, /event: ping/);
     assert.match(text, /molenkopf_cli_step/);
-    assert.match(text, /tool_use: Read/);
+    assert.match(text, /using Read/);
+    assert.doesNotMatch(text, /tool_use: Read/);
     assert.match(text, /event: content_block_delta/);
     assert.match(text, /alpha /);
     assert.match(text, /beta/);

@@ -4,6 +4,35 @@ export type JsonStringReplacement = { start: number; end: number; value: string 
 type Frame = { type: "object"; state: "key" | "colon" | "value" | "comma"; key?: string } | { type: "array"; state: "value" | "comma" };
 const MAX_SCAN_DEPTH = 1000;
 
+export function hasLongJsonStringCandidate(text: string, minChars: number): boolean {
+  let inString = false;
+  let escaped = false;
+  let count = 0;
+  for (const char of text) {
+    if (!inString) {
+      if (char === '"') {
+        inString = true;
+        count = 0;
+      }
+      continue;
+    }
+    if (escaped) {
+      escaped = false;
+      count++;
+    } else if (char === "\\") {
+      escaped = true;
+      count++;
+    } else if (char === '"') {
+      inString = false;
+      count = 0;
+    } else {
+      count++;
+    }
+    if (count >= minChars) return true;
+  }
+  return false;
+}
+
 export function replaceJsonStrings(text: string, replacements: JsonStringReplacement[]): string {
   if (!replacements.length) return text;
   const ordered = [...replacements].sort((a, b) => a.start - b.start);

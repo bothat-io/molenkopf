@@ -28,7 +28,7 @@ export const descriptorV2: PluginDescriptorV2 = {
 
 export const runtimeMetadata: BuiltinPluginRuntimeMetadata = {
   type: "observer",
-  description: "Observes token usage, budgets, and repeated context without mutating traffic.",
+  description: "Observes token usage, budgets, and repeated token pressure without mutating traffic.",
   traffic: { reads: ["audit", "metadata"], mutates: ["none"] },
   permissions: ["audit:read", "metadata:read"],
   hooks: ["workspace:local-page"],

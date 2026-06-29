@@ -42,12 +42,13 @@
     <div class="statusbox"><div class="state" id="state">Loading workspace...</div><div class="actions"><button id="refresh" type="button">Refresh snapshot</button></div></div>
   </header>
   <section class="grid" id="metrics"></section>
-  <section class="chart-grid">
-    <div class="panel"><h2>Payload reduction chart</h2><div id="reduction"></div></div>
-    <div class="panel"><h2>Recent activity chart</h2><div id="timeline"></div></div>
-  </section>
-  <section class="panel" id="funnel"></section>
-  <section class="grid two">
+	  <section class="chart-grid">
+	    <div class="panel"><h2>Payload reduction chart</h2><div id="reduction"></div></div>
+	    <div class="panel"><h2>Recent activity chart</h2><div id="timeline"></div></div>
+	  </section>
+	  <section class="panel" id="funnel"></section>
+	  <section class="grid two"><div class="panel"><h2>Top skip reasons</h2><div id="skipReasons"></div></div><div class="panel"><h2>Compression by kind</h2><div id="contentKinds"></div></div></section>
+	  <section class="grid two">
     <div class="panel"><h2>Projects / API keys</h2><div id="accounts"></div></div>
     <div class="panel"><h2>Provider savings</h2><div id="providers"></div></div>
   </section>
@@ -58,7 +59,7 @@
 const DATA_URL="/__molenkopf/plugins/context-compressor-plugin/data";
 const METRICS=[
   ["Requests","requests"],["Observed payload","originalTokens"],["Forwarded payload","forwardedTokens"],
-  ["Transform delta","payloadDelta","delta"],["Compression saved","savedTokens"],["Compressed items","compressedItems"],["Compression %","savedPercent","pct"],
+  ["Transform delta","payloadDelta","delta"],["Compression saved","savedTokens"],["Potential saved","potentialSavedTokens"],["Compressed items","compressedItems"],["Compression %","savedPercent","pct"],
   ["Input tokens","upstreamInputTokens"],["Output tokens","upstreamOutputTokens"],["Redacted secrets","redactedSecrets"]
 ];
 const TABLE_COLS=[["Requests","requests"],["Compression saved","savedTokens"],["Compression %","savedPercent","pct"],["Original","originalTokens"],["Forwarded","forwardedTokens"]];
@@ -141,7 +142,13 @@ function renderBreakdown(id,rows,emptyLabel,withSource=false){
       `<div><span class="label">Requests</span><b>${n(row.requests)}</b></div><div><span class="label">Compression saved</span><b>${n(row.savedTokens)}</b></div>`+
       `<div><span class="label">${third[0]}</span><b>${third[1]}</b></div><div><span class="label">${fourth[0]}</span><b>${fourth[1]}</b></div>`+
       `</div></div>`;
-  }).join("")+`</div>`;
+	  }).join("")+`</div>`;
+		}
+
+function renderCounts(id,rows,emptyLabel){
+  if(!rows?.length){$(id).innerHTML=`<div class="empty">${emptyLabel}</div>`;return}
+  const max=Math.max(...rows.map((row)=>row.count||0),1);
+  $(id).innerHTML=rows.slice(0,8).map((row)=>chartRow(row.label,row.count,Math.max(2,Math.round((row.count||0)/max*100)),"sent")).join("");
 }
 
 function renderRecent(groups){
@@ -167,14 +174,16 @@ async function load(){
   if(button) button.disabled=true;
   try{
     const data=await loadData(DATA_URL);
-    if(data.loadError){$("state").innerHTML=`Data unavailable <span class="badge">error</span><div class="muted">${esc(data.loadError)}</div>`;["metrics","reduction","timeline","funnel","accounts","providers","endpoints","recent"].forEach((id)=>$(id).innerHTML=`<div class="empty status-error">Plugin data unavailable. Refresh after the proxy returns a valid data response.</div>`);return}
-    const m=data.metrics||{}, groups=data.requestGroups||[];
+	    if(data.loadError){$("state").innerHTML=`Data unavailable <span class="badge">error</span><div class="muted">${esc(data.loadError)}</div>`;["metrics","reduction","timeline","funnel","skipReasons","contentKinds","accounts","providers","endpoints","recent"].forEach((id)=>$(id).innerHTML=`<div class="empty status-error">Plugin data unavailable. Refresh after the proxy returns a valid data response.</div>`);return}
+	    const m=data.metrics||{}, groups=data.requestGroups||[];
     $("state").innerHTML=stateText(data.plugin,m);
     renderMetrics(m);
     renderReduction(m);
-    renderTimeline(groups);
-    renderFunnel(m);
-    const projectRows=m.projects&&m.projects.length?m.projects:m.buckets;
+	    renderTimeline(groups);
+	    renderFunnel(m);
+	    renderCounts("skipReasons",data.diagnostics?.skipReasons,"No skipped compression candidates observed yet.");
+	    renderCounts("contentKinds",data.diagnostics?.contentKindCounts,"No compressible content kinds observed yet.");
+	    const projectRows=m.projects&&m.projects.length?m.projects:m.buckets;
     renderBreakdown("accounts",projectRows,"No project or API-key buckets observed yet.",!(m.projects&&m.projects.length));
     renderBreakdown("providers",m.providers,"No provider traffic observed yet.");
     renderTable("endpoints",m.endpoints,"No endpoint traffic observed yet.");
@@ -187,5 +196,4 @@ async function load(){
 $("refresh").addEventListener("click",load);
 load();
 </script>
-</body>
-</html>
+</body></html>

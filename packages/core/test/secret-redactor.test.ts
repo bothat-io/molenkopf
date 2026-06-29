@@ -42,6 +42,22 @@ test("redacts query-style secrets inside JSON without consuming JSON delimiters"
   assert.doesNotMatch(result.text, /render-secret-0|hunter2|abc123/);
 });
 
+test("redacts authorization headers inside JSON without consuming string delimiters", () => {
+  const bearer = "sk-proj-" + "a".repeat(48);
+  const result = redactSecrets(JSON.stringify({
+    log: `Authorization: Bearer ${bearer}`,
+    basic: "Authorization: Basic dXNlcjpwYXNz",
+    line: "Cookie: sid=abc; token=def",
+    cookie: "json-cookie-secret"
+  }));
+  const parsed = JSON.parse(result.text);
+  assert.match(parsed.log, /^Authorization: Bearer \[REDACTED_SECRET:authorization_bearer:sha256:[a-f0-9]{12}\]$/);
+  assert.match(parsed.basic, /^Authorization: Basic \[REDACTED_SECRET:authorization_basic:sha256:[a-f0-9]{12}\]$/);
+  assert.match(parsed.line, /^Cookie: \[REDACTED_SECRET:cookie:sha256:[a-f0-9]{12}\]$/);
+  assert.match(parsed.cookie, /^\[REDACTED_SECRET:json_cookie:sha256:[a-f0-9]{12}\]$/);
+  assert.doesNotMatch(result.text, /sk-proj-|dXNlcjpwYXNz|sid=abc|json-cookie-secret/);
+});
+
 test("redacts sensitive JSON keys with ordinary string values", () => {
   const result = redactSecrets(JSON.stringify({
     password: "plain-password",

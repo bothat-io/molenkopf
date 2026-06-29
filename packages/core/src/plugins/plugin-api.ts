@@ -20,6 +20,17 @@ export type PluginMetrics = {
   savedTokens: number;
   retrievalIds: string[];
   compressorsUsed: string[];
+  compressionCandidates?: number;
+  compressionSkipped?: number;
+  skipReasons?: Record<string, number>;
+  contentKindCounts?: Record<string, number>;
+  originalBytes?: number;
+  forwardedBytes?: number;
+  compressionRatio?: number;
+  potentialCompressedItems?: number;
+  potentialSavedTokens?: number;
+  potentialSavedBytes?: number;
+  contentFingerprints?: AuditManifest["contentFingerprints"];
 };
 
 export type PluginLifecycleContext = {
@@ -38,6 +49,7 @@ export type PluginRequestContext = {
   consumerId: string;
   providerId: string;
   body: string;
+  settings: Record<string, unknown>;
   usageOf: (consumerId: string) => PluginUsage;
   note: (message: string) => void;
 };
@@ -88,6 +100,7 @@ export type PluginRuntimeContext = {
   pluginId: string;
   dataDir?: string;
   storage?: unknown;
+  fingerprintSecret?: string;
   now: () => Date;
 };
 

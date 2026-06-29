@@ -3,7 +3,7 @@ import type { ProviderConfig } from "../../../core/src/providers/provider-catalo
 const hopByHop = new Set(["connection", "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "transfer-encoding", "upgrade", "host"]);
 const sensitive = new Set(["authorization", "cookie", "set-cookie", "x-api-key"]);
 const providerAuth = new Set(["authorization", "x-api-key"]);
-const blockedRequest = new Set(["set-cookie", "forwarded", "proxy-connection", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto"]);
+const blockedRequest = new Set(["content-length", "set-cookie", "forwarded", "proxy-connection", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto"]);
 
 export function buildForwardHeaders(headers: Headers, provider?: ProviderConfig, env: Record<string, string | undefined> = process.env): Headers {
   const out = new Headers();

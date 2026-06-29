@@ -1,11 +1,10 @@
 export type CliStreamUsage = { inputTokens?: number; outputTokens?: number };
+export type OpenAiStreamState = { reasoningParts: string[]; messageStarted: boolean };
 
 export function openAiStreamStart(requestId: string, model: string): string {
   return [
     sse("response.created", { type: "response.created", response: openAiResponse(requestId, model, "in_progress") }),
-    openAiProgress(requestId, model),
-    sse("response.output_item.added", { type: "response.output_item.added", output_index: 0, item: { ...messageItem(requestId, ""), status: "in_progress", content: [] } }),
-    sse("response.content_part.added", { type: "response.content_part.added", item_id: itemId(requestId), output_index: 0, content_index: 0, part: { type: "output_text", text: "", annotations: [] } })
+    openAiProgress(requestId, model)
   ].join("");
 }
 
@@ -13,24 +12,47 @@ export function openAiProgress(requestId: string, model: string, metadata?: Reco
   return sse("response.in_progress", { type: "response.in_progress", response: openAiResponse(requestId, model, "in_progress", metadata) });
 }
 
-export function openAiTextDelta(requestId: string, text: string): string {
-  return sse("response.output_text.delta", { type: "response.output_text.delta", item_id: itemId(requestId), output_index: 0, content_index: 0, delta: text });
+export function openAiTextDelta(requestId: string, state: OpenAiStreamState, text: string): string {
+  return sse("response.output_text.delta", { type: "response.output_text.delta", item_id: itemId(requestId), output_index: messageOutputIndex(state), content_index: 0, delta: text });
 }
 
-export function openAiStep(requestId: string, model: string, label: string): string {
-  return openAiProgress(requestId, model, { molenkopf_cli_step: label });
+export function openAiStep(requestId: string, state: OpenAiStreamState, label: string): string {
+  const text = `**Molenkopf: ${label}**\n`;
+  const index = state.reasoningParts.length;
+  const start = index ? "" : [
+    sse("response.output_item.added", { type: "response.output_item.added", output_index: 0, item: { ...reasoningItem(requestId, []), status: "in_progress", summary: [] } })
+  ].join("");
+  state.reasoningParts.push(text);
+  return start + [
+    sse("response.reasoning_summary_part.added", { type: "response.reasoning_summary_part.added", item_id: reasoningId(requestId), output_index: 0, summary_index: index, part: { type: "summary_text", text: "" } }),
+    sse("response.reasoning_summary_text.delta", { type: "response.reasoning_summary_text.delta", item_id: reasoningId(requestId), output_index: 0, summary_index: index, delta: text })
+  ].join("");
 }
 
-export function openAiStreamDone(requestId: string, model: string, text: string, usage: CliStreamUsage): string {
+export function openAiMessageStart(requestId: string, state: OpenAiStreamState): string {
+  if (state.messageStarted) return "";
+  state.messageStarted = true;
+  const outputIndex = messageOutputIndex(state);
+  return [
+    state.reasoningParts.length ? sse("response.output_item.done", { type: "response.output_item.done", output_index: 0, item: reasoningItem(requestId, state.reasoningParts) }) : "",
+    sse("response.output_item.added", { type: "response.output_item.added", output_index: outputIndex, item: { ...messageItem(requestId, ""), status: "in_progress", content: [] } }),
+    sse("response.content_part.added", { type: "response.content_part.added", item_id: itemId(requestId), output_index: outputIndex, content_index: 0, part: { type: "output_text", text: "", annotations: [] } })
+  ].join("");
+}
+
+export function openAiStreamDone(requestId: string, model: string, text: string, usage: CliStreamUsage, state: OpenAiStreamState): string {
   const input = usage.inputTokens ?? 0, output = usage.outputTokens ?? 0;
   const item = messageItem(requestId, text);
+  const outputIndex = messageOutputIndex(state);
+  const responseOutput = state.reasoningParts.length ? [reasoningItem(requestId, state.reasoningParts), item] : [item];
   return [
-    sse("response.output_text.done", { type: "response.output_text.done", item_id: item.id, output_index: 0, content_index: 0, text }),
-    sse("response.content_part.done", { type: "response.content_part.done", item_id: item.id, output_index: 0, content_index: 0, part: item.content[0] }),
-    sse("response.output_item.done", { type: "response.output_item.done", output_index: 0, item }),
+    openAiMessageStart(requestId, state),
+    sse("response.output_text.done", { type: "response.output_text.done", item_id: item.id, output_index: outputIndex, content_index: 0, text }),
+    sse("response.content_part.done", { type: "response.content_part.done", item_id: item.id, output_index: outputIndex, content_index: 0, part: item.content[0] }),
+    sse("response.output_item.done", { type: "response.output_item.done", output_index: outputIndex, item }),
     sse("response.completed", {
       type: "response.completed",
-      response: { id: requestId, object: "response", model, status: "completed", output: [item], output_text: text, usage: { input_tokens: input, output_tokens: output, total_tokens: input + output, prompt_tokens: input, completion_tokens: output } }
+      response: { id: requestId, object: "response", model, status: "completed", output: responseOutput, output_text: text, usage: { input_tokens: input, output_tokens: output, total_tokens: input + output, prompt_tokens: input, completion_tokens: output } }
     }),
     "data: [DONE]\n\n"
   ].join("");
@@ -75,12 +97,24 @@ function messageItem(requestId: string, text: string) {
   return { id: itemId(requestId), type: "message", status: "completed", role: "assistant", content: [{ type: "output_text", text, annotations: [] }] };
 }
 
+function reasoningItem(requestId: string, parts: string[]) {
+  return { id: reasoningId(requestId), type: "reasoning", status: "completed", summary: parts.map((text) => ({ type: "summary_text", text })), content: null, encrypted_content: null };
+}
+
 function openAiResponse(requestId: string, model: string, status: "in_progress" | "completed", metadata?: Record<string, string>) {
   return { id: requestId, object: "response", model, status, output: [], ...(metadata ? { metadata } : {}) };
 }
 
 function itemId(requestId: string): string {
   return `msg_${requestId.replaceAll("-", "")}`;
+}
+
+function reasoningId(requestId: string): string {
+  return `rs_${requestId.replaceAll("-", "")}`;
+}
+
+function messageOutputIndex(state: OpenAiStreamState): number {
+  return state.reasoningParts.length ? 1 : 0;
 }
 
 function messageId(requestId: string): string {

@@ -11,9 +11,12 @@ export type TokenBudgetSummary = {
   warnings: string[];
 };
 
+const MEDIUM_TOKEN_PRESSURE = 50_000;
+const HIGH_TOKEN_PRESSURE = 200_000;
+
 export function summarizeBudgetPressure(manifests: readonly AuditManifest[]): TokenBudgetSummary {
   const total = manifests.reduce((sum, manifest) => sum + (manifest.upstreamInputTokens ?? 0) + (manifest.upstreamOutputTokens ?? 0), 0);
-  const pressure = total >= 2000 ? "high" : total >= 500 ? "medium" : "low";
+  const pressure = total >= HIGH_TOKEN_PRESSURE ? "high" : total >= MEDIUM_TOKEN_PRESSURE ? "medium" : "low";
   const warnings = pressure === "high" ? ["budget_pressure_high"] : pressure === "medium" ? ["budget_pressure_medium"] : [];
   return {
     totalTokens: { state: "available", value: total, source: "provider_reported" },

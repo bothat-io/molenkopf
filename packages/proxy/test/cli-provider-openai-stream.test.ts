@@ -111,9 +111,10 @@ test("Codex CLI JSON events stream visible steps and text deltas", async () => {
 
     assert.equal(response.status, 200);
     const text = await response.text();
-    assert.match(text, /event: response\.in_progress/);
-    assert.match(text, /molenkopf_cli_step/);
-    assert.match(text, /exec_command_begin: shell/);
+    assert.match(text, /event: response\.reasoning_summary_text\.delta/);
+    assert.doesNotMatch(text, /molenkopf_cli_step/);
+    assert.match(text, /Molenkopf: running command/);
+    assert.doesNotMatch(text, /exec_command_begin: shell/);
     assert.match(text, /event: response\.output_text\.delta/);
     assert.match(text, /part one /);
     assert.match(text, /part two/);

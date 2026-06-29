@@ -2,7 +2,7 @@ import type { AuditManifest } from "../../../core/src/manifest/audit-store.ts";
 import { costEur } from "../../../core/src/identity/pricing.ts";
 import { budgetPeriodKey } from "../../../core/src/identity/budget.ts";
 import type { BudgetPeriod } from "../../../core/src/identity/types.ts";
-import { clientIdForAgent } from "./client-identity.ts";
+import { clientIdForAgent, safeSubjectId } from "./client-identity.ts";
 import type { RuntimeState, UsagePeriodTotals, UsageTotals } from "./runtime-types.ts";
 
 export function recordUsage(state: RuntimeState, manifest: AuditManifest): void {
@@ -11,7 +11,8 @@ export function recordUsage(state: RuntimeState, manifest: AuditManifest): void 
   if (manifest.providerId) accumulate(state.usageByProvider, manifest.providerId, manifest, cost, at);
   const client = manifest.client;
   if (client) {
-    if (client.userId) accumulate(state.usageByUser, userUsageKey(client.userId), manifest, cost, at);
+    const userId = usageUserId(state, client);
+    if (userId) accumulate(state.usageByUser, userUsageKey(userId), manifest, cost, at);
     else if (client.source === "user") accumulate(state.usageByUser, client.id, manifest, cost, at);
     for (const id of agentUsageKeys(client)) accumulate(state.usageByAgent, id, manifest, cost, at);
     if (client.keyId) accumulate(state.usageByKey, client.keyId, manifest, cost, at);
@@ -63,6 +64,13 @@ export function orgCostUsed(state: RuntimeState, period: BudgetPeriod = "total",
 
 export function agentTokensUsed(state: RuntimeState, clientId: string): number {
   return tokensOf(state.usageByAgent[clientId] ?? state.usageByUser[clientId]);
+}
+
+export function identityUserIdForAuditId(state: RuntimeState, value: string): string {
+  if (!state.identity) return value;
+  if (state.identity.getUser(value)) return value;
+  const matches = state.identity.listUsers().filter((user) => safeSubjectId(user.id) === value);
+  return matches.length === 1 ? matches[0].id : value;
 }
 
 function agentUsageKeys(client: NonNullable<AuditManifest["client"]>): string[] {
@@ -120,6 +128,14 @@ function addReasoningUsage(usage: NonNullable<UsagePeriodTotals["models"]>[strin
 
 function tokensOf(usage: UsageTotals | undefined): number {
   return usage ? usage.inputTokens + usage.outputTokens : 0;
+}
+
+function usageUserId(state: RuntimeState, client: NonNullable<AuditManifest["client"]>): string | undefined {
+  if (client.keyId) {
+    const owner = state.identity?.data.keys[client.keyId]?.ownerUserId;
+    if (owner) return owner;
+  }
+  return client.userId ? identityUserIdForAuditId(state, client.userId) : undefined;
 }
 
 function costOf(usage: UsageTotals | undefined): number {

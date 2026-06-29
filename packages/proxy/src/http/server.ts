@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { AuditStore } from "../../../core/src/manifest/audit-store.ts";
 import { EventBus } from "../../../core/src/events/event-bus.ts";
+import { RequestTimer } from "../../../core/src/observability/request-timing.ts";
+import { requestCacheDiagnostics } from "../../../core/src/cache/request-cache-diagnostics.ts";
 import { type RewriteAudit } from "../../../core/src/pipeline/openai-request-rewriter.ts";
 import { estimateTokens } from "../../../core/src/utils/tokens.ts";
 import { builtinMiddlewares, runRequestPipeline, type PluginContext } from "./plugin-pipeline.ts";
@@ -9,7 +11,7 @@ import { orderIndex } from "./local-api-pipeline.ts";
 import { RetrievalStore } from "../../../core/src/store/retrieval-store.ts";
 import { buildForwardHeaders, missingProviderCredential } from "./header-utils.ts";
 import { handleLocalRequest } from "./local-api.ts";
-import { createRuntimeState, emptyUsage, resolveRequestPluginIds } from "./runtime-state.ts";
+import { createRuntimeState, emptyUsage, resolveEffectivePluginPolicy, resolveRequestPluginIds } from "./runtime-state.ts";
 import type { RuntimeState } from "./runtime-types.ts";
 import { resolveRouting } from "./agent-router.ts";
 import { finishProxyRequest } from "./request-finish.ts";
@@ -74,16 +76,16 @@ async function handle(req: IncomingMessage, res: ServerResponse, store: Retrieva
   }
 }
 async function handleProxy(req: IncomingMessage, res: ServerResponse, store: RetrievalStore, auditStore: AuditStore, events: EventBus, state: RuntimeState, pluginHost: PluginHost) {
-  const started = Date.now(), requestId = randomUUID(), rawPath = req.url ?? "/", path = auditPath(rawPath);
+  const started = Date.now(), timer = new RequestTimer(), requestId = randomUUID(), rawPath = req.url ?? "/", path = auditPath(rawPath);
   const method = req.method ?? "GET";
   const inbound = new Headers(req.headers as Record<string, string>);
-  const resolved = resolveClientIdentity(state.identity, inbound);
+  timer.mark("auth:start"); const resolved = resolveClientIdentity(state.identity, inbound);
+  timer.mark("auth:end");
   if (!resolved.keyOk) {
     events.emit("request_failed", { requestId, data: { error: "invalid_api_key" } });
     return writeJson(res, 401, { error: "invalid_api_key" });
   }
-  const client = resolved.client;
-  const policy = effectiveRequestPolicy(state, inbound, client);
+  const client = resolved.client; const policy = effectiveRequestPolicy(state, inbound, client);
   const requestPluginIds = resolveRequestPluginIds(state, client.teamIds, policy.enabledPluginIds);
   pluginHost?.setRequestPlugins(requestId, requestPluginIds);
   stripMolenkopfAuthHeaders(inbound);
@@ -116,12 +118,14 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
   if (jsonRequest && originalBody) {
     const ctx: PluginContext = {
       requestId, method, path, consumerId: client.id, providerId: provider.id,
-      body, redactedSecrets: 0, compressedItems: 0, savedTokens: 0, retrievalIds: [], compressorsUsed: [], notes: [],
+      body, settingsFor: (id) => resolveEffectivePluginPolicy(state, id, client.teamIds)?.settings ?? {}, redactedSecrets: 0, compressedItems: 0, compressionCandidates: 0, compressionSkipped: 0, savedTokens: 0, retrievalIds: [], compressorsUsed: [], skipReasons: {}, contentKindCounts: {}, notes: [],
       usageOf: (id) => state.usageByAgent[id] ?? emptyUsage(),
       note(message) { ctx.notes.push(message); }
     };
     const ordered = [...builtinMiddlewares].sort((a, b) => orderIndex(state, a.id) - orderIndex(state, b.id));
-    await runRequestPipeline(ctx, (id) => requestPluginIds.includes(id), { store }, ordered);
+    timer.mark("plugin:start"); timer.mark("compression:start");
+    await runRequestPipeline(ctx, (id) => requestPluginIds.includes(id), { store, fingerprintSecret: state.sessionSecret }, ordered);
+    timer.mark("compression:end"); timer.mark("plugin:end");
     if (ctx.block) return reject(ctx.block.status, ctx.block.error, undefined, requestModel);
     if (ctx.providerId !== provider.id) {
       const next = state.providers.find((item) => item.id === ctx.providerId && item.enabled !== false);
@@ -132,14 +136,11 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
     }
     body = ctx.body;
     audit = {
-      compressedItems: ctx.compressedItems,
-      estimatedOriginalTokens: estimateTokens(originalBody),
-      estimatedCompressedTokens: estimateTokens(body),
-      estimatedSavedTokens: ctx.savedTokens,
-      redactedSecrets: ctx.redactedSecrets,
-      retrievalIds: ctx.retrievalIds,
-      compressorsUsed: ctx.compressorsUsed,
-      warnings: ctx.notes
+      compressedItems: ctx.compressedItems, estimatedOriginalTokens: estimateTokens(originalBody), estimatedCompressedTokens: estimateTokens(body), estimatedSavedTokens: ctx.savedTokens,
+      redactedSecrets: ctx.redactedSecrets, retrievalIds: ctx.retrievalIds, compressorsUsed: ctx.compressorsUsed, warnings: ctx.notes,
+      compressionCandidates: ctx.compressionCandidates, compressionSkipped: ctx.compressionSkipped, skipReasons: ctx.skipReasons, contentKindCounts: ctx.contentKindCounts,
+      originalBytes: ctx.originalBytes, forwardedBytes: ctx.forwardedBytes, compressionRatio: ctx.compressionRatio,
+      potentialCompressedItems: ctx.potentialCompressedItems, potentialSavedTokens: ctx.potentialSavedTokens, potentialSavedBytes: ctx.potentialSavedBytes, contentFingerprints: ctx.contentFingerprints, ...requestCacheDiagnostics(body, state.sessionSecret)
     };
     if (ctx.compressedItems) events.emit("request_compressed", { requestId, data: { items: ctx.compressedItems } });
   }
@@ -149,12 +150,12 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
   const headers = buildForwardHeaders(inbound, provider);
   if (body) headers.set("content-length", String(Buffer.byteLength(body)));
   const finish = (statusCode: number, usage?: Parameters<typeof finishProxyRequest>[0]["usage"]) =>
-    finishProxyRequest({ auditStore, events, state, pluginHost, pluginIds: requestPluginIds, requestId, method, path, target, providerId: provider.id, started, client, statusCode, audit, usage, requestModel });
+    finishProxyRequest({ auditStore, events, state, pluginHost, pluginIds: requestPluginIds, requestId, method, path, target, providerId: provider.id, started, client, statusCode, audit, usage, requestModel, timings: timer.snapshot() });
   if (isCliProvider(provider)) {
     events.emit("request_forwarded", { requestId, data: { path } });
     if (isModelListPath(path)) return handleCliModelListResponse({ res, auditStore, events, state, pluginHost, requestPluginIds, requestId, method, path, target, provider, started, client });
     if (canStreamCli(path, body)) {
-      const cli = await streamCliProvider(provider, body, requestId, path, res);
+      const cli = await streamCliProvider(provider, body, requestId, path, res, { onEvent: (event) => event.kind === "step" && (audit?.warnings.push(`cli_step:${event.label}`), events.emit("request_step", { requestId, data: { step: event.label } })) });
       await finish(cli.status, cli.usage);
       return;
     }
@@ -164,7 +165,7 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
     req.once("aborted", abortCli);
     res.once("close", abortCli);
     try {
-      const cli = await runCliProvider(provider, body, requestId, path, { signal: abort.signal });
+      const cli = await runCliProvider(provider, body, requestId, path, { signal: abort.signal, onEvent: (event) => event.kind === "step" && (audit?.warnings.push(`cli_step:${event.label}`), events.emit("request_step", { requestId, data: { step: event.label } })) });
       cliDone = true;
       await finish(cli.status, cli.usage);
       res.writeHead(cli.status, cli.headers);
@@ -180,14 +181,14 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
     }
   }
   events.emit("request_forwarded", { requestId, data: { path } });
-  let scanner = createResponseUsageScanner(undefined), statusCode: number;
+  let scanner = createResponseUsageScanner(undefined), statusCode: number, sawFirstByte = false, sawFirstSse = false, isSse = false;
   try {
-    const result = await forwardStream(res, target, rawPath, req.method ?? "GET", headers, body || undefined, {
+    timer.mark("upstream:start"); const result = await forwardStream(res, target, rawPath, req.method ?? "GET", headers, body || undefined, {
       allowPrivateTarget: provider.kind === "local" || provider.id === "default",
-      onResponseHead: (_status, responseHeaders) => { scanner = createResponseUsageScanner(headerValue(responseHeaders["content-encoding"])); },
-      onResponseBody: (chunk) => { scanner.feed(chunk); }
+      onResponseHead: (_status, responseHeaders) => { timer.mark("upstream:connected"); isSse = /text\/event-stream/i.test(headerValue(responseHeaders["content-type"]) ?? ""); scanner = createResponseUsageScanner(headerValue(responseHeaders["content-encoding"])); },
+      onResponseBody: (chunk) => { if (!sawFirstByte) { timer.mark("upstream:first-byte"); sawFirstByte = true; } if (isSse && !sawFirstSse) { timer.mark("upstream:first-sse"); sawFirstSse = true; } scanner.feed(chunk); }
     });
-    statusCode = result.statusCode;
+    timer.mark("upstream:end"); statusCode = result.statusCode;
   } catch (error) {
     await finish(502);
     if (!res.headersSent) return writeJson(res, 502, { error: "proxy_error", requestId });

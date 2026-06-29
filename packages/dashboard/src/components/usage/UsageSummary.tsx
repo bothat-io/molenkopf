@@ -29,7 +29,7 @@ export function UsageSummary({ summary, teamCount, variants, activeVariantId, on
         <SummaryMetric label="Teams" value={num(teamCount)} />
       </div>
       <div className="usage-summary-details">
-        <UsageGauge used={used} budget={budget} />
+        <UsageGauge used={used} requests={Number(summary.requests || 0)} budget={budget} />
         <TokenMix usage={summary} />
       </div>
     </div>
@@ -47,7 +47,7 @@ function activeLabel(variants: UsageVariant[], activeId: string): string {
   return active.detail ? `${active.model || active.label} / thinking: ${active.detail}` : active.label;
 }
 
-function UsageGauge({ used, budget }: { used: number; budget?: Budget }) {
+function UsageGauge({ used, requests, budget }: { used: number; requests: number; budget?: Budget }) {
   const limit = budget?.tokenLimit;
   const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
   return <section className="usage-summary-detail usage-summary-gauge">
@@ -57,6 +57,7 @@ function UsageGauge({ used, budget }: { used: number; budget?: Budget }) {
         <span className="usage-summary-detail-label">{limit ? "Budget gauge" : "Usage gauge"}</span>
         <div className="n">{num(used)}</div>
         <div className="t">tokens used</div>
+        {requests > 0 && used === 0 ? <span className="rs">provider usage unavailable</span> : null}
         <BudgetLine used={used} budget={budget} />
       </div>
     </div>
