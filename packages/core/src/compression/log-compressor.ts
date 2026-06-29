@@ -2,7 +2,7 @@ import { stripAnsi } from "../utils/text.ts";
 
 export type CompressionResult = { text: string; compressed: boolean; compressorName: string };
 
-const SIGNAL = /ERROR|FATAL|FAIL|failed|exception|traceback|panic|timeout|exit code|assert|Expected:|Received:|\.([jt]s|py|go|rs):\d+/i;
+const SIGNAL = /ERROR|FATAL|FAIL|failed|exception|traceback|panic|timeout|exit code|assert|Expected:|Received:|npm ERR!|error TS\d+|failed to solve|--- FAIL:|\.([jt]s|py|go|rs):\d+/i;
 const NOISE = /\b(downloaded|resolved|fetching|progress|installing|extracting|vite transform|npm timing)\b/i;
 const TIMESTAMP = /\b20\d\d-\d\d-\d\d[T ][0-2]\d:[0-5]\d:[0-5]\d(?:\.\d+)?Z?\b/g;
 const COMMAND = /^\s*(?:\$|>)?\s*((?:npm|pnpm|yarn|pytest|go test|cargo test|mvn|gradle|dotnet test|vitest|jest|tsc|eslint|docker build)\b.*)$/i;
@@ -84,10 +84,10 @@ function ciSummary(lines: string[]): string[] {
     if (cwdMatch) cwd = cwdMatch[1].trim();
     const exitMatch = /exit code[: ]+(\d+)/i.exec(line);
     if (exitMatch) exitCode = exitMatch[1];
-    if (/^\s*(?:FAIL|FAILED)\b/i.test(line)) pushLimited(failed, line.trim(), 12);
-    if (/\b(?:AssertionError|Expected|Received|assert)\b/i.test(line)) pushLimited(assertions, line.trim(), 16);
+    if (/^\s*(?:FAIL|FAILED|--- FAIL:)\b/i.test(line) || /\bFAILED\b.*::/.test(line)) pushLimited(failed, line.trim(), 12);
+    if (/\b(?:AssertionError|Expected|Received|assert|npm ERR!|error TS\d+|failed to solve|panicked at)\b/i.test(line)) pushLimited(assertions, line.trim(), 16);
     if (APP_FRAME.test(line)) pushLimited(frames, line.trim(), 16);
-    if (/^\s*(?:stderr|error)[:>]/i.test(line)) pushLimited(stderr, line.trim(), 12);
+    if (/^\s*(?:stderr|error)[:>]/i.test(line) || /\b(?:npm ERR!|error TS\d+|failed to solve)\b/i.test(line)) pushLimited(stderr, line.trim(), 12);
   }
   for (const line of lines.slice(-40)) if (SIGNAL.test(line) || /\b(?:tests?|summary|passed)\b/i.test(line)) pushLimited(final, line.trim(), 12);
   return [

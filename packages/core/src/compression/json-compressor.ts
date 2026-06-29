@@ -33,10 +33,12 @@ function summarizeArray(items: unknown[], retrieveId: string): string {
   const last = items.slice(-ARRAY_EDGE_ITEMS).map((item) => summarizeValue(item, 1));
   const important = importantItems(items).map((item) => summarizeValue(item, 1));
   const keys = arrayKeys(items);
+  const statuses = statusCounts(items);
   return [
     `[molenkopf compressed: kind=json original_items=${items.length} kept_edge_items=${ARRAY_EDGE_ITEMS * 2} omitted_items=${Math.max(0, items.length - ARRAY_EDGE_ITEMS * 2)} retrieve=${retrieveId}]`,
     `item_keys: ${keys.items.join(", ")}${keys.omitted ? `, ... omitted_key_entries=${keys.omitted}` : ""}`,
     `key_counts: ${keyCounts(items).join(", ")}`,
+    statuses.length ? `status_counts: ${statuses.join(", ")}` : "",
     `important_items_count: ${important.length}`,
     important.length ? "important_items:" : "",
     important.length ? JSON.stringify(important, null, 2) : "",
@@ -159,4 +161,18 @@ function keyCounts(items: unknown[]): string[] {
     for (const key of Object.keys(item)) counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20).map(([key, count]) => `${key}=${count}`);
+}
+
+function statusCounts(items: unknown[]): string[] {
+  const fields = new Set(["status", "state", "result", "level", "severity"]);
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    for (const [key, value] of Object.entries(item)) {
+      if (!fields.has(key) || typeof value !== "string" || value.length > 48) continue;
+      const label = `${key}.${value.replace(/[^a-z0-9_.:-]+/gi, "_")}`;
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 16).map(([key, count]) => `${key}=${count}`);
 }

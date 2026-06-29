@@ -72,6 +72,24 @@ test("extracts cwd stderr and final summaries from shell output", () => {
   assert.match(result.text, /Tests: 1 failed, 4 passed/);
 });
 
+test("keeps compiler, npm, and docker failure signals", () => {
+  const lines = [
+    "$ npm run build",
+    ...Array.from({ length: 260 }, (_, i) => `2026-01-01T00:00:00Z npm timing idealTree:${i} Completed in ${i}ms`),
+    "src/index.ts:12:5 - error TS2322: Type 'string' is not assignable to type 'number'.",
+    "npm ERR! code ELIFECYCLE",
+    "stderr: failed to solve: process exited with code 1",
+    "exit code 1"
+  ];
+  const result = compressLog(lines.join("\n"), "molenkopf://sha256/build");
+  assert.ok(result.compressed);
+  assert.match(result.text, /command: npm run build/);
+  assert.match(result.text, /error TS2322/);
+  assert.match(result.text, /npm ERR! code ELIFECYCLE/);
+  assert.match(result.text, /failed to solve/);
+  assert.match(result.text, /exit_code: 1/);
+});
+
 test("preserves late expected and received details when early assertions fill the budget", () => {
   const lines = [
     "$ npm test",
