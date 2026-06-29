@@ -113,10 +113,10 @@ function normalizeNode(schema: PluginMiniSchema, value: unknown, depth: number, 
     return clamp(value, schema.minimum ?? -Number.MAX_SAFE_INTEGER, schema.maximum ?? Number.MAX_SAFE_INTEGER);
   }
   if (schema.type === "enum") return typeof value === "string" && schema.values.includes(value) ? value : schema.default ?? schema.values[0] ?? "";
-  if (schema.type === "array") {
-    const arraySchema = schema;
-    const source = Array.isArray(value) ? value : [];
-    const max = arraySchema.maxLength ?? MAX_ARRAY_LENGTH;
+	  if (schema.type === "array") {
+	    const arraySchema = schema;
+	    const source = Array.isArray(value) ? value : Array.isArray(arraySchema.default) ? [...arraySchema.default] : [];
+	    const max = arraySchema.maxLength ?? MAX_ARRAY_LENGTH;
     const items = arraySchema.items as PluginMiniSchema;
     return source.slice(0, max).map((item) => normalizeNode(items, item, depth + 1, seen));
   }

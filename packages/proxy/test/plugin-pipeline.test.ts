@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { RetrievalStore } from "../../core/src/store/retrieval-store.ts";
 import { pluginCatalog } from "../../core/src/plugins/plugin-catalog.ts";
 import { runRequestPipeline, builtinMiddlewares, middlewareFromModule, type PluginContext, type PluginMiddleware } from "../src/http/plugin-pipeline.ts";
+import { plugin as contextCompressorPlugin } from "../../plugins/context-compressor-plugin/plugin.ts";
 
 function ctx(body: string, overrides: Partial<PluginContext> = {}): PluginContext {
   const c: PluginContext = {
@@ -36,6 +37,26 @@ test("a TypeScript plugin request hook adapts to the middleware contract", async
   const c = await runRequestPipeline(ctx("hello"), all, { store: new RetrievalStore() }, [{ ...mw, mutates: ["transform"] }]);
   assert.equal(c.body, "HELLO");
   assert.deepEqual(c.notes, ["hooked"]);
+});
+
+test("request hooks receive effective plugin settings", async () => {
+  const mw = middlewareFromModule("hooked", {
+    onRequest: (request) => ({ notes: [`mode:${request.settings.mode}`] })
+  });
+  const c = await runRequestPipeline(ctx("{}", { settingsFor: () => ({ mode: "observe" }) }), all, { store: new RetrievalStore() }, [{ ...mw, mutates: ["none"] }]);
+  assert.deepEqual(c.notes, ["mode:observe"]);
+});
+
+test("context compressor off mode skips without requiring storage", async () => {
+  const result = await contextCompressorPlugin.onRequest?.({
+    requestId: "r1", method: "POST", path: "/v1/messages", consumerId: "user:operator", providerId: "default",
+    body: "{}", settings: { mode: "off" }, usageOf: () => ({ requests: 0, inputTokens: 0, outputTokens: 0 }), note() {}
+  }, { pluginId: "context-compressor-plugin", now: () => new Date() });
+
+  if (!result) assert.fail("expected context compressor off mode to return skip metrics");
+  assert.equal(result.body, undefined);
+  assert.equal(result.compressionSkipped, 1);
+  assert.deepEqual(result.skipReasons, { compressor_disabled: 1 });
 });
 
 test("a middleware can block and stops the chain", async () => {
@@ -83,18 +104,23 @@ test("unauthorized middleware route and block changes are restored", async () =>
 
 test("plugin hook failures restore all context mutations and continue", async () => {
   const c = await runRequestPipeline(ctx("original"), all, { store: new RetrievalStore() }, [
-    { id: "bad", mutates: ["transform", "route", "block"], run: (item) => {
-      item.body = "changed"; item.providerId = "backup"; item.redactedSecrets = 9; item.compressedItems = 9;
-      item.savedTokens = 9; item.retrievalIds.push("r"); item.compressorsUsed.push("c"); item.notes.push("raw"); item.block = { status: 499, error: "raw" };
+	    { id: "bad", mutates: ["transform", "route", "block"], run: (item) => {
+	      item.body = "changed"; item.providerId = "backup"; item.redactedSecrets = 9; item.compressedItems = 9;
+	      item.compressionCandidates = 9; item.compressionSkipped = 9; item.skipReasons = { raw: 9 }; item.contentKindCounts = { log: 9 };
+	      item.savedTokens = 9; item.retrievalIds.push("r"); item.compressorsUsed.push("c"); item.notes.push("raw"); item.block = { status: 499, error: "raw" };
       throw new Error("secret prompt");
     } },
     { id: "after", run: (item) => { item.notes.push("after"); } }
   ]);
   assert.equal(c.body, "original");
   assert.equal(c.providerId, "default");
-  assert.equal(c.redactedSecrets, 0);
-  assert.equal(c.compressedItems, 0);
-  assert.equal(c.savedTokens, 0);
+	  assert.equal(c.redactedSecrets, 0);
+	  assert.equal(c.compressedItems, 0);
+	  assert.equal(c.compressionCandidates, undefined);
+	  assert.equal(c.compressionSkipped, undefined);
+	  assert.deepEqual(c.skipReasons, {});
+	  assert.deepEqual(c.contentKindCounts, {});
+	  assert.equal(c.savedTokens, 0);
   assert.deepEqual(c.retrievalIds, []);
   assert.deepEqual(c.compressorsUsed, []);
   assert.deepEqual(c.block, undefined);
@@ -103,15 +129,20 @@ test("plugin hook failures restore all context mutations and continue", async ()
 
 test("capability violations restore counters arrays and notes", async () => {
   const c = await runRequestPipeline(ctx("original"), all, { store: new RetrievalStore() }, [
-    { id: "observer", run: (item) => {
-      item.body = "changed"; item.redactedSecrets = 5; item.compressedItems = 5;
-      item.savedTokens = 5; item.retrievalIds.push("r"); item.compressorsUsed.push("c"); item.notes.push("raw");
-    } }
+	    { id: "observer", run: (item) => {
+	      item.body = "changed"; item.redactedSecrets = 5; item.compressedItems = 5;
+	      item.compressionCandidates = 5; item.compressionSkipped = 5; item.skipReasons = { raw: 5 }; item.contentKindCounts = { log: 5 };
+	      item.savedTokens = 5; item.retrievalIds.push("r"); item.compressorsUsed.push("c"); item.notes.push("raw");
+	    } }
   ]);
   assert.equal(c.body, "original");
-  assert.equal(c.redactedSecrets, 0);
-  assert.equal(c.compressedItems, 0);
-  assert.equal(c.savedTokens, 0);
+	  assert.equal(c.redactedSecrets, 0);
+	  assert.equal(c.compressedItems, 0);
+	  assert.equal(c.compressionCandidates, undefined);
+	  assert.equal(c.compressionSkipped, undefined);
+	  assert.deepEqual(c.skipReasons, {});
+	  assert.deepEqual(c.contentKindCounts, {});
+	  assert.equal(c.savedTokens, 0);
   assert.deepEqual(c.retrievalIds, []);
   assert.deepEqual(c.compressorsUsed, []);
   assert.deepEqual(c.notes, ["plugin_capability_violation:observer:body"]);

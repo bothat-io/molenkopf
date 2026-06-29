@@ -1,4 +1,11 @@
-export type UsageTotals = { inputTokens?: number; outputTokens?: number };
+export type UsageTotals = {
+  inputTokens?: number;
+  outputTokens?: number;
+  cachedTokens?: number;
+  cacheReadTokens?: number;
+  cacheCreationTokens?: number;
+  reasoningTokens?: number;
+};
 
 const MAX_TOKEN_VALUE = 1_000_000_000;
 const MAX_BUFFER_CHARS = 2_000_000;
@@ -6,6 +13,10 @@ const MAX_BUFFER_CHARS = 2_000_000;
 export function createUsageMeter() {
   let input: number | undefined;
   let output: number | undefined;
+  let cached: number | undefined;
+  let cacheRead: number | undefined;
+  let cacheCreation: number | undefined;
+  let reasoning: number | undefined;
   let buffer = "";
   let sseBuffer = "";
   return {
@@ -17,13 +28,22 @@ export function createUsageMeter() {
     },
     result(): UsageTotals {
       applyUsage(jsonUsage(buffer));
-      return { inputTokens: input, outputTokens: output };
+      const result: UsageTotals = { inputTokens: input, outputTokens: output };
+      if (cached !== undefined) result.cachedTokens = cached;
+      if (cacheRead !== undefined) result.cacheReadTokens = cacheRead;
+      if (cacheCreation !== undefined) result.cacheCreationTokens = cacheCreation;
+      if (reasoning !== undefined) result.reasoningTokens = reasoning;
+      return result;
     }
   };
 
   function applyUsage(usage: UsageTotals | undefined) {
     input = maxToken(input, usage?.inputTokens);
     output = maxToken(output, usage?.outputTokens);
+    cached = maxToken(cached, usage?.cachedTokens);
+    cacheRead = maxToken(cacheRead, usage?.cacheReadTokens);
+    cacheCreation = maxToken(cacheCreation, usage?.cacheCreationTokens);
+    reasoning = maxToken(reasoning, usage?.reasoningTokens);
   }
 }
 
@@ -83,8 +103,16 @@ function usageObject(value: unknown): UsageTotals | undefined {
   if (!isRecord(value)) return undefined;
   return {
     inputTokens: token(value.input_tokens) ?? token(value.prompt_tokens),
-    outputTokens: token(value.output_tokens) ?? token(value.completion_tokens)
+    outputTokens: token(value.output_tokens) ?? token(value.completion_tokens),
+    cachedTokens: nestedToken(value.prompt_tokens_details, "cached_tokens"),
+    cacheReadTokens: token(value.cache_read_input_tokens),
+    cacheCreationTokens: token(value.cache_creation_input_tokens),
+    reasoningTokens: nestedToken(value.completion_tokens_details, "reasoning_tokens")
   };
+}
+
+function nestedToken(value: unknown, key: string): number | undefined {
+  return isRecord(value) ? token(value[key]) : undefined;
 }
 
 function token(value: unknown): number | undefined {

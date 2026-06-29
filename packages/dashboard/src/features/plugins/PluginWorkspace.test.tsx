@@ -17,6 +17,7 @@ describe("PluginWorkspace", () => {
     expect(html).toContain("Global default");
     expect(html).toContain("Everyone");
     expect(html).toContain("context-compressor-plugin");
+    expect(html).toContain("plugin-summary-side");
     expect(html).toContain("transformer");
     expect(html).toContain("12 tokens saved");
     expect(html).toContain("Turn on");

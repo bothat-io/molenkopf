@@ -46,6 +46,20 @@ describe("OverviewTab", () => {
     expect(html).toContain("50%");
   });
 
+  it("explains zero provider tokens when requests have no usage", () => {
+    const html = renderToString(<OverviewTab
+      config={{ bindHost: "127.0.0.1", port: 8787 }}
+      currentUser={{ id: "member-a", displayName: "Member Alpha", role: "member", teamIds: ["alpha"] }}
+      keys={[]}
+      usage={{ users: [{ id: "member-a", displayName: "Member Alpha", role: "member", teamIds: ["alpha"], usage: { requests: 2, inputTokens: 0, outputTokens: 0 } }], teams: [] }}
+      selectedSecret=""
+      onNewKey={() => {}}
+      onRevoke={() => {}}
+    />);
+
+    expect(html).toContain("provider usage unavailable");
+  });
+
   it("scopes teams and members to the current user's teams", () => {
     const html = renderToString(<OverviewTab
       config={{ bindHost: "127.0.0.1", port: 8787 }}

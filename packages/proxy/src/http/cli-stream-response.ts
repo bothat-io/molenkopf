@@ -4,7 +4,10 @@ import { estimateTokens } from "../../../core/src/utils/tokens.ts";
 import { executeCliProvider } from "../runtime/cli-executor.ts";
 import { cliRequest } from "../runtime/cli-request.ts";
 import { isOpenAiResponses, wantsStream } from "../runtime/cli-provider.ts";
-import { anthropicStep, anthropicStreamDone, anthropicStreamStart, anthropicTextDelta, openAiProgress, openAiStep, openAiStreamDone, openAiStreamStart, openAiTextDelta, streamError } from "./cli-sse-format.ts";
+import type { CliOutputEvent } from "../runtime/cli-output-events.ts";
+import { visibleCliStepLabel } from "./cli-progress-label.ts";
+import { anthropicStep, anthropicStreamDone, anthropicStreamStart, anthropicTextDelta, openAiMessageStart, openAiProgress, openAiStep, openAiStreamDone, openAiStreamStart, openAiTextDelta, streamError, type OpenAiStreamState } from "./cli-sse-format.ts";
+import { endSse, writeSse, writeSseHeaders } from "./cli-sse-writer.ts";
 
 const CLI_STREAM_PROGRESS_INTERVAL_MS = 2000;
 
@@ -12,6 +15,7 @@ export type CliStreamResult = {
   status: number;
   usage?: { inputTokens?: number; outputTokens?: number };
 };
+export type CliStreamOptions = { onEvent?: (event: CliOutputEvent) => void };
 
 export function canStreamCli(path: string, body: string): boolean {
   return wantsStream(body) && (isOpenAiResponses(path) || isAnthropicMessages(path));
@@ -22,22 +26,20 @@ export async function streamCliProvider(
   body: string,
   requestId: string,
   path: string,
-  res: ServerResponse
+  res: ServerResponse,
+  options: CliStreamOptions = {}
 ): Promise<CliStreamResult> {
   return isAnthropicMessages(path)
-    ? streamAnthropicCliProvider(provider, body, requestId, res)
-    : streamOpenAiCliProvider(provider, body, requestId, res);
+    ? streamAnthropicCliProvider(provider, body, requestId, res, options)
+    : streamOpenAiCliProvider(provider, body, requestId, res, options);
 }
 
-async function streamOpenAiCliProvider(provider: ProviderConfig, body: string, requestId: string, res: ServerResponse): Promise<CliStreamResult> {
+async function streamOpenAiCliProvider(provider: ProviderConfig, body: string, requestId: string, res: ServerResponse, options: CliStreamOptions): Promise<CliStreamResult> {
   const request = cliRequest(body, provider);
-  res.writeHead(200, {
-    "content-type": "text/event-stream",
-    "cache-control": "no-cache",
-    connection: "keep-alive"
-  });
-  res.write(openAiStreamStart(requestId, request.responseModel));
-  const keepAlive = setInterval(() => res.write(openAiProgress(requestId, request.responseModel)), CLI_STREAM_PROGRESS_INTERVAL_MS);
+  writeSseHeaders(res);
+  writeSse(res, openAiStreamStart(requestId, request.responseModel));
+  const streamState: OpenAiStreamState = { reasoningParts: [], messageStarted: false };
+  const keepAlive = setInterval(() => writeSse(res, openAiProgress(requestId, request.responseModel)), CLI_STREAM_PROGRESS_INTERVAL_MS);
   keepAlive.unref?.();
   const abort = new AbortController();
   let clientClosed = false;
@@ -48,21 +50,25 @@ async function streamOpenAiCliProvider(provider: ProviderConfig, body: string, r
     const output = await executeCliProvider(provider, request.prompt, request.runModel, {
       signal: abort.signal,
       onEvent: (event) => {
+        options.onEvent?.(event);
         if (clientClosed || res.destroyed) return;
-        if (event.kind === "text_delta") { streamedText += event.text; res.write(openAiTextDelta(requestId, event.text)); }
-        else res.write(openAiStep(requestId, request.responseModel, event.label));
+        if (event.kind === "text_delta") { streamedText += event.text; writeSse(res, openAiMessageStart(requestId, streamState) + openAiTextDelta(requestId, streamState, event.text)); }
+        else {
+          const label = visibleCliStepLabel(event.label);
+          if (label) writeSse(res, openAiStep(requestId, streamState, label));
+        }
       }
     });
     const usage = { inputTokens: estimateTokens(request.prompt), outputTokens: estimateTokens(output) };
-    if (!streamedText && output) res.write(openAiTextDelta(requestId, output));
-    res.end(openAiStreamDone(requestId, request.responseModel, output, usage));
+    if (!streamedText && output) writeSse(res, openAiMessageStart(requestId, streamState) + openAiTextDelta(requestId, streamState, output));
+    endSse(res, openAiStreamDone(requestId, request.responseModel, output, usage, streamState));
     return { status: 200, usage };
   } catch {
     if (!clientClosed && !res.destroyed) {
       const output = streamedText || "Local CLI provider failed before producing a complete response.";
-      if (!streamedText) res.write(openAiTextDelta(requestId, output));
+      if (!streamedText) writeSse(res, openAiMessageStart(requestId, streamState) + openAiTextDelta(requestId, streamState, output));
       const usage = { inputTokens: estimateTokens(request.prompt), outputTokens: estimateTokens(output) };
-      res.end(openAiStreamDone(requestId, request.responseModel, output, usage));
+      endSse(res, openAiStreamDone(requestId, request.responseModel, output, usage, streamState));
     }
     return { status: 502 };
   } finally {
@@ -71,12 +77,12 @@ async function streamOpenAiCliProvider(provider: ProviderConfig, body: string, r
   }
 }
 
-async function streamAnthropicCliProvider(provider: ProviderConfig, body: string, requestId: string, res: ServerResponse): Promise<CliStreamResult> {
+async function streamAnthropicCliProvider(provider: ProviderConfig, body: string, requestId: string, res: ServerResponse, options: CliStreamOptions): Promise<CliStreamResult> {
   const request = cliRequest(body, provider);
   const inputTokens = estimateTokens(request.prompt);
-  res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
-  res.write(anthropicStreamStart(requestId, request.responseModel, { inputTokens }));
-  const keepAlive = setInterval(() => res.write(": keep-alive\n\n"), CLI_STREAM_PROGRESS_INTERVAL_MS);
+  writeSseHeaders(res);
+  writeSse(res, anthropicStreamStart(requestId, request.responseModel, { inputTokens }));
+  const keepAlive = setInterval(() => writeSse(res, ": keep-alive\n\n"), CLI_STREAM_PROGRESS_INTERVAL_MS);
   keepAlive.unref?.();
   const abort = new AbortController();
   let clientClosed = false, streamedText = "";
@@ -86,17 +92,21 @@ async function streamAnthropicCliProvider(provider: ProviderConfig, body: string
     const output = await executeCliProvider(provider, request.prompt, request.runModel, {
       signal: abort.signal,
       onEvent: (event) => {
+        options.onEvent?.(event);
         if (clientClosed || res.destroyed) return;
-        if (event.kind === "text_delta") { streamedText += event.text; res.write(anthropicTextDelta(event.text)); }
-        else res.write(anthropicStep(event.label));
+        if (event.kind === "text_delta") { streamedText += event.text; writeSse(res, anthropicTextDelta(event.text)); }
+        else {
+          const label = visibleCliStepLabel(event.label);
+          if (label) writeSse(res, anthropicStep(label));
+        }
       }
     });
     const usage = { inputTokens, outputTokens: estimateTokens(output) };
-    if (!streamedText && output) res.write(anthropicTextDelta(output));
-    res.end(anthropicStreamDone(usage));
+    if (!streamedText && output) writeSse(res, anthropicTextDelta(output));
+    endSse(res, anthropicStreamDone(usage));
     return { status: 200, usage };
   } catch {
-    if (!clientClosed && !res.destroyed) res.end(streamError());
+    if (!clientClosed && !res.destroyed) endSse(res, streamError());
     return { status: 502 };
   } finally {
     clearInterval(keepAlive);
@@ -105,5 +115,9 @@ async function streamAnthropicCliProvider(provider: ProviderConfig, body: string
 }
 
 function isAnthropicMessages(path: string): boolean {
-  return path.split("?")[0] === "/v1/messages";
+  return cleanPath(path) === "/v1/messages";
+}
+
+function cleanPath(path: string): string {
+  return path.split("?")[0] || "/";
 }

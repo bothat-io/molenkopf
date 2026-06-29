@@ -50,7 +50,7 @@ test("Codex CLI streams progress while long commands are still running", async (
     assert.equal(response.status, 200);
     const text = await response.text();
     const progressEvents = text.match(/event: response\.in_progress/g) ?? [];
-    assert.ok(progressEvents.length >= 2, "long-running CLI streams should keep progress visible");
+    assert.ok(progressEvents.length >= 2, "long-running CLI streams should keep transport progress alive");
     assert.match(text, /done after work/);
     assert.match(text, /data: \[DONE\]/);
   } finally {

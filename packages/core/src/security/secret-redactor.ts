@@ -8,9 +8,9 @@ type Rule = { kind: string; pattern: RegExp; value?: (match: RegExpExecArray) =>
 
 const rules: Rule[] = [
   { kind: "private_key", pattern: /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g },
-  { kind: "authorization_bearer", pattern: /(Authorization:\s*Bearer\s+)([^\s\r\n]+)/gi, value: (m) => m[2] },
-  { kind: "authorization_basic", pattern: /(Authorization:\s*Basic\s+)([A-Za-z0-9+/=]+)/gi, value: (m) => m[2] },
-  { kind: "cookie", pattern: /(Cookie:\s*)([^\r\n]+)/gi, value: (m) => m[2] },
+  { kind: "authorization_bearer", pattern: /(?<![A-Za-z0-9_])(Authorization:\s*Bearer\s+)([^\s\r\n"\\]+)/gi, value: (m) => m[2] },
+  { kind: "authorization_basic", pattern: /(?<![A-Za-z0-9_])(Authorization:\s*Basic\s+)([A-Za-z0-9+/=]+)/gi, value: (m) => m[2] },
+  { kind: "cookie", pattern: /(?<![A-Za-z0-9_])(Cookie:\s*)([^\r\n"\\]+)/gi, value: (m) => m[2] },
   { kind: "anthropic_api_key", pattern: /\bsk-ant-[A-Za-z0-9_-]{32,}\b/g },
   { kind: "openai_api_key", pattern: /\bsk-(?:proj-|)[A-Za-z0-9_-]{32,}\b/g },
   { kind: "github_token", pattern: /\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{30,}\b/g },

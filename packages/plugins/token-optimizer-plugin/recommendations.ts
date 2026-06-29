@@ -5,7 +5,7 @@ import type { TokenBudgetSummary } from "./budgets.ts";
 
 export type TokenOptimizerRecommendation = {
   id: string;
-  kind: "repeated_context" | "high_prompt_volume" | "budget_warning";
+  kind: "compression_candidate" | "repeated_token_pressure" | "high_prompt_volume" | "budget_warning";
   severity: "green" | "yellow";
   summary: string;
   action: string;
@@ -18,13 +18,23 @@ export function buildRecommendations(
   budgets: TokenBudgetSummary
 ): TokenOptimizerRecommendation[] {
   const recommendations: TokenOptimizerRecommendation[] = [];
-  if (repeated.length) {
+  if (observations.potentialSavedTokens > 0 && observations.savedTokens === 0) {
     recommendations.push({
-      id: "repeated-context",
-      kind: "repeated_context",
+      id: "compression-candidate",
+      kind: "compression_candidate",
       severity: "yellow",
-      summary: `Repeated context detected in ${repeated[0].endpoint}`,
-      action: "Move stable instructions into a shared system prompt, profile, or retrieval note."
+      summary: `${observations.potentialSavedTokens} potential tokens were observed in safe compression candidates.`,
+      action: "Enable transform mode only after reviewing skip reasons and confirming the savings gate for this project."
+    });
+  }
+  if (repeated.length) {
+    const top = repeated[0];
+    recommendations.push({
+      id: "repeated-token-pressure",
+      kind: "repeated_token_pressure",
+      severity: "yellow",
+      summary: top.confidence === "high" ? `Repeated operational context observed in ${top.endpoint} with matching content fingerprints.` : `Repeated token pressure candidate in ${top.endpoint}; content fingerprints are unavailable.`,
+      action: top.confidence === "high" ? "Review the matching operational block and move stable context into a cacheable prefix or project-level reference." : "Review compressor skip reasons and enable safe content fingerprints before treating this as repeated content."
     });
   }
   if (buckets[0] && buckets[0].inputTokens >= 500) {

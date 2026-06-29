@@ -1,5 +1,6 @@
 import { redactSecrets } from "../security/secret-redactor.ts";
 import type { AuditManifest } from "./audit-store.ts";
+import { optionalContentFingerprints, safeContentFingerprints } from "./audit-fingerprints.ts";
 
 export function normalizedManifest(manifest: AuditManifest): AuditManifest {
   if (!isAuditManifest(manifest)) throw new Error("invalid audit manifest");
@@ -13,12 +14,36 @@ export function normalizedManifest(manifest: AuditManifest): AuditManifest {
     estimatedOriginalTokens: finiteNumber(manifest.estimatedOriginalTokens),
     estimatedCompressedTokens: finiteNumber(manifest.estimatedCompressedTokens),
     estimatedSavedTokens: finiteNumber(manifest.estimatedSavedTokens),
-    redactedSecrets: finiteNumber(manifest.redactedSecrets),
-    retrievalIds: manifest.retrievalIds.map(safeRetrievalId).filter((item): item is string => Boolean(item)).slice(0, 50),
-    compressorsUsed: manifest.compressorsUsed.map((item) => redactedToken(String(item), "compressor")).slice(0, 20),
-    warnings: manifest.warnings.map((item) => safeWarning(redactSecrets(String(item)).text)).slice(0, 20)
-  };
-  const statusCode = finiteOptional(manifest.statusCode);
+	    redactedSecrets: finiteNumber(manifest.redactedSecrets),
+	    retrievalIds: manifest.retrievalIds.map(safeRetrievalId).filter((item): item is string => Boolean(item)).slice(0, 50),
+	    compressorsUsed: manifest.compressorsUsed.map((item) => redactedToken(String(item), "compressor")).slice(0, 20),
+	    warnings: manifest.warnings.map((item) => safeWarning(redactSecrets(String(item)).text)).slice(0, 20)
+	  };
+	  assignNumber(safe, "compressionCandidates", manifest.compressionCandidates);
+	  assignNumber(safe, "compressionSkipped", manifest.compressionSkipped);
+	  assignNumber(safe, "originalBytes", manifest.originalBytes);
+	  assignNumber(safe, "forwardedBytes", manifest.forwardedBytes);
+	  assignNumber(safe, "compressionRatio", manifest.compressionRatio);
+	  assignNumber(safe, "potentialCompressedItems", manifest.potentialCompressedItems);
+	  assignNumber(safe, "potentialSavedTokens", manifest.potentialSavedTokens);
+	  assignNumber(safe, "potentialSavedBytes", manifest.potentialSavedBytes);
+	  assignNumber(safe, "cachedTokens", manifest.cachedTokens);
+	  assignNumber(safe, "cacheReadTokens", manifest.cacheReadTokens);
+	  assignNumber(safe, "cacheCreationTokens", manifest.cacheCreationTokens);
+	  assignNumber(safe, "reasoningTokens", manifest.reasoningTokens);
+	  assignNumber(safe, "cacheablePrefixBytes", manifest.cacheablePrefixBytes);
+	  assignNumber(safe, "toolCount", manifest.toolCount);
+	  assignNumber(safe, "toolSchemaBytes", manifest.toolSchemaBytes);
+	  assignNumber(safe, "toolSchemaTokens", manifest.toolSchemaTokens);
+	  if (manifest.timings) safe.timings = safeTimings(manifest.timings);
+	  if (manifest.contentFingerprints) safe.contentFingerprints = safeContentFingerprints(manifest.contentFingerprints);
+	  if (safeHash(manifest.staticPrefixHash)) safe.staticPrefixHash = manifest.staticPrefixHash;
+	  if (safeHash(manifest.toolSchemaHash)) safe.toolSchemaHash = manifest.toolSchemaHash;
+	  if (typeof manifest.hasTimestampNoise === "boolean") safe.hasTimestampNoise = manifest.hasTimestampNoise;
+	  if (typeof manifest.hasRandomIdNoise === "boolean") safe.hasRandomIdNoise = manifest.hasRandomIdNoise;
+	  if (manifest.skipReasons) safe.skipReasons = safeCountRecord(manifest.skipReasons);
+	  if (manifest.contentKindCounts) safe.contentKindCounts = safeCountRecord(manifest.contentKindCounts);
+	  const statusCode = finiteOptional(manifest.statusCode);
   const durationMs = finiteOptional(manifest.durationMs);
   const upstreamInputTokens = finiteOptional(manifest.upstreamInputTokens);
   const upstreamOutputTokens = finiteOptional(manifest.upstreamOutputTokens);
@@ -39,10 +64,19 @@ export function isAuditManifest(value: unknown): value is AuditManifest {
   return Boolean(item && typeof item === "object" && typeof item.requestId === "string" && typeof item.timestamp === "string"
     && typeof item.method === "string" && typeof item.path === "string" && typeof item.targetHost === "string"
     && typeof item.compressedItems === "number" && typeof item.estimatedOriginalTokens === "number"
-    && typeof item.estimatedCompressedTokens === "number" && typeof item.estimatedSavedTokens === "number"
-    && typeof item.redactedSecrets === "number" && finiteOptionalNumber(item.statusCode) && finiteOptionalNumber(item.durationMs)
-    && stringArray(item.retrievalIds) && stringArray(item.compressorsUsed) && stringArray(item.warnings));
-}
+	    && typeof item.estimatedCompressedTokens === "number" && typeof item.estimatedSavedTokens === "number"
+	    && typeof item.redactedSecrets === "number" && finiteOptionalNumber(item.statusCode) && finiteOptionalNumber(item.durationMs)
+	    && finiteOptionalNumber(item.compressionCandidates) && finiteOptionalNumber(item.compressionSkipped)
+	    && finiteOptionalNumber(item.originalBytes) && finiteOptionalNumber(item.forwardedBytes) && finiteOptionalNumber(item.compressionRatio)
+	    && finiteOptionalNumber(item.potentialCompressedItems) && finiteOptionalNumber(item.potentialSavedTokens) && finiteOptionalNumber(item.potentialSavedBytes)
+	    && finiteOptionalNumber(item.cachedTokens) && finiteOptionalNumber(item.cacheReadTokens) && finiteOptionalNumber(item.cacheCreationTokens) && finiteOptionalNumber(item.reasoningTokens)
+	    && finiteOptionalNumber(item.cacheablePrefixBytes) && finiteOptionalNumber(item.toolCount) && finiteOptionalNumber(item.toolSchemaBytes) && finiteOptionalNumber(item.toolSchemaTokens)
+	    && optionalHash(item.staticPrefixHash) && optionalHash(item.toolSchemaHash) && optionalBoolean(item.hasTimestampNoise) && optionalBoolean(item.hasRandomIdNoise)
+	    && optionalContentFingerprints(item.contentFingerprints)
+	    && optionalTimings(item.timings)
+	    && optionalCountRecord(item.skipReasons) && optionalCountRecord(item.contentKindCounts)
+	    && stringArray(item.retrievalIds) && stringArray(item.compressorsUsed) && stringArray(item.warnings));
+	}
 
 function safeClient(client: NonNullable<AuditManifest["client"]>): NonNullable<AuditManifest["client"]> {
   const source = safeSource(client.source);
@@ -69,6 +103,20 @@ function finiteNumber(value: number): number {
 
 function finiteOptional(value: number | undefined): number | undefined {
   return Number.isFinite(value) ? value : undefined;
+}
+
+function assignNumber(target: AuditManifest, key: keyof AuditManifest, value: number | undefined): void {
+  if (value !== undefined) (target as Record<string, unknown>)[key] = finiteNumber(value);
+}
+
+const TIMING_KEYS = new Set(["authMs", "redactionMs", "classificationMs", "compressionMs", "retrievalWriteMs", "pluginMs", "upstreamConnectMs", "firstByteMs", "firstSseMs", "streamDurationMs", "totalMs"]);
+
+function safeTimings(value: Record<string, number>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (TIMING_KEYS.has(key) && Number.isFinite(item) && item >= 0) out[key] = Math.round(item);
+  }
+  return out;
 }
 
 function text(value: unknown, fallback: string): string {
@@ -112,4 +160,33 @@ function stringArray(value: unknown): value is string[] {
 
 function finiteOptionalNumber(value: unknown): boolean {
   return value === undefined || (typeof value === "number" && Number.isFinite(value));
+}
+
+function optionalBoolean(value: unknown): boolean {
+  return value === undefined || typeof value === "boolean";
+}
+
+function optionalHash(value: unknown): boolean {
+  return value === undefined || safeHash(value);
+}
+
+function safeHash(value: unknown): value is string {
+  return typeof value === "string" && /^[a-f0-9]{64}$/i.test(value);
+}
+
+function optionalCountRecord(value: unknown): value is Record<string, number> {
+  return value === undefined || Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.values(value).every((item) => typeof item === "number" && Number.isFinite(item)));
+}
+
+function optionalTimings(value: unknown): value is Record<string, number> {
+  return value === undefined || Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.values(value).every((item) => typeof item === "number" && Number.isFinite(item)));
+}
+
+function safeCountRecord(value: Record<string, number>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [key, count] of Object.entries(value).slice(0, 50)) {
+    const safeKey = safeWarning(redactSecrets(key).text).replace(/ /g, "_").slice(0, 80);
+    if (safeKey) out[safeKey] = finiteNumber(count);
+  }
+  return out;
 }

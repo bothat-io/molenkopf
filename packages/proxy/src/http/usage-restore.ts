@@ -1,6 +1,6 @@
 import type { AuditStore } from "../../../core/src/manifest/audit-store.ts";
 import { UsageSnapshotError, type UsageSnapshotStore } from "../../../core/src/identity/usage-snapshot.ts";
-import { auditCursor, recordUsage } from "./usage-accounting.ts";
+import { auditCursor, identityUserIdForAuditId, recordUsage, userUsageKey } from "./usage-accounting.ts";
 import type { RuntimeState, UsageTotals } from "./runtime-types.ts";
 
 const USAGE_FIELDS = ["usageByAgent", "usageByUser", "usageByProvider", "usageByKey", "usageByTeam"] as const;
@@ -14,7 +14,7 @@ export async function restoreUsage(state: RuntimeState, snapshots: UsageSnapshot
     throw error;
   });
   const restored = snapshot ? validateSnapshot(snapshot) : undefined;
-  if (restored && (!latestCursor || snapshot.usageSnapshotCursor === latestCursor)) {
+  if (restored && (!latestCursor || snapshot.usageSnapshotCursor === latestCursor) && !snapshotMissesKnownUserUsage(state, restored, manifests)) {
     for (const field of USAGE_FIELDS) state[field] = restored[field];
     state.usageSnapshotCursor = snapshot.usageSnapshotCursor;
     return;
@@ -37,6 +37,22 @@ function validateSnapshot(snapshot: Partial<Record<UsageField, unknown>>): Pick<
     }
   }
   return out;
+}
+
+function snapshotMissesKnownUserUsage(state: RuntimeState, snapshot: Pick<RuntimeState, UsageField>, manifests: Awaited<ReturnType<AuditStore["list"]>>): boolean {
+  if (!state.identity) return false;
+  const expected: Record<string, number> = {};
+  for (const manifest of manifests) {
+    const userId = manifest.client?.userId ? identityUserIdForAuditId(state, manifest.client.userId) : undefined;
+    if (!userId || !state.identity.getUser(userId)) continue;
+    const tokens = (manifest.upstreamInputTokens ?? 0) + (manifest.upstreamOutputTokens ?? 0);
+    if (tokens > 0) expected[userId] = (expected[userId] ?? 0) + tokens;
+  }
+  return Object.entries(expected).some(([userId, tokens]) => tokensOf(snapshot.usageByUser[userUsageKey(userId)]) < tokens);
+}
+
+function tokensOf(usage: UsageTotals | undefined): number {
+  return (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
 }
 
 function validateUsageMap(value: unknown): Record<string, UsageTotals> | undefined {

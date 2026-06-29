@@ -37,12 +37,13 @@ export async function finishProxyRequest(input: {
   audit?: RewriteAudit;
   usage?: UsageTotals;
   requestModel?: RequestModelMetadata;
+  timings?: Record<string, number>;
 }): Promise<void> {
-  const manifest = buildManifest(input.requestId, input.method, input.path, input.target, input.providerId, input.statusCode, Date.now() - input.started, input.client, input.audit, input.usage, input.requestModel);
+  const manifest = buildManifest(input.requestId, input.method, input.path, input.target, input.providerId, input.statusCode, Date.now() - input.started, input.client, input.audit, input.usage, input.requestModel, input.timings);
   await finishRequest(manifest, input.auditStore, input.events, input.state, input.pluginHost, input.pluginIds);
 }
 
-export function buildManifest(requestId: string, method: string, path: string, target: string, providerId: string, statusCode: number, durationMs: number, client: ClientIdentity, audit?: RewriteAudit, usage?: UsageTotals, requestModel?: RequestModelMetadata): AuditManifest {
+export function buildManifest(requestId: string, method: string, path: string, target: string, providerId: string, statusCode: number, durationMs: number, client: ClientIdentity, audit?: RewriteAudit, usage?: UsageTotals, requestModel?: RequestModelMetadata, timings?: Record<string, number>): AuditManifest {
   return {
     requestId, timestamp: new Date().toISOString(), method, path, targetHost: new URL(target).host, providerId,
     requestedModel: requestModel?.model,
@@ -52,12 +53,23 @@ export function buildManifest(requestId: string, method: string, path: string, t
     estimatedOriginalTokens: audit?.estimatedOriginalTokens ?? 0,
     estimatedCompressedTokens: audit?.estimatedCompressedTokens ?? 0,
     estimatedSavedTokens: audit?.estimatedSavedTokens ?? 0,
-    redactedSecrets: audit?.redactedSecrets ?? 0,
-    retrievalIds: audit?.retrievalIds ?? [],
-    compressorsUsed: [...new Set(audit?.compressorsUsed ?? [])],
-    warnings: audit?.warnings ?? [], statusCode, durationMs,
-    upstreamInputTokens: usage?.inputTokens,
-    upstreamOutputTokens: usage?.outputTokens
+	    redactedSecrets: audit?.redactedSecrets ?? 0,
+	    retrievalIds: audit?.retrievalIds ?? [],
+	    compressorsUsed: [...new Set(audit?.compressorsUsed ?? [])],
+	    warnings: audit?.warnings ?? [], statusCode, durationMs,
+	    compressionCandidates: audit?.compressionCandidates, compressionSkipped: audit?.compressionSkipped, skipReasons: audit?.skipReasons, contentKindCounts: audit?.contentKindCounts,
+	    originalBytes: audit?.originalBytes, forwardedBytes: audit?.forwardedBytes, compressionRatio: audit?.compressionRatio,
+	    potentialCompressedItems: audit?.potentialCompressedItems, potentialSavedTokens: audit?.potentialSavedTokens, potentialSavedBytes: audit?.potentialSavedBytes,
+	    contentFingerprints: audit?.contentFingerprints,
+	    staticPrefixHash: audit?.staticPrefixHash, toolSchemaHash: audit?.toolSchemaHash, cacheablePrefixBytes: audit?.cacheablePrefixBytes, hasTimestampNoise: audit?.hasTimestampNoise, hasRandomIdNoise: audit?.hasRandomIdNoise,
+	    toolCount: audit?.toolCount, toolSchemaBytes: audit?.toolSchemaBytes, toolSchemaTokens: audit?.toolSchemaTokens,
+	    upstreamInputTokens: usage?.inputTokens,
+    upstreamOutputTokens: usage?.outputTokens,
+    cachedTokens: usage?.cachedTokens,
+    cacheReadTokens: usage?.cacheReadTokens,
+    cacheCreationTokens: usage?.cacheCreationTokens,
+    reasoningTokens: usage?.reasoningTokens,
+    timings
   };
 }
 

@@ -4,7 +4,7 @@ import { shortHash } from "../utils/hash.ts";
 
 export type MolenkopfEvent = {
   id: string;
-  type: "request_started" | "request_compressed" | "request_forwarded" | "request_finished" | "request_failed" | "request_warning" | "plugin_event" | "warning";
+  type: "request_started" | "request_compressed" | "request_forwarded" | "request_step" | "request_finished" | "request_failed" | "request_warning" | "plugin_event" | "warning";
   timestamp: string;
   requestId?: string;
   data?: Record<string, unknown>;

@@ -21,6 +21,16 @@ test("forwards safe headers and strips client credentials by default", () => {
   assert.equal(out.get("forwarded"), null);
 });
 
+test("strips inbound content-length before forwarding", () => {
+  const out = buildForwardHeaders(new Headers({
+    "content-length": "999",
+    "content-type": "application/json"
+  }));
+
+  assert.equal(out.get("content-length"), null);
+  assert.equal(out.get("content-type"), "application/json");
+});
+
 test("transparent default provider forwards caller API credentials but not cookies", () => {
   const out = buildForwardHeaders(new Headers({
     authorization: "Bearer client-secret",
