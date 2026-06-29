@@ -41,9 +41,25 @@ const requiredRelease = [
   /GITHUB_REF_NAME.*expected/
 ];
 
+const requiredPreview = [
+  /name: preview/,
+  /branches:\s*\[preview\]/,
+  /packages: write/,
+  /npm run smoke:docker/,
+  /MOLENKOPF_DOCKER_IMAGE:\s*molenkopf:preview/,
+  /docker\/login-action@v3/,
+  /ghcr\.io\/\$\{\{ github\.repository \}\}/,
+  /docker tag molenkopf:preview "\$image:preview"/,
+  /docker tag molenkopf:preview "\$image:preview-\$short_sha"/,
+  /docker push "\$image:preview"/,
+  /docker push "\$image:preview-\$short_sha"/
+];
+
 const requiredTest = [
   /name: E2E[\s\S]*npm run e2e/,
-  /name: Docker smoke[\s\S]*npm run smoke:docker/
+  /name: Docker smoke[\s\S]*npm run smoke:docker/,
+  /push:[\s\S]*branches:\s*\[main, preview\]/,
+  /pull_request:[\s\S]*branches:\s*\[main, preview\]/
 ];
 
 const requiredDockerSmoke = [
@@ -62,6 +78,7 @@ export function containerContractFailures(rootDir = root) {
   const dockerfile = read(rootDir, "Dockerfile");
   const dockerignore = read(rootDir, ".dockerignore");
   const release = read(rootDir, ".github/workflows/release.yml");
+  const preview = read(rootDir, ".github/workflows/preview.yml");
   const testWorkflow = read(rootDir, ".github/workflows/test.yml");
   const pkg = read(rootDir, "package.json");
   const dockerSmoke = read(rootDir, "scripts/smoke-docker.js");
@@ -71,6 +88,7 @@ export function containerContractFailures(rootDir = root) {
     ...missing("Dockerfile", dockerfile, requiredDockerfile),
     ...missing(".dockerignore", dockerignore, [/!LICENSE/, /!packages\/dashboard\/public\//]),
     ...missing("release.yml", release, requiredRelease),
+    ...missing("preview.yml", preview, requiredPreview),
     ...missing("test.yml", testWorkflow, requiredTest)
   ];
   if (testWorkflow && /name: E2E[\s\S]{0,300}CYPRESS_INSTALL_BINARY:\s*["']0["']/.test(testWorkflow)) {

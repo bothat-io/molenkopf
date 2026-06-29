@@ -31,6 +31,7 @@ test("container contract still validates patterns when files exist", async () =>
     await writeFile(join(root, "package.json"), "{}\n");
     await writeFile(join(root, "scripts", "smoke-docker.js"), "console.log('x')\n");
     await writeFile(join(root, ".github", "workflows", "release.yml"), "name: release\n");
+    await writeFile(join(root, ".github", "workflows", "preview.yml"), "name: preview\n");
     await writeFile(join(root, ".github", "workflows", "test.yml"), "name: test\n");
 
     const failures = containerContractFailures(root);
