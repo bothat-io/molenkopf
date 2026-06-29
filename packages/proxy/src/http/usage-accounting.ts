@@ -1,4 +1,5 @@
 import type { AuditManifest } from "../../../core/src/manifest/audit-store.ts";
+import { debugLog } from "../../../core/src/debug/debug-log.ts";
 import { costEur } from "../../../core/src/identity/pricing.ts";
 import { budgetPeriodKey } from "../../../core/src/identity/budget.ts";
 import type { BudgetPeriod } from "../../../core/src/identity/types.ts";
@@ -20,6 +21,15 @@ export function recordUsage(state: RuntimeState, manifest: AuditManifest): void 
   }
   state.usageSnapshotCursor = auditCursor(manifest);
   state.usageSnapshot?.schedule(state);
+  debugLog("usage", "recorded", {
+    requestId: manifest.requestId,
+    providerId: manifest.providerId,
+    statusCode: manifest.statusCode,
+    inputTokens: manifest.upstreamInputTokens,
+    outputTokens: manifest.upstreamOutputTokens,
+    cachedTokens: manifest.cachedTokens,
+    cacheReadTokens: manifest.cacheReadTokens
+  });
 }
 
 export function auditCursor(manifest: AuditManifest): string {
