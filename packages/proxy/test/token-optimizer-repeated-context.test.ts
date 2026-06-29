@@ -37,6 +37,17 @@ test("token optimizer reports high confidence for repeated content fingerprints"
   assert.equal(findings[0].repeatedInputTokens, 500);
 });
 
+test("token optimizer reports high confidence for repeated retrieval ids", () => {
+  const findings = detectRepeatedContext([
+    { ...manifest("project-alpha", "POST", "/v1/responses", 100), retrievalIds: ["molenkopf://sha256/repeated"], estimatedOriginalTokens: 800 },
+    { ...manifest("project-alpha", "POST", "/v1/responses", 120), retrievalIds: ["molenkopf://sha256/repeated"], estimatedOriginalTokens: 850 }
+  ]);
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].confidence, "high");
+  assert.equal(findings[0].reason, "matching_retrieval_id");
+  assert.equal(findings[0].repeatedInputTokens, 1650);
+});
+
 function manifest(project: string, method: string, path: string, inputTokens: number) {
   return { client: { project }, method, path, upstreamInputTokens: inputTokens } as any;
 }

@@ -5,13 +5,15 @@ import type { RepeatedContextFinding } from "./repeated-context.ts";
 
 export type OptimizationPlan = {
   id: string;
-  kind: "enable_context_compressor" | "enable_content_fingerprints" | "tune_context_compressor" | "stabilize_prompt_cache" | "review_tool_schema_pressure";
+  kind: "enable_context_compressor" | "enable_content_fingerprints" | "tune_context_compressor" | "stabilize_prompt_cache" | "review_tool_schema_pressure" | "review_output_limit";
   confidence: "low" | "medium";
   summary: string;
   action: string;
   requiresConfirmation: true;
   evidence: Record<string, number | string>;
 };
+
+const OUTPUT_HEAVY_TOKENS = 1000;
 
 export function buildOptimizationPlans(
   manifests: readonly AuditManifest[],
@@ -28,6 +30,7 @@ export function buildOptimizationPlans(
   if (manifests.some((item) => item.hasTimestampNoise || item.hasRandomIdNoise) && observations.cacheReadTokens === 0) plans.push(plan("stabilize_prompt_cache", "medium", "Volatile prefix noise is present and no provider cache reads were observed.", "Move Molenkopf-owned timestamps or request ids out of cacheable prefixes where safe; do not rewrite user prompts.", { requests: observations.requests, cacheReadTokens: observations.cacheReadTokens }));
   const toolSchemaTokens = sum(manifests, "toolSchemaTokens");
   if (toolSchemaTokens >= 500) plans.push(plan("review_tool_schema_pressure", budgets.pressure === "high" ? "medium" : "low", "Tool schemas are a meaningful part of observed input pressure.", "Stabilize tool ordering and remove duplicate Molenkopf-owned schema wrappers; do not minify provider-native schemas without evals.", { toolSchemaTokens }));
+  if (observations.providerReportedOutputTokens >= OUTPUT_HEAVY_TOKENS && observations.providerReportedOutputTokens > observations.providerReportedInputTokens) plans.push(plan("review_output_limit", "medium", "Provider output tokens are heavier than observed input tokens.", "Review max output, response format, and tool-call verbosity; do not mutate traffic automatically.", { requests: observations.requests, inputTokens: observations.providerReportedInputTokens, outputTokens: observations.providerReportedOutputTokens }));
   return plans;
 }
 
