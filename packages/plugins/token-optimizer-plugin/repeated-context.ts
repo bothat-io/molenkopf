@@ -7,7 +7,7 @@ export type RepeatedContextFinding = {
   repeatedInputTokens: number;
   averageInputTokens: number;
   confidence: "low" | "high";
-  reason: "content_fingerprints_unavailable" | "matching_content_fingerprint";
+  reason: "content_fingerprints_unavailable" | "matching_content_fingerprint" | "matching_retrieval_id";
 };
 
 const MIN_REQUESTS = 3;
@@ -17,6 +17,8 @@ const MIN_AVERAGE_INPUT_TOKENS = 250;
 export function detectRepeatedContext(manifests: readonly AuditManifest[]): RepeatedContextFinding[] {
   const fingerprintFindings = byFingerprint(manifests);
   if (fingerprintFindings.length) return fingerprintFindings;
+  const retrievalFindings = byRetrievalId(manifests);
+  if (retrievalFindings.length) return retrievalFindings;
   const grouped = new Map<string, RepeatedContextFinding>();
   for (const manifest of manifests) {
     const project = manifest.client?.project ?? "unattributed";
@@ -64,4 +66,28 @@ function byFingerprint(manifests: readonly AuditManifest[]): RepeatedContextFind
     }
   }
   return [...grouped.values()].filter((item) => item.requests >= 2).sort((a, b) => b.repeatedInputTokens - a.repeatedInputTokens).slice(0, 5);
+}
+
+function byRetrievalId(manifests: readonly AuditManifest[]): RepeatedContextFinding[] {
+  const grouped = new Map<string, RepeatedContextFinding>();
+  for (const manifest of manifests) {
+    const seen = new Set<string>();
+    for (const retrievalId of manifest.retrievalIds ?? []) {
+      if (seen.has(retrievalId) || !safeRetrievalId(retrievalId)) continue;
+      seen.add(retrievalId);
+      const project = manifest.client?.project ?? "unattributed";
+      const endpoint = `${manifest.method} ${manifest.path}`;
+      const key = `${project}|${endpoint}|${retrievalId}`;
+      const item = grouped.get(key) ?? { project, endpoint, requests: 0, repeatedInputTokens: 0, averageInputTokens: 0, confidence: "high", reason: "matching_retrieval_id" };
+      item.requests += 1;
+      item.repeatedInputTokens += manifest.estimatedOriginalTokens ?? manifest.upstreamInputTokens ?? 0;
+      item.averageInputTokens = Math.round(item.repeatedInputTokens / item.requests);
+      grouped.set(key, item);
+    }
+  }
+  return [...grouped.values()].filter((item) => item.requests >= 2).sort((a, b) => b.repeatedInputTokens - a.repeatedInputTokens).slice(0, 5);
+}
+
+function safeRetrievalId(value: string): boolean {
+  return /^molenkopf:\/\/sha256\/[a-z0-9._:-]+$/i.test(value);
 }

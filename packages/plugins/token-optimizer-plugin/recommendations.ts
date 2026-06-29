@@ -33,7 +33,7 @@ export function buildRecommendations(
       id: "repeated-token-pressure",
       kind: "repeated_token_pressure",
       severity: "yellow",
-      summary: top.confidence === "high" ? `Repeated operational context observed in ${top.endpoint} with matching content fingerprints.` : `Repeated token pressure candidate in ${top.endpoint}; content fingerprints are unavailable.`,
+      summary: repeatedSummary(top),
       action: top.confidence === "high" ? "Review the matching operational block and move stable context into a cacheable prefix or project-level reference." : "Review compressor skip reasons and enable safe content fingerprints before treating this as repeated content."
     });
   }
@@ -56,4 +56,10 @@ export function buildRecommendations(
     });
   }
   return recommendations;
+}
+
+function repeatedSummary(top: RepeatedContextFinding): string {
+  if (top.confidence !== "high") return `Repeated token pressure candidate in ${top.endpoint}; content fingerprints are unavailable.`;
+  const evidence = top.reason === "matching_retrieval_id" ? "matching retrieval ids" : "matching content fingerprints";
+  return `Repeated operational context observed in ${top.endpoint} with ${evidence}.`;
 }

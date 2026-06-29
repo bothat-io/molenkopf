@@ -29,3 +29,17 @@ test("token optimizer plans transform enablement from observed potential savings
   assert.equal(plan.requiresConfirmation, true);
   assert.equal(plan.evidence.potentialSavedTokens, 300);
 });
+
+test("token optimizer plans output-heavy review without mutating traffic", () => {
+  const plans = buildOptimizationPlans(
+    [],
+    { requests: 4, inputTokens: 900, outputTokens: 1800, providerReportedInputTokens: 900, providerReportedOutputTokens: 1800, originalTokens: 900, forwardedTokens: 900, cachedTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0, savedTokens: 0, potentialSavedTokens: 0 },
+    [],
+    { totalTokens: { state: "available", value: 2700, source: "provider_reported" }, budgetLimit: { state: "unavailable", reason: "no_plugin_budget_limit_configured" }, pressure: "low", warnings: [] }
+  );
+  const plan = plans.find((item) => item.kind === "review_output_limit");
+  assert.ok(plan);
+  assert.equal(plan.requiresConfirmation, true);
+  assert.equal(plan.evidence.outputTokens, 1800);
+  assert.match(plan.action, /do not mutate traffic automatically/i);
+});

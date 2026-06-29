@@ -77,7 +77,10 @@
     pricing_unavailable:"Pricing is not configured",
     no_plugin_budget_limit_configured:"No plugin budget limit configured",
     budget_pressure_high:"Budget pressure is high",
-    budget_pressure_medium:"Budget pressure is medium"
+    budget_pressure_medium:"Budget pressure is medium",
+    content_fingerprints_unavailable:"Content fingerprints unavailable",
+    matching_content_fingerprint:"Matching content fingerprint",
+    matching_retrieval_id:"Matching retrieval id"
   };
   const kindLabels={
     compression_candidate:"Compression candidate",
@@ -139,7 +142,7 @@ function renderRepeated(items){
     $("repeated").innerHTML='<div class="empty">No repeated token pressure candidates yet.</div>';
     return;
   }
-  $("repeated").innerHTML=`<div class="list">${items.slice(0,10).map((item)=>row(item.project,item.endpoint,{html:stats([["Requests",num(item.requests)],["Input pressure",num(item.repeatedInputTokens)],["Confidence",item.confidence||"low"]])})).join("")}</div>`;
+  $("repeated").innerHTML=`<div class="list">${items.slice(0,10).map((item)=>row(item.project,item.endpoint,{html:stats([["Requests",num(item.requests)],["Input pressure",num(item.repeatedInputTokens)],["Confidence",item.confidence||"low"],["Evidence",reasonText(item.reason)]])})).join("")}</div>`;
 }
 function renderRecommendations(items){
   if(!items?.length){
