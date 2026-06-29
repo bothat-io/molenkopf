@@ -54,7 +54,7 @@
   <header>
     <div>
       <h1>Token optimizer</h1>
-      <div class="sub">Observe token usage, repeated context, budget pressure, and safe recommendations without mutating traffic.</div>
+      <div class="sub">Observe token usage, repeated token pressure, budget pressure, and safe recommendations without mutating traffic.</div>
     </div>
     <div class="statusbox"><div class="state" id="state">Loading workspace...</div><div class="actions"><button id="refresh" type="button">Refresh snapshot</button></div></div>
   </header>
@@ -63,7 +63,8 @@
     <div class="panel"><h2>Buckets</h2><div id="buckets"></div></div>
     <div class="panel"><h2>Budget and unavailable metrics</h2><div id="budget"></div></div>
   </section>
-  <section class="panel"><h2>Repeated context</h2><div id="repeated"></div></section>
+  <section class="panel"><h2>Repeated token pressure</h2><div id="repeated"></div></section>
+  <section class="panel"><h2>Optimization plans</h2><div id="plans"></div></section>
   <section class="panel"><h2>Recommendations</h2><div id="recommendations"></div></section>
 </main>
 <script>
@@ -76,10 +77,14 @@
     pricing_unavailable:"Pricing is not configured",
     no_plugin_budget_limit_configured:"No plugin budget limit configured",
     budget_pressure_high:"Budget pressure is high",
-    budget_pressure_medium:"Budget pressure is medium"
+    budget_pressure_medium:"Budget pressure is medium",
+    content_fingerprints_unavailable:"Content fingerprints unavailable",
+    matching_content_fingerprint:"Matching content fingerprint",
+    matching_retrieval_id:"Matching retrieval id"
   };
   const kindLabels={
-    repeated_context:"Repeated context",
+    compression_candidate:"Compression candidate",
+    repeated_token_pressure:"Repeated token pressure",
     high_prompt_volume:"High prompt volume",
     budget_warning:"Budget warning"
   };
@@ -105,9 +110,10 @@
 function renderMetrics(data){
   const observations=data.observations||{}, budgets=data.budgets||{};
   const cards=[
-    ["Requests",observations.requests],["Input tokens",observations.inputTokens],
-    ["Output tokens",observations.outputTokens],["Saved tokens",observations.savedTokens,"No compression savings recorded"],
-    ["Budget pressure",budgets.pressure||"low"],["Cache savings",metricText(data.cacheSavings," tokens"),metricHint(data.cacheSavings)],
+    ["Requests",observations.requests],["Provider input",observations.providerReportedInputTokens??observations.inputTokens],
+    ["Provider output",observations.providerReportedOutputTokens??observations.outputTokens],["Confirmed saved",observations.savedTokens,"No compression savings recorded"],["Potential saved",observations.potentialSavedTokens||0],
+    ["Local original",observations.originalTokens??0],["Local forwarded",observations.forwardedTokens??0],
+    ["Budget pressure",budgets.pressure||"low"],["Provider cache tokens",metricText(data.providerCacheTokens," tokens"),metricHint(data.providerCacheTokens)],
     ["Estimated cost",metricText(data.estimatedCostEur," EUR"),metricHint(data.estimatedCostEur)],["Recommendations",(data.recommendations||[]).length]
   ];
   $("metrics").innerHTML=cards.map(([k,v,hint])=>`<div class="metric"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div>${hint?`<div class="hint">${esc(hint)}</div>`:""}</div>`).join("");
@@ -117,7 +123,7 @@ function renderBuckets(items){
     $("buckets").innerHTML='<div class="empty">No grouped token buckets observed yet.</div>';
     return;
   }
-  $("buckets").innerHTML=`<div class="list">${items.slice(0,8).map((item)=>row(item.label,item.id,{html:stats([["Requests",num(item.requests)],["Input",num(item.inputTokens)],["Output",num(item.outputTokens)]])})).join("")}</div>`;
+  $("buckets").innerHTML=`<div class="list">${items.slice(0,8).map((item)=>row(item.label,item.project||item.id,{html:stats([["Requests",num(item.requests)],["Input",num(item.inputTokens)],["Saved",`${num(item.savedTokens)} (${num(item.savedPercent)}%)`]])})).join("")}</div>`;
 }
 function renderBudget(data){
   const budgets=data.budgets||{}, warnings=budgets.warnings||[];
@@ -125,7 +131,7 @@ function renderBudget(data){
     row("Budget pressure","Current summary",{badge:budgets.pressure||"low",badgeWarn:budgets.pressure==="high"}),
     row("Total tokens","Observed token total",{html:`<div class="mono">${esc(metricText(budgets.totalTokens," tokens"))}</div>`}),
     row("Budget limit","Configured limit or fallback",{html:`<div class="mono">${esc(metricText(budgets.budgetLimit," tokens"))}</div><div class="muted">${esc(metricHint(budgets.budgetLimit))}</div>`}),
-    row("Cache savings","Availability",{html:`<div class="mono">${esc(metricText(data.cacheSavings," tokens"))}</div><div class="muted">${esc(metricHint(data.cacheSavings))}</div>`}),
+    row("Provider cache tokens","Reported cache counters, not confirmed savings",{html:`<div class="mono">${esc(metricText(data.providerCacheTokens," tokens"))}</div><div class="muted">${esc(metricHint(data.providerCacheTokens))}</div>`}),
     row("Estimated cost","Availability",{html:`<div class="mono">${esc(metricText(data.estimatedCostEur," EUR"))}</div><div class="muted">${esc(metricHint(data.estimatedCostEur))}</div>`})
   ];
   if(warnings.length) rows.push(row("Warnings","Current warnings",{html:`<div class="list">${warnings.map((item)=>`<div class="pill warn">${esc(reasonText(item))}</div>`).join("")}</div>`}));
@@ -133,10 +139,10 @@ function renderBudget(data){
 }
 function renderRepeated(items){
   if(!items?.length){
-    $("repeated").innerHTML='<div class="empty">No repeated context pattern detected yet.</div>';
+    $("repeated").innerHTML='<div class="empty">No repeated token pressure candidates yet.</div>';
     return;
   }
-  $("repeated").innerHTML=`<div class="list">${items.slice(0,10).map((item)=>row(item.project,item.endpoint,{html:stats([["Requests",num(item.requests)],["Repeated input",num(item.repeatedInputTokens)],["Scope",item.endpoint]])})).join("")}</div>`;
+  $("repeated").innerHTML=`<div class="list">${items.slice(0,10).map((item)=>row(item.project,item.endpoint,{html:stats([["Requests",num(item.requests)],["Input pressure",num(item.repeatedInputTokens)],["Confidence",item.confidence||"low"],["Evidence",reasonText(item.reason)]])})).join("")}</div>`;
 }
 function renderRecommendations(items){
   if(!items?.length){
@@ -144,6 +150,13 @@ function renderRecommendations(items){
     return;
   }
   $("recommendations").innerHTML=`<div class="list">${items.map((item)=>row(kindLabels[item.kind]||item.kind,item.id,{badge:severityText(item.severity),badgeWarn:item.severity==="yellow",html:`<div class="muted">${esc(item.summary)}</div><div class="action">${esc(item.action||"Review this finding before changing routing.")}</div>`})).join("")}</div>`;
+}
+function renderPlans(items){
+  if(!items?.length){
+    $("plans").innerHTML='<div class="empty">No optimization plans yet.</div>';
+    return;
+  }
+  $("plans").innerHTML=`<div class="list">${items.map((item)=>row(item.kind,item.id,{badge:item.confidence||"low",badgeWarn:item.confidence==="medium",html:`<div class="muted">${esc(item.summary)}</div><div class="action">${esc(item.action)}</div><div class="muted">Requires admin confirmation: ${esc(item.requiresConfirmation?"yes":"no")}</div>`})).join("")}</div>`;
 }
 async function load(){
   const button=$("refresh");
@@ -153,13 +166,15 @@ async function load(){
     if(data.loadError){
       $("state").innerHTML=`Data unavailable <span class="badge">error</span><div class="muted">${esc(data.loadError)}</div>`;
       ["metrics","buckets","budget","repeated","recommendations"].forEach((id)=>$(id).innerHTML='<div class="empty warn">Plugin data unavailable. Refresh after the proxy returns a valid data response.</div>');
+      $("plans").innerHTML='<div class="empty warn">Plugin data unavailable.</div>';
       return;
     }
-    $("state").innerHTML=`Observe and recommend <span class="badge">read only</span><div class="muted">This workspace reports budgets, repeated context, and unavailable metrics without changing routing or request bodies.</div>`;
+    $("state").innerHTML=`Observe and recommend <span class="badge">read only</span><div class="muted">Recent snapshot: ${num(data.snapshot?.observedRequests)} of ${num(data.snapshot?.limit)} max requests. This workspace reports budgets, token pressure, and unavailable metrics without changing routing or request bodies.</div>`;
     renderMetrics(data);
     renderBuckets(data.buckets);
     renderBudget(data);
     renderRepeated(data.repeatedContext);
+    renderPlans(data.optimizationPlans);
     renderRecommendations(data.recommendations);
   }finally{button.disabled=false}
 }

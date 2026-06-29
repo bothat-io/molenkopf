@@ -5,11 +5,11 @@ import { pathToFileURL } from "node:url";
 import { ensurePrivateDirSync } from "../../../core/src/storage/private-state.ts";
 import { validateProviderTarget } from "../../../core/src/security/target-policy.ts";
 import { loadDefaultEnvFile } from "./env-file.ts";
+import { dashboardDevEnabled, dashboardDevOrigin, requestedDashboardDevPort, resolveDashboardDevPort } from "./dashboard-dev.ts";
 
 export const DEV_WATCH_DIRS = ["packages/core/src", "packages/proxy/src", "packages/plugins"] as const;
 const RESTART_DEBOUNCE_MS = 250;
 const FORCE_KILL_MS = 1500;
-const DASHBOARD_DEV_PORT = 5173;
 
 const PROFILE_DEFAULTS = {
   dev: { port: 8787, dataDir: ".molenkopf/dev" },
@@ -54,22 +54,23 @@ export function cliDevWatchEnabled(profile: Profile, argv: readonly string[] = p
   return devWatchEnabled(profile, env) && !argv.includes("--no-watch");
 }
 
-function spawnProxy(profile: Profile, revision?: string) {
+function spawnProxy(profile: Profile, revision?: string, dashboardPort?: number) {
   const env: NodeJS.ProcessEnv = { ...process.env, MOLENKOPF_PROFILE: profile.name };
   if (revision) env.MOLENKOPF_DEV_REVISION = revision;
-  if (profile.name === "dev" && dashboardDevEnabled()) env.MOLENKOPF_DASHBOARD_DEV_ORIGIN = dashboardDevOrigin(env);
+  if (profile.name === "dev" && dashboardPort) env.MOLENKOPF_DASHBOARD_DEV_ORIGIN = dashboardDevOrigin(dashboardPort);
   return spawnLogged(process.execPath, proxyArgs(profile), { env });
 }
 
-function run() {
+async function run() {
   loadDefaultEnvFile();
   const profile = resolveProfile(process.argv[2] || "dev");
   ensurePrivateDirSync(profile.dataDir);
   console.log(`Molenkopf ${profile.name}: http://${profile.host}:${profile.port}`);
   console.log(`data-dir: ${profile.dataDir}`);
   if (cliDevWatchEnabled(profile)) return runWatched(profile);
-  const dashboard = profile.name === "dev" && dashboardDevEnabled() ? spawnDashboardDev() : undefined;
-  const child = spawnProxy(profile);
+  const dashboardPort = await dashboardPortFor(profile);
+  const dashboard = dashboardPort ? spawnDashboardDev(profile, dashboardPort) : undefined;
+  const child = spawnProxy(profile, undefined, dashboardPort);
   const stop = (code: number) => {
     child.kill();
     dashboard?.kill();
@@ -83,17 +84,18 @@ function run() {
   process.on("SIGTERM", () => stop(143));
 }
 
-function runWatched(profile: Profile) {
+async function runWatched(profile: Profile) {
   const watchers: ReturnType<typeof watch>[] = [];
   let child: ReturnType<typeof spawnProxy>;
-  const dashboard = dashboardDevEnabled() ? spawnDashboardDev() : undefined;
+  const dashboardPort = await dashboardPortFor(profile);
+  const dashboard = dashboardPort ? spawnDashboardDev(profile, dashboardPort) : undefined;
   let revision = String(Date.now());
   let restartTimer: ReturnType<typeof setTimeout>;
   let restarting = false;
 
   const startChild = () => {
     console.log(`dev-revision: ${revision}`);
-    child = spawnProxy(profile, revision);
+    child = spawnProxy(profile, revision, dashboardPort);
     child.on("exit", (code, signal) => {
       if (restarting) { restarting = false; startChild(); return; }
       closeWatchers(watchers);
@@ -137,37 +139,30 @@ function runWatched(profile: Profile) {
   process.on("SIGTERM", () => stop(143));
 }
 
-function dashboardDevEnabled(env = process.env) {
-  return env.MOLENKOPF_DASHBOARD_DEV !== "0";
+async function dashboardPortFor(profile: Profile): Promise<number | undefined> {
+  if (profile.name !== "dev" || !dashboardDevEnabled()) return undefined;
+  const requested = requestedDashboardDevPort();
+  const port = await resolveDashboardDevPort();
+  if (port !== requested) console.warn(`Dashboard dev port ${requested} is busy; using ${port}.`);
+  return port;
 }
 
-function dashboardDevOrigin(env = process.env) {
-  const port = Number(env.MOLENKOPF_DASHBOARD_DEV_PORT || DASHBOARD_DEV_PORT);
-  return `http://127.0.0.1:${port}`;
-}
-
-function spawnDashboardDev() {
+function spawnDashboardDev(profile: Profile, dashboardPort: number) {
   const command = process.platform === "win32" ? process.env.ComSpec || "cmd.exe" : "npm";
   const args = process.platform === "win32" ? ["/d", "/s", "/c", "npm --prefix packages/dashboard run dev"] : ["--prefix", "packages/dashboard", "run", "dev"];
-  const profile = resolveProfile(process.argv[2] || "dev");
   return spawnLogged(command, args, {
     env: {
       ...process.env,
-      MOLENKOPF_DASHBOARD_DEV_PORT: String(Number(process.env.MOLENKOPF_DASHBOARD_DEV_PORT || DASHBOARD_DEV_PORT)),
+      MOLENKOPF_DASHBOARD_DEV_PORT: String(dashboardPort),
       MOLENKOPF_DASHBOARD_API_ORIGIN: `http://${profile.host}:${profile.port}`
     }
   });
 }
 
-function closeWatchers(watchers: ReturnType<typeof watch>[]) {
-  for (const watcher of watchers) watcher.close();
-}
+function closeWatchers(watchers: ReturnType<typeof watch>[]) { for (const watcher of watchers) watcher.close(); }
 
 function spawnLogged(command: string, args: string[], options: { env: NodeJS.ProcessEnv }) {
-  const child = spawn(command, args, { ...options, stdio: ["ignore", "pipe", "pipe"] });
-  child.stdout?.pipe(process.stdout);
-  child.stderr?.pipe(process.stderr);
-  return child;
+  return spawn(command, args, { ...options, stdio: ["ignore", "inherit", "inherit"] });
 }
 
 function isProfileName(name: string): name is ProfileName {
@@ -189,11 +184,11 @@ function validateHost(value: string): void {
 }
 
 function validateTarget(value: string): void {
-  try {
-    validateProviderTarget(value, { path: "profile target", allowPrivate: true });
-  } catch {
-    throw new Error("invalid profile target");
-  }
+  try { validateProviderTarget(value, { path: "profile target", allowPrivate: true }); }
+  catch { throw new Error("invalid profile target"); }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) run();
+if (import.meta.url === pathToFileURL(process.argv[1]).href) run().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+});

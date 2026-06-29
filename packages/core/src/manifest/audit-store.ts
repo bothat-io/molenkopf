@@ -5,6 +5,7 @@ import { defaultDataDir } from "../storage/local-paths.ts";
 import { chmodPrivateSync, ensurePrivateDirSync, PRIVATE_FILE_MODE } from "../storage/private-state.ts";
 import { purgeChildDir } from "../storage/purge-dir.ts";
 import { isAuditManifest, normalizedManifest } from "./audit-safety.ts";
+import type { AuditContentFingerprint } from "./audit-fingerprints.ts";
 
 export type AuditManifest = {
   requestId: string;
@@ -24,10 +25,15 @@ export type AuditManifest = {
   retrievalIds: string[];
   compressorsUsed: string[];
   warnings: string[];
+  compressionCandidates?: number; compressionSkipped?: number; skipReasons?: Record<string, number>; contentKindCounts?: Record<string, number>;
+  originalBytes?: number; forwardedBytes?: number; compressionRatio?: number;
+  potentialCompressedItems?: number; potentialSavedTokens?: number; potentialSavedBytes?: number;
+  contentFingerprints?: AuditContentFingerprint[];
   statusCode?: number;
   durationMs?: number;
   upstreamInputTokens?: number;
   upstreamOutputTokens?: number;
+  cachedTokens?: number; cacheReadTokens?: number; cacheCreationTokens?: number; reasoningTokens?: number; timings?: Record<string, number>; staticPrefixHash?: string; toolSchemaHash?: string; cacheablePrefixBytes?: number; hasTimestampNoise?: boolean; hasRandomIdNoise?: boolean; toolCount?: number; toolSchemaBytes?: number; toolSchemaTokens?: number;
 };
 export type AuditRetention = { maxFiles?: number; maxBytes?: number; maxAgeMs?: number };
 export type AuditStoreOptions = { retention?: AuditRetention; now?: () => Date };

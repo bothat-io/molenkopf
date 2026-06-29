@@ -69,6 +69,7 @@ function PluginRow(props: {
     onToggle={() => {}}
     bodyClassName="plugin-body"
     summaryClassName="plugin-summary"
+    sideClassName="plugin-summary-side"
     metrics={[
       { key: "status", label: "Status", value: <span className={`pill${enabled ? "" : " off"}`}>{plugin.lifecycleStatus || (enabled ? "enabled" : "disabled")}</span> },
       { key: "type", label: "Type", value: plugin.type || plugin.category || "plugin" },

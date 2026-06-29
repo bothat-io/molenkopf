@@ -1,23 +1,64 @@
+import { byteLength } from "../utils/text.ts";
+
 export type StacktraceCompressionResult = { text: string; compressed: boolean; compressorName: string };
+
+const VENDOR_FRAME =
+  /node_modules|node:internal|site-packages|[\\/]vendor[\\/]|[\\/]\.cargo[\\/]registry[\\/]|[\\/]pkg[\\/]mod[\\/]|\.m2[\\/]repository|\.gradle[\\/]caches|[\\/]\.nuget[\\/]packages|[\\/]NuGet[\\/]packages|[\\/]usr[\\/]local[\\/]go[\\/]src|[\\/]rustc[\\/]|stdlib/i;
+const CAUSE_LINE =
+  /\b(?:caused by|direct cause|during handling|inner exception|aggregateerror|traceback|panic|error|exception|fatal|assertion|failed)\b/i;
 
 export function compressStacktrace(input: string, retrieveId: string): StacktraceCompressionResult {
   const lines = input.split(/\r?\n/);
-  if (lines.length <= 12 && !/node_modules|node:internal|site-packages/.test(input)) {
-    return { text: input, compressed: false, compressorName: "stacktrace" };
-  }
   const output = [`[molenkopf compressed: kind=stacktrace original_lines=${lines.length} retrieve=${retrieveId}]`];
-  let vendor = 0;
+  let vendorFrames = 0;
+  let repeatedFrames = 0;
+  let lastKept = "";
+
   for (const line of lines) {
-    if (/node_modules|node:internal|\/vendor\/|site-packages|stdlib/.test(line)) {
-      vendor++;
+    if (isVendorFrame(line) && !isCauseLine(line)) {
+      flushRepeated(output, repeatedFrames, retrieveId);
+      repeatedFrames = 0;
+      vendorFrames++;
       continue;
     }
-    if (vendor) {
-      output.push(`[molenkopf omitted: ${vendor} vendor/stdlib frames retrieve=${retrieveId}]`);
-      vendor = 0;
+
+    flushVendor(output, vendorFrames, retrieveId);
+    vendorFrames = 0;
+
+    if (line === lastKept && looksLikeFrame(line)) {
+      repeatedFrames++;
+      continue;
     }
+
+    flushRepeated(output, repeatedFrames, retrieveId);
+    repeatedFrames = 0;
     output.push(line);
+    lastKept = line;
   }
-  if (vendor) output.push(`[molenkopf omitted: ${vendor} vendor/stdlib frames retrieve=${retrieveId}]`);
-  return { text: output.join("\n"), compressed: output.length < lines.length + 1, compressorName: "stacktrace" };
+
+  flushRepeated(output, repeatedFrames, retrieveId);
+  flushVendor(output, vendorFrames, retrieveId);
+  const text = output.join("\n");
+  if (byteLength(text) >= byteLength(input)) return { text: input, compressed: false, compressorName: "stacktrace" };
+  return { text, compressed: true, compressorName: "stacktrace" };
+}
+
+function isVendorFrame(line: string): boolean {
+  return VENDOR_FRAME.test(line);
+}
+
+function isCauseLine(line: string): boolean {
+  return CAUSE_LINE.test(line);
+}
+
+function looksLikeFrame(line: string): boolean {
+  return /\bat\b|\.java:\d+|\.go:\d+|\.rs:\d+|\.cs:\d+|\.py", line \d+|:line \d+|:\d+(?::\d+)?/.test(line);
+}
+
+function flushVendor(output: string[], count: number, retrieveId: string): void {
+  if (count > 0) output.push(`[molenkopf omitted: ${count} vendor/stdlib frames retrieve=${retrieveId}]`);
+}
+
+function flushRepeated(output: string[], count: number, retrieveId: string): void {
+  if (count > 0) output.push(`[molenkopf omitted: ${count} repeated frames retrieve=${retrieveId}]`);
 }

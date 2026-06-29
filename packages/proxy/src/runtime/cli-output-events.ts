@@ -82,7 +82,9 @@ function stepLabel(event: Record<string, unknown>): string {
   const type = raw.toLowerCase();
   const itemType = text(nested(event, "item", "type"));
   if (type.startsWith("item.") && itemType && itemType !== "agent_message") {
-    return safeLabel([itemType, text(nested(event, "item", "status"))].filter(Boolean).join(" "));
+    const status = text(nested(event, "item", "status"));
+    const command = itemType === "command_execution" ? safeCommand(text(nested(event, "item", "command"))) : "";
+    return safeLabel([itemType, status, command ? `- ${command}` : ""].filter(Boolean).join(" "));
   }
   if (!raw || /(?:delta|message|text|result|completed|complete|created|progress)/.test(type)) return "";
   if (!/(?:tool|exec|command|patch|mcp|task|plan|step|turn|action)/.test(type)) return "";
@@ -134,4 +136,16 @@ function text(value: unknown): string {
 
 function safeLabel(value: string): string {
   return redactSecrets(value).text.replace(/\s+/g, " ").trim().slice(0, 160);
+}
+
+const SAFE_COMMANDS = new Set(["npm", "pnpm", "yarn", "node", "npx", "vitest", "jest", "pytest", "python", "python3", "go", "cargo", "mvn", "gradle", "dotnet", "tsc", "eslint", "cypress", "git", "make", "cmake", "docker"]);
+
+function safeCommand(value: string): string {
+  if (!value) return "";
+  const redacted = redactSecrets(value);
+  if (redacted.redactions.length) return "";
+  const command = redacted.text.replace(/\s+/g, " ").trim();
+  const name = command.split(" ")[0]?.split(/[\\/]/).pop()?.toLowerCase() ?? "";
+  if (!SAFE_COMMANDS.has(name)) return "";
+  return name;
 }

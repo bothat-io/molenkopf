@@ -16,7 +16,7 @@ const SOURCE_LANGS = new Set(["ts", "tsx", "js", "jsx", "mjs", "cjs", "py", "go"
 const OPERATIONAL_LANGS = new Set(["log", "logs", "output", "shell-output", "terminal"]);
 const FENCE = /```([a-z0-9_-]*)[^\n]*\n([\s\S]*?)```/gi;
 
-export function compressOperationalBlocks(text: string, retrieveId: string): OperationalBlockCompression {
+export function compressOperationalBlocks(text: string, retrieveId: string, allowedKinds?: readonly string[]): OperationalBlockCompression {
   let compressed = false;
   let kind: string | undefined;
   let compressorName: string | undefined;
@@ -26,6 +26,7 @@ export function compressOperationalBlocks(text: string, retrieveId: string): Ope
     if (normalizedLang && !OPERATIONAL_LANGS.has(normalizedLang)) return match;
     const blockKind = classifyContent(body);
     if (!COMPRESSIBLE.has(blockKind)) return match;
+    if (allowedKinds && !allowedKinds.includes(blockKind)) return match;
     const result = compressStructured(blockKind, body, retrieveId);
     if (!result.compressed || byteLength(result.text) >= byteLength(body)) return match;
     compressed = true;

@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { debugLog, type DebugScope } from "../debug/debug-log.ts";
 import { redactSecrets } from "../security/secret-redactor.ts";
 import { shortHash } from "../utils/hash.ts";
 
 export type MolenkopfEvent = {
   id: string;
-  type: "request_started" | "request_compressed" | "request_forwarded" | "request_finished" | "request_failed" | "request_warning" | "plugin_event" | "warning";
+  type: "request_started" | "request_compressed" | "request_forwarded" | "request_step" | "request_finished" | "request_failed" | "request_warning" | "plugin_event" | "warning";
   timestamp: string;
   requestId?: string;
   data?: Record<string, unknown>;
@@ -19,6 +20,7 @@ export class EventBus {
     this.history.push(event);
     this.history = this.history.slice(-100);
     for (const client of [...this.clients]) this.deliver(client, event);
+    debugLog(scopeFor(event), event.type, { requestId: event.requestId, ...(event.data ?? {}) });
     return event;
   }
 
@@ -37,6 +39,13 @@ export class EventBus {
       return false;
     }
   }
+}
+
+function scopeFor(event: MolenkopfEvent): DebugScope {
+  if (event.type === "request_step") return "cli";
+  if (event.type === "plugin_event") return "plugins";
+  if (event.type === "warning" && event.data?.pluginId) return "plugins";
+  return "pipeline";
 }
 
 function safeData(value: unknown, seen = new WeakSet<object>()): Record<string, unknown> | undefined {
