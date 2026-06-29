@@ -3,9 +3,9 @@ import { byteLength } from "../utils/text.ts";
 export type StacktraceCompressionResult = { text: string; compressed: boolean; compressorName: string };
 
 const VENDOR_FRAME =
-  /node_modules|node:internal|site-packages|\/vendor\/|\/\.cargo\/registry\/|\/pkg\/mod\/|\.m2\/repository|\.gradle\/caches|\/NuGet\/packages|stdlib/i;
+  /node_modules|node:internal|site-packages|[\\/]vendor[\\/]|[\\/]\.cargo[\\/]registry[\\/]|[\\/]pkg[\\/]mod[\\/]|\.m2[\\/]repository|\.gradle[\\/]caches|[\\/]\.nuget[\\/]packages|[\\/]NuGet[\\/]packages|[\\/]usr[\\/]local[\\/]go[\\/]src|[\\/]rustc[\\/]|stdlib/i;
 const CAUSE_LINE =
-  /\b(?:caused by|direct cause|during handling|aggregateerror|traceback|panic|error|exception|fatal|assertion|failed)\b/i;
+  /\b(?:caused by|direct cause|during handling|inner exception|aggregateerror|traceback|panic|error|exception|fatal|assertion|failed)\b/i;
 
 export function compressStacktrace(input: string, retrieveId: string): StacktraceCompressionResult {
   const lines = input.split(/\r?\n/);
@@ -52,7 +52,7 @@ function isCauseLine(line: string): boolean {
 }
 
 function looksLikeFrame(line: string): boolean {
-  return /\bat\b|\.java:\d+|\.go:\d+|\.rs:\d+|\.py", line \d+|:\d+(?::\d+)?/.test(line);
+  return /\bat\b|\.java:\d+|\.go:\d+|\.rs:\d+|\.cs:\d+|\.py", line \d+|:line \d+|:\d+(?::\d+)?/.test(line);
 }
 
 function flushVendor(output: string[], count: number, retrieveId: string): void {

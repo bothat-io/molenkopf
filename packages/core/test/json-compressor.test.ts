@@ -31,6 +31,7 @@ test("keeps important array rows outside the edge samples", () => {
   assert.ok(result.compressed);
   assert.match(result.text, /item_keys: id, status, message/);
   assert.match(result.text, /key_counts: id=80, status=80, message=80/);
+  assert.match(result.text, /status_counts: status\.ok=79, status\.failed=1/);
   assert.match(result.text, /important_items:/);
   assert.match(result.text, /AssertionError: expected 401 received 200/);
   assert.doesNotMatch(result.text, /normal row 40/);

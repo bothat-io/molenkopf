@@ -46,3 +46,22 @@ test("folds repeated recursive frames", () => {
   assert.match(result.text, /omitted: 39 repeated frames/);
   assert.match(result.text, /parser\.ts:44/);
 });
+
+test("keeps .NET app frames and inner exceptions while folding NuGet frames", () => {
+  const trace = [
+    "System.InvalidOperationException: request failed",
+    "   at Acme.Proxy.Runner.Run() in /work/src/Runner.cs:line 42",
+    ...Array.from({ length: 30 }, (_, i) => `   at Vendor.Package.Step${i}() in /home/owl/.nuget/packages/vendor/lib/File.cs:line ${i}`),
+    " ---> System.Exception: Inner exception: missing body:write",
+    "   at Acme.Proxy.Policy.Check() in /work/src/Policy.cs:line 12",
+    ...Array.from({ length: 20 }, (_, i) => `   at System.Runtime.Go${i}() in /usr/local/go/src/runtime/proc.go:${i}`)
+  ].join("\n");
+  const result = compressStacktrace(trace, "molenkopf://sha256/dotnet");
+  assert.ok(result.compressed);
+  assert.match(result.text, /System\.InvalidOperationException/);
+  assert.match(result.text, /Runner\.cs:line 42/);
+  assert.match(result.text, /Inner exception/);
+  assert.match(result.text, /Policy\.cs:line 12/);
+  assert.doesNotMatch(result.text, /\.nuget\/packages\/vendor/);
+  assert.doesNotMatch(result.text, /\/usr\/local\/go\/src\/runtime/);
+});
