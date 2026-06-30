@@ -49,23 +49,6 @@ test("reads Anthropic cache read and cache creation tokens", () => {
   assert.deepEqual(meter.result(), { inputTokens: 900, outputTokens: 80, cacheReadTokens: 700, cacheCreationTokens: 100, source: "provider_response" });
 });
 
-test("reads OpenAI cached and reasoning token details", () => {
-  const meter = createUsageMeter();
-  meter.feed(Buffer.from(JSON.stringify({ usage: {
-    prompt_tokens: 1000,
-    completion_tokens: 120,
-    prompt_tokens_details: { cached_tokens: 768 },
-    completion_tokens_details: { reasoning_tokens: 64 }
-  } })));
-  assert.deepEqual(meter.result(), { inputTokens: 1000, outputTokens: 120, cachedTokens: 768, reasoningTokens: 64 });
-});
-
-test("reads Anthropic cache read and cache creation tokens", () => {
-  const meter = createUsageMeter();
-  meter.feed(Buffer.from(JSON.stringify({ usage: { input_tokens: 900, output_tokens: 80, cache_read_input_tokens: 700, cache_creation_input_tokens: 100 } })));
-  assert.deepEqual(meter.result(), { inputTokens: 900, outputTokens: 80, cacheReadTokens: 700, cacheCreationTokens: 100 });
-});
-
 test("keeps the cumulative maximum across streamed SSE chunks", () => {
   const meter = createUsageMeter();
   meter.feed(Buffer.from('event: message_start\ndata: {"message":{"usage":{"input_tokens":500,"output_tokens":1}}}\n\n'));
