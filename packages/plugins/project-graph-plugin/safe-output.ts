@@ -19,7 +19,7 @@ export function safeProjectGraphForView(graph: ProjectGraph): Record<string, unk
 }
 
 export function safeProjectGraphNodeForView(node: ProjectGraphNode): Record<string, unknown> {
-  return {
+  return compact({
     id: safeString(node.id),
     kind: node.kind,
     label: safeString(node.label),
@@ -30,24 +30,24 @@ export function safeProjectGraphNodeForView(node: ProjectGraphNode): Record<stri
     lineEnd: node.lineEnd,
     safeSignature: node.safeSignature ? safeString(node.safeSignature) : undefined,
     metadata: safeMetadata(node.metadata)
-  };
+  });
 }
 
 export function safeProjectGraphEdgeForView(edge: ProjectGraphEdge): Record<string, unknown> {
-  return {
+  return compact({
     id: safeString(edge.id),
     from: safeString(edge.from),
     to: safeString(edge.to),
     kind: edge.kind,
     weight: edge.weight,
-    evidence: edge.evidence ? {
+    evidence: edge.evidence ? compact({
       path: edge.evidence.path ? safeString(edge.evidence.path) : undefined,
       lineStart: edge.evidence.lineStart,
       lineEnd: edge.evidence.lineEnd,
       extractor: safeString(edge.evidence.extractor),
       confidence: edge.evidence.confidence
-    } : undefined
-  };
+    }) : undefined
+  });
 }
 
 export function safeQueryResultForView(nodes: ProjectGraphNode[]): Record<string, unknown>[] {
@@ -69,4 +69,8 @@ function safeMetadataValue(value: unknown): unknown {
 
 function safeString(value: string): string {
   return value.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, MAX_STRING);
+}
+
+function compact(value: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined));
 }

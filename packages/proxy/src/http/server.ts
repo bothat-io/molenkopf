@@ -3,9 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { AuditStore } from "../../../core/src/manifest/audit-store.ts";
 import { EventBus } from "../../../core/src/events/event-bus.ts";
 import { RequestTimer } from "../../../core/src/observability/request-timing.ts";
-import { requestCacheDiagnostics } from "../../../core/src/cache/request-cache-diagnostics.ts";
 import { type RewriteAudit } from "../../../core/src/pipeline/openai-request-rewriter.ts";
-import { estimateTokens } from "../../../core/src/utils/tokens.ts";
 import { builtinMiddlewares, runRequestPipeline, type PluginContext } from "./plugin-pipeline.ts";
 import { orderIndex } from "./local-api-pipeline.ts";
 import { RetrievalStore } from "../../../core/src/store/retrieval-store.ts";
@@ -37,28 +35,29 @@ import { rejectBudget } from "./budget-response.ts";
 import { handleCliModelListResponse } from "./cli-model-list-response.ts";
 import { finishRejectedProxyRequest } from "./rejected-proxy-response.ts";
 import type { ProxyOptions, RunningProxy } from "./server-types.ts";
+import { cleanupFailedStartup, closeRunningProxy } from "./server-lifecycle.ts";
+import { buildProxyAudit } from "./proxy-audit.ts";
 export async function startProxy(options: ProxyOptions): Promise<RunningProxy> {
-  const host = options.host ?? "127.0.0.1";
-  requirePublicBindFlag(host, options.allowPublicBind);
+  const host = options.host ?? "127.0.0.1"; requirePublicBindFlag(host, options.allowPublicBind);
   const state = createRuntimeState(options, host), identity = new IdentityStore(options.dataDir);
-  await identity.load(); state.identity = identity;
-  const usageSnapshot = new UsageSnapshotStore(options.dataDir), store = new RetrievalStore(options.dataDir), audit = new AuditStore(options.dataDir);
-  await restoreUsage(state, usageSnapshot, audit); state.usageSnapshot = usageSnapshot;
-  const events = new EventBus(), pluginHost = createPluginHost(state, { store, events });
-  await pluginHost.boot();
-  const server = createServer((req, res) => handle(req, res, store, audit, events, state, pluginHost));
-  await listen(server, options.port, host);
-  const address = server.address();
-  const port = typeof address === "object" && address ? address.port : options.port;
-  state.port = port;
-  await pluginHost.start(port);
-  return {
-    port,
-    close: async () => {
-      await pluginHost.stop().catch(() => {}); usageSnapshot.schedule(state); await usageSnapshot.close(); identity.close();
-      await new Promise<void>((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
-    }
-  };
+  const usageSnapshot = new UsageSnapshotStore(options.dataDir);
+  const store = new RetrievalStore(options.dataDir), audit = new AuditStore(options.dataDir);
+  let pluginHost: PluginHost | undefined, server: ReturnType<typeof createServer> | undefined, pluginBooted = false;
+  try {
+    await identity.load(); state.identity = identity;
+    await restoreUsage(state, usageSnapshot, audit); state.usageSnapshot = usageSnapshot;
+    const events = new EventBus(); pluginHost = createPluginHost(state, { store, events });
+    await pluginHost.boot(); pluginBooted = true;
+    server = createServer((req, res) => handle(req, res, store, audit, events, state, pluginHost!));
+    await listen(server, options.port, host);
+    const address = server.address(), port = typeof address === "object" && address ? address.port : options.port;
+    state.port = port;
+    await pluginHost.start(port);
+    return { port, close: () => closeRunningProxy({ pluginHost: pluginHost!, usageSnapshot, identity, state, server: server! }) };
+  } catch (error) {
+    await cleanupFailedStartup({ pluginHost, pluginBooted, usageSnapshot, identity, server });
+    throw error;
+  }
 }
 async function handle(req: IncomingMessage, res: ServerResponse, store: RetrievalStore, audit: AuditStore, events: EventBus, state: RuntimeState, pluginHost: PluginHost) {
   try {
@@ -135,13 +134,7 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
       }
     }
     body = ctx.body;
-    audit = {
-      compressedItems: ctx.compressedItems, estimatedOriginalTokens: estimateTokens(originalBody), estimatedCompressedTokens: estimateTokens(body), estimatedSavedTokens: ctx.savedTokens,
-      redactedSecrets: ctx.redactedSecrets, retrievalIds: ctx.retrievalIds, compressorsUsed: ctx.compressorsUsed, warnings: ctx.notes,
-      compressionCandidates: ctx.compressionCandidates, compressionSkipped: ctx.compressionSkipped, skipReasons: ctx.skipReasons, contentKindCounts: ctx.contentKindCounts,
-      originalBytes: ctx.originalBytes, forwardedBytes: ctx.forwardedBytes, compressionRatio: ctx.compressionRatio,
-      potentialCompressedItems: ctx.potentialCompressedItems, potentialSavedTokens: ctx.potentialSavedTokens, potentialSavedBytes: ctx.potentialSavedBytes, contentFingerprints: ctx.contentFingerprints, ...requestCacheDiagnostics(body, state.sessionSecret)
-    };
+    audit = buildProxyAudit(ctx, originalBody, body, state.sessionSecret);
     if (ctx.compressedItems) events.emit("request_compressed", { requestId, data: { items: ctx.compressedItems } });
   }
   audit = withBudgetWarnings(audit, budget.warnings);

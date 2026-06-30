@@ -1,12 +1,11 @@
 import { getNeighborhood, listEventUsage, listPluginFacts, listRoutes, listStorageUsage, searchGraph } from "./graph-query.ts";
-import { deleteProjectGraph, listProjectGraphs } from "./graph-storage.ts";
+import { deleteProjectGraph, listProjectGraphs, loadLatestProjectGraph, saveProjectGraph } from "./graph-storage.ts";
+import { deleteProjectGraphCache, deleteProjectGraphCacheByRoot, getProjectGraphCache, setProjectGraphCache } from "./graph-cache.ts";
 import { safeProjectGraphEdgeForView, safeProjectGraphNodeForView, safeQueryResultForView } from "./safe-output.ts";
 import type { PluginActionContext, PluginJson, PluginRuntimeContext } from "../../core/src/plugins/plugin-api.ts";
 import type { AuditManifest } from "../../core/src/manifest/audit-store.ts";
 import { buildProjectGraphFromTokenContext } from "./token-graph-builder.ts";
 import type { ProjectGraph } from "./types.ts";
-
-const scopedGraphs = new Map<string, ProjectGraph>();
 
 export async function handleProjectGraphAction(ctx: PluginActionContext, runtime: PluginRuntimeContext): Promise<PluginJson> {
   if (ctx.actionId === "graph.query") return queryGraphAction(ctx, runtime);
@@ -15,23 +14,24 @@ export async function handleProjectGraphAction(ctx: PluginActionContext, runtime
   return { error: "unknown_action" };
 }
 
-export async function queryGraphAction(ctx: PluginActionContext, _runtime: PluginRuntimeContext): Promise<PluginJson> {
-  const graph = currentGraph(ctx);
+export async function queryGraphAction(ctx: PluginActionContext, runtime: PluginRuntimeContext): Promise<PluginJson> {
+  const graph = await currentGraph(ctx, runtime);
   if (!graph) return { results: [], warnings: [{ code: "graph_not_derived" }] };
   const query = typeof ctx.input.query === "string" ? ctx.input.query : "";
   const limit = typeof ctx.input.limit === "number" ? ctx.input.limit : 20;
-  return { results: safeQueryResultForView(searchGraph(graph, query, { limit })) };
+  return { results: safeQueryResultForView(searchGraph(graph, query, { limit })), freshness: freshnessFor(graph) };
 }
 
-export async function graphNeighborhoodAction(ctx: PluginActionContext, _runtime: PluginRuntimeContext): Promise<PluginJson> {
-  const graph = currentGraph(ctx);
+export async function graphNeighborhoodAction(ctx: PluginActionContext, runtime: PluginRuntimeContext): Promise<PluginJson> {
+  const graph = await currentGraph(ctx, runtime);
   if (!graph) return { nodes: [], edges: [], warnings: [{ code: "graph_not_derived" }] };
   const nodeId = typeof ctx.input.nodeId === "string" ? ctx.input.nodeId : "";
   const depth = typeof ctx.input.depth === "number" ? ctx.input.depth : 1;
   const neighborhood = getNeighborhood(graph, nodeId, depth);
   return {
     nodes: neighborhood.nodes.map(safeProjectGraphNodeForView),
-    edges: neighborhood.edges.map(safeProjectGraphEdgeForView)
+    edges: neighborhood.edges.map(safeProjectGraphEdgeForView),
+    freshness: freshnessFor(graph)
   };
 }
 
@@ -39,18 +39,17 @@ export async function deleteGraphAction(ctx: PluginActionContext, runtime: Plugi
   const rootId = typeof ctx.input.rootId === "string" ? ctx.input.rootId : "";
   if (ctx.input.confirm !== rootId) return { ok: false, error: "confirmation_required" };
   const ok = await deleteProjectGraph(runtime.dataDir, rootId);
-  for (const [scope, graph] of scopedGraphs) if (graph.rootId === rootId) scopedGraphs.delete(scope);
+  deleteProjectGraphCacheByRoot(rootId);
   return { ok };
 }
 
 export function latestProjectGraph(): ProjectGraph | undefined {
-  return scopedGraphs.values().next().value;
+  return getProjectGraphCache(scopeKeyFor());
 }
 
 export async function projectGraphDataView(runtime: PluginRuntimeContext, manifests: AuditManifest[] = [], scopeKey = scopeKeyFor()): Promise<PluginJson> {
-  if (manifests.length) scopedGraphs.set(scopeKey, buildProjectGraphFromTokenContext(manifests, runtime.now()));
-  else scopedGraphs.delete(scopeKey);
-  const graph = scopedGraphs.get(scopeKey);
+  if (!manifests.length) deleteProjectGraphCache(scopeKey);
+  const graph = manifests.length ? await resolveGraph({ manifests, scopeKey, canReadPersisted: false }, runtime) : undefined;
   if (!graph) return { graphSummaries: await listProjectGraphs(runtime.dataDir), routes: [], topFilesByDegree: [], topSymbolsByDegree: [] };
   const graphSummaries = await listProjectGraphs(runtime.dataDir);
   const derivedSummary = { rootId: graph.rootId, projectId: graph.projectId, generatedAt: graph.generatedAt, stats: graph.stats, source: "token-context" };
@@ -67,8 +66,35 @@ export async function projectGraphDataView(runtime: PluginRuntimeContext, manife
   };
 }
 
-function currentGraph(ctx: { userId?: string; teamIds?: readonly string[] }): ProjectGraph | undefined {
-  return scopedGraphs.get(scopeKeyFor(ctx));
+async function currentGraph(ctx: PluginActionContext, runtime: PluginRuntimeContext): Promise<ProjectGraph | undefined> {
+  const scopeKey = scopeKeyFor(ctx);
+  return resolveGraph({ manifests: ctx.manifests ?? [], scopeKey, canReadPersisted: !ctx.userId }, runtime);
+}
+
+async function resolveGraph(input: { manifests: AuditManifest[]; scopeKey: string; canReadPersisted: boolean }, runtime: PluginRuntimeContext): Promise<ProjectGraph | undefined> {
+  const cached = getProjectGraphCache(input.scopeKey, runtime.now());
+  if (cached) return cached;
+  if (input.manifests.length) {
+    const graph = buildProjectGraphFromTokenContext(input.manifests, runtime.now());
+    setProjectGraphCache(input.scopeKey, graph, runtime.now());
+    await saveProjectGraph(runtime.dataDir, graph).catch(() => undefined);
+    return graph;
+  }
+  if (!input.canReadPersisted) return undefined;
+  const stored = await loadLatestProjectGraph(runtime.dataDir);
+  if (stored) setProjectGraphCache(input.scopeKey, stored, runtime.now());
+  return stored;
+}
+
+function freshnessFor(graph: ProjectGraph): Record<string, unknown> {
+  return {
+    generatedAt: graph.generatedAt,
+    rootId: graph.rootId,
+    projectId: graph.projectId,
+    source: "token-context",
+    nodeCount: graph.nodes.length,
+    edgeCount: graph.edges.length
+  };
 }
 
 function scopeKeyFor(ctx?: { userId?: string; teamIds?: readonly string[] }): string {

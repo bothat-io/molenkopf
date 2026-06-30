@@ -1,14 +1,15 @@
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
-import { estimateTokens } from "../../../core/src/utils/tokens.ts";
+import type { UsageTotals } from "../../../core/src/manifest/usage-meter.ts";
 import { executeCliProvider } from "./cli-executor.ts";
 import type { CliOutputEvent } from "./cli-output-events.ts";
 import { cliRequest } from "./cli-request.ts";
+import { mergedCliUsage } from "./cli-usage.ts";
 
 export type CliProviderResult = {
   status: number;
   headers: Record<string, string>;
   body: Buffer;
-  usage?: { inputTokens?: number; outputTokens?: number };
+  usage?: UsageTotals;
 };
 
 export type CliProviderOptions = { signal?: AbortSignal; onEvent?: (event: CliOutputEvent) => void };
@@ -37,8 +38,9 @@ export function cliModelList(provider: ProviderConfig): CliProviderResult {
 export async function runCliProvider(provider: ProviderConfig, body: string, requestId: string, path = "/v1/responses", options: CliProviderOptions = {}): Promise<CliProviderResult> {
   const request = cliRequest(body, provider);
   const prompt = request.prompt;
-  const output = await executeCliProvider(provider, prompt, request.runModel, { signal: options.signal, onEvent: options.onEvent });
-  const usage = { inputTokens: estimateTokens(prompt), outputTokens: estimateTokens(output) };
+  const cli = await executeCliProvider(provider, prompt, request.runModel, { signal: options.signal, onEvent: options.onEvent });
+  const output = cli.output;
+  const usage = mergedCliUsage(prompt, output, cli.usage);
   const model = request.responseModel;
   if (isAnthropicMessages(path) && wantsStream(body)) {
     return {
@@ -64,8 +66,7 @@ export async function runCliProvider(provider: ProviderConfig, body: string, req
   };
 }
 
-function responseBody(requestId: string, model: string, text: string, path: string, usage: { inputTokens?: number; outputTokens?: number }) {
-  const input = usage.inputTokens ?? 0, output = usage.outputTokens ?? 0;
+function responseBody(requestId: string, model: string, text: string, path: string, usage: UsageTotals) {
   if (isAnthropicMessages(path)) {
     return {
       id: `msg_${requestId.replaceAll("-", "")}`,
@@ -75,7 +76,7 @@ function responseBody(requestId: string, model: string, text: string, path: stri
       content: [{ type: "text", text }],
       stop_reason: "end_turn",
       stop_sequence: null,
-      usage: { input_tokens: input, output_tokens: output }
+      usage: anthropicUsage(usage)
     };
   }
   return {
@@ -88,7 +89,7 @@ function responseBody(requestId: string, model: string, text: string, path: stri
       role: "assistant",
       content: [{ type: "output_text", text }]
     }],
-    usage: { input_tokens: input, output_tokens: output, prompt_tokens: input, completion_tokens: output }
+    usage: openAiUsage(usage)
   };
 }
 
@@ -109,7 +110,7 @@ export function wantsStream(body: string): boolean {
   }
 }
 
-function anthropicStream(requestId: string, model: string, text: string, usage: { inputTokens?: number; outputTokens?: number }): string {
+function anthropicStream(requestId: string, model: string, text: string, usage: UsageTotals): string {
   const id = `msg_${requestId.replaceAll("-", "")}`;
   const input = usage.inputTokens ?? 0, output = usage.outputTokens ?? 0;
   return [
@@ -122,7 +123,7 @@ function anthropicStream(requestId: string, model: string, text: string, usage: 
   ].join("");
 }
 
-function openAiResponsesStream(requestId: string, model: string, text: string, usage: { inputTokens?: number; outputTokens?: number }): string {
+function openAiResponsesStream(requestId: string, model: string, text: string, usage: UsageTotals): string {
   return [
     openAiResponsesStreamStart(requestId, model),
     openAiResponsesStreamOutput(requestId, model, text, usage),
@@ -138,8 +139,7 @@ export function openAiResponsesStreamStart(requestId: string, model: string): st
   ].join("");
 }
 
-export function openAiResponsesStreamOutput(requestId: string, model: string, text: string, usage: { inputTokens?: number; outputTokens?: number }): string {
-  const input = usage.inputTokens ?? 0, output = usage.outputTokens ?? 0;
+export function openAiResponsesStreamOutput(requestId: string, model: string, text: string, usage: UsageTotals): string {
   const itemId = `msg_${requestId.replaceAll("-", "")}`;
   const base = { id: requestId, object: "response", model, output: [] };
   const item = { id: itemId, type: "message", status: "completed", role: "assistant", content: [{ type: "output_text", text, annotations: [] }] };
@@ -148,13 +148,7 @@ export function openAiResponsesStreamOutput(requestId: string, model: string, te
     status: "completed",
     output: [item],
     output_text: text,
-    usage: {
-      input_tokens: input,
-      output_tokens: output,
-      total_tokens: input + output,
-      prompt_tokens: input,
-      completion_tokens: output
-    }
+    usage: openAiUsage(usage)
   };
   return [
     sse("response.output_item.added", { type: "response.output_item.added", output_index: 0, item: { ...item, status: "in_progress", content: [] } }),
@@ -179,4 +173,26 @@ export function openAiResponsesStreamFailure(requestId: string, model: string): 
 
 function sse(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+function openAiUsage(usage: UsageTotals): Record<string, unknown> {
+  const input = usage.inputTokens ?? 0, output = usage.outputTokens ?? 0;
+  return {
+    input_tokens: input,
+    output_tokens: output,
+    total_tokens: input + output,
+    prompt_tokens: input,
+    completion_tokens: output,
+    ...(usage.cachedTokens !== undefined ? { input_tokens_details: { cached_tokens: usage.cachedTokens } } : {}),
+    ...(usage.reasoningTokens !== undefined ? { output_tokens_details: { reasoning_tokens: usage.reasoningTokens } } : {})
+  };
+}
+
+function anthropicUsage(usage: UsageTotals): Record<string, unknown> {
+  return {
+    input_tokens: usage.inputTokens ?? 0,
+    output_tokens: usage.outputTokens ?? 0,
+    ...(usage.cacheReadTokens !== undefined ? { cache_read_input_tokens: usage.cacheReadTokens } : {}),
+    ...(usage.cacheCreationTokens !== undefined ? { cache_creation_input_tokens: usage.cacheCreationTokens } : {})
+  };
 }

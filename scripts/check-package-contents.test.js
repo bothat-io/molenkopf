@@ -40,6 +40,28 @@ test("package checker accepts descriptor-v2-derived plugin inventory", async () 
   }
 });
 
+test("package checker rejects non-executable bin tarball entries", async () => {
+  const root = await fixtureRoot();
+  try {
+    const paths = requiredPaths().map((path) => ({ path, mode: path.startsWith("bin/") ? 0o644 : 0o644 }));
+    const failures = packageFailures(manifest(), paths, root);
+    assert.ok(failures.includes("package bin is not executable: bin/molenkopf.js"));
+    assert.ok(failures.includes("package bin is not executable: bin/launcher.js"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("package checker accepts executable bin tarball entries", async () => {
+  const root = await fixtureRoot();
+  try {
+    const paths = requiredPaths().map((path) => ({ path, mode: path.startsWith("bin/") ? 0o755 : 0o644 }));
+    assert.deepEqual(packageFailures(manifest(), paths, root), []);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 function manifest() {
   return { files: [
     ".env.example", "bin/", "packages/core/src/", "packages/proxy/src/",

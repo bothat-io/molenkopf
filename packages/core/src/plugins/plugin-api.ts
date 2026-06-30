@@ -30,7 +30,12 @@ export type PluginMetrics = {
   potentialCompressedItems?: number;
   potentialSavedTokens?: number;
   potentialSavedBytes?: number;
+  protectedSourceTokens?: number;
+  protectedDiffTokens?: number;
   contentFingerprints?: AuditManifest["contentFingerprints"];
+  effectivePluginIds?: string[];
+  compressorMode?: string;
+  zeroSavingsReasons?: string[];
 };
 
 export type PluginLifecycleContext = {
@@ -94,6 +99,7 @@ export type PluginActionContext = {
   userId?: string;
   teamIds: string[];
   scope: string;
+  manifests?: AuditManifest[];
 };
 
 export type PluginRuntimeContext = {

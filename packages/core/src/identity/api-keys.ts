@@ -1,5 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { IdentityStore } from "./identity-store.ts";
+import { DEFAULT_TEAM_ID, isDefaultTeamId, nonDefaultTeamIds } from "./team-scope.ts";
 import { viewKey, type ApiKey, type ApiKeyView, type Budget } from "./types.ts";
 
 // Molenkopf-issued API keys. The secret is shown EXACTLY ONCE at creation; only
@@ -117,13 +118,13 @@ function resolveIssueTeam(store: IdentityStore, owner: { teamIds: string[] }, va
   const teamId = value?.trim();
   if (teamId) {
     if (!store.getTeam(teamId) || !owner.teamIds.includes(teamId)) return false;
-    if (teamId === "everyone" && billableTeamIds(owner.teamIds).length) return false;
+    if (isDefaultTeamId(teamId) && nonDefaultTeamIds(owner.teamIds).length) return false;
     return teamId;
   }
-  const billingTeams = billableTeamIds(owner.teamIds);
+  const billingTeams = nonDefaultTeamIds(owner.teamIds);
   if (billingTeams.length === 1) return billingTeams[0];
   if (billingTeams.length > 1) return false;
-  return owner.teamIds.includes("everyone") ? "everyone" : undefined;
+  return owner.teamIds.includes(DEFAULT_TEAM_ID) ? DEFAULT_TEAM_ID : undefined;
 }
 
 function keyUsable(store: IdentityStore, key: ApiKey): boolean {
@@ -131,11 +132,7 @@ function keyUsable(store: IdentityStore, key: ApiKey): boolean {
   if (!owner || owner.disabled) return false;
   if (!cleanKeyProject(key.project)) return false;
   if (key.teamId) return Boolean(store.getTeam(key.teamId) && owner.teamIds.includes(key.teamId));
-  return billableTeamIds(owner.teamIds).length <= 1;
-}
-
-function billableTeamIds(teamIds: string[]): string[] {
-  return teamIds.filter((id) => id !== "everyone");
+  return nonDefaultTeamIds(owner.teamIds).length <= 1;
 }
 
 export function cleanKeyLabel(value: string | undefined): string | undefined {

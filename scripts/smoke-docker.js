@@ -12,6 +12,7 @@ const envFile = join(tmp, ".env");
 const host = "127.0.0.1";
 const hostPort = smokeHostPort();
 const baseUrl = `http://${host}:${hostPort}`;
+assertDockerAvailable();
 const hostProbe = dockerHost().startsWith("ssh://") ? "docker-host" : "local-host";
 
 writeFileSync(envFile, "MOLENKOPF_SESSION_SECRET=test-8f6e1a9d0c2b4f739ab15c6d8e029471\n");
@@ -137,6 +138,15 @@ function run(args, stdio = "pipe") {
   } catch (error) {
     if (stdio === "ignore") return Buffer.alloc(0);
     throw error;
+  }
+}
+
+function assertDockerAvailable() {
+  try {
+    execFileSync("docker", ["version"], { stdio: "ignore" });
+  } catch {
+    console.error("Docker is required for smoke:docker. Install Docker or set up Docker before running this smoke test.");
+    process.exit(1);
   }
 }
 

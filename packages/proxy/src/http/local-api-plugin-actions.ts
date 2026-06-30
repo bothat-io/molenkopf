@@ -1,10 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { EventBus } from "../../../core/src/events/event-bus.ts";
 import { findPlugin } from "../../../core/src/plugins/plugin-catalog.ts";
+import { validatePluginActionOutput } from "../../../core/src/plugins/plugin-action-output.ts";
 import { pluginView } from "./local-api-state.ts";
 import type { PluginActionDescriptor } from "../../../core/src/plugins/plugin-descriptor-v2.ts";
-import { validatePluginSettings } from "../../../core/src/plugins/plugin-settings-schema.ts";
-import { pluginPolicySchemaVersion, parsePluginPolicyState, resolveActionPermission } from "../../../core/src/plugins/plugin-policy.ts";
-import { normalizePluginSettings } from "../../../core/src/plugins/plugin-settings-schema.ts";
+import { pluginPolicySchemaVersion, parsePluginPolicyState, resolveActionPermission, resolvePluginActionRole } from "../../../core/src/plugins/plugin-policy.ts";
+import { normalizePluginSettings, validatePluginSettings } from "../../../core/src/plugins/plugin-settings-schema.ts";
 import { builtinPluginDescriptorV2 } from "./plugin-platform.ts";
 import { readJson, writeJson } from "./local-api-io.ts";
 import { persistRuntimeSettings } from "./runtime-settings.ts";
@@ -13,6 +14,8 @@ import type { PluginHost } from "./plugin-host.ts";
 import type { RuntimeState } from "./runtime-types.ts";
 import { safePluginOutput } from "./plugin-output-safety.ts";
 import { resolveEffectivePluginPolicy } from "./runtime-plugin-policy.ts";
+import type { AuditStore } from "../../../core/src/manifest/audit-store.ts";
+import { scopedManifests } from "./plugin-data.ts";
 
 export async function togglePlugin(req: IncomingMessage, res: ServerResponse, state: RuntimeState, pluginHost?: PluginHost) {
   const body = await readJson(req);
@@ -35,7 +38,7 @@ export async function togglePlugin(req: IncomingMessage, res: ServerResponse, st
   writeJson(res, 200, pluginView(plugin, state));
 }
 
-export async function runPluginAction(req: IncomingMessage, res: ServerResponse, state: RuntimeState, user: AuthUser | undefined, pluginHost?: PluginHost) {
+export async function runPluginAction(req: IncomingMessage, res: ServerResponse, state: RuntimeState, user: AuthUser | undefined, audit: AuditStore, pluginHost?: PluginHost, events?: EventBus) {
   const path = new URL(req.url ?? "/", "http://local").pathname;
   const match = path.match(/^\/__molenkopf\/plugins\/([^/]+)\/actions\/([^/]+)$/);
   if (!match) return writeJson(res, 404, { error: "plugin_action_not_found" });
@@ -59,22 +62,45 @@ export async function runPluginAction(req: IncomingMessage, res: ServerResponse,
   const permission = resolveActionPermission(action, policy);
   if (!permission.ok) return writeJson(res, 403, { error: permission.code ?? "plugin_action_forbidden" });
   const rawActionPayload = typeof body.input === "object" && !Array.isArray(body.input) ? body.input as Record<string, unknown> : body;
+  if (!confirmationSatisfied(action, rawActionPayload)) return writeJson(res, 409, { error: "confirmation_required" });
   const settings = validatePluginSettings(action.inputSchema, rawActionPayload);
   if (!settings.ok) return writeJson(res, 400, { error: "plugin_settings_invalid", warnings: settings.errors });
   const normalized = normalizePluginSettings(action.inputSchema, rawActionPayload);
-  const result = await pluginHost.action(pluginId, actionId, normalized as Record<string, unknown>, user?.id, user?.teamIds) as { ok: boolean; status?: number; error?: string; payload: unknown };
+  const manifests = await scopedManifests(audit, state, user);
+  const result = await pluginHost.action(pluginId, actionId, normalized as Record<string, unknown>, user?.id, user?.teamIds, manifests) as { ok: boolean; status?: number; error?: string; payload: unknown };
   if (!result.ok) {
     const fallback = result.error === "plugin_action_not_found" ? "plugin_action_not_found" : "plugin_runtime_failed";
     return writeJson(res, result.status ?? 500, { error: result.error === "plugin_action_not_found" ? "plugin_action_not_found" : fallback });
   }
+  const output = validatePluginActionOutput(action.outputSchema, result.payload);
+  if (!output.ok) return writeJson(res, 500, { error: "plugin_action_invalid_output" });
   const safe = safePluginOutput(pluginId, result.payload, action.outputSafety);
+  if (action.auditEvent) emitActionAudit(events, pluginId, action, user);
   writeJson(res, 200, safe);
 }
 
 function pluginActionRoleAllowed(state: RuntimeState, action: PluginActionDescriptor, user: AuthUser | undefined): boolean {
-  if (action.requiredRole === "admin") return canManage(state, user);
-  if (action.requiredRole === "manager") return false;
-  return true;
+  if (!user && action.requiredRole !== "member") return canManage(state, user);
+  return resolvePluginActionRole(action, user?.role ?? "member");
+}
+
+function confirmationSatisfied(action: PluginActionDescriptor, input: Record<string, unknown>): boolean {
+  if (action.confirmation === "none") return true;
+  if (action.confirmation === "required") return input.confirm === true || input.confirmation === true;
+  const confirm = typeof input.confirm === "string" ? input.confirm : "";
+  const expected = typeof input.rootId === "string" && input.rootId ? input.rootId : action.id;
+  return confirm === expected;
+}
+
+function emitActionAudit(events: EventBus | undefined, pluginId: string, action: PluginActionDescriptor, user: AuthUser | undefined): void {
+  events?.emit("plugin_event", { data: safePluginOutput(pluginId, {
+    auditEvent: true,
+    pluginId,
+    actionId: action.id,
+    userId: user?.id,
+    teamIds: user?.teamIds ?? [],
+    sideEffects: [...action.sideEffects]
+  }, "strict") as Record<string, unknown> });
 }
 
 function buildPluginPolicyStateFromGlobalOverride(state: RuntimeState, id: string, enabled: boolean) {
