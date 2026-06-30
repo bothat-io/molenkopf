@@ -6,18 +6,14 @@ produce fake savings. Remaining work should stay in small, tested batches.
 
 ## High Priority
 
-- [ ] Add request-level optimizer effectiveness fields.
-  Track sanitized `effectivePluginIds`, skip reasons, and compressor mode per
-  request without storing request bodies or raw policy objects.
-
-- [ ] Add a first-class "why zero savings" diagnostic.
-  Explain disabled compressor, observe-only mode, retrieval unavailable, no
-  candidates, protected source/diff, thresholds, candidate limits, body limits,
-  and compression-not-smaller outcomes.
-
 - [ ] Add protected coding-context pressure metrics.
   Track source and diff pressure separately from compressible candidate
   pressure. Never count protected pressure as potential savings.
+
+- [ ] Surface zero-savings diagnostics in operator UI.
+  The request/audit layer now records sanitized `zeroSavingsReasons`,
+  `effectivePluginIds`, skip reasons, and compressor mode. Expose those fields
+  in dashboard views without rendering raw request content or policy objects.
 
 - [ ] Build dashboard controls for context-compressor settings.
   Expose mode, thresholds, body limits, candidate limits, and allowed kinds
