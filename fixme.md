@@ -1,33 +1,34 @@
-# Molenkopf Open Follow-Up
+# Plugin platform follow-up backlog
 
-Resolved findings and completed work packages were removed after verification on
-2026-06-30. This file now tracks only work that is still intentionally open.
+This file tracks remaining plugin hardening work after the v0.1.6 release
+preparation batch. Keep entries short and move implementation detail into tests
+or docs when work starts.
 
-## Open Work Packages
+## Completed in the current hardening batch
 
-[ ] Centralize team-scope and default-team helpers
-Priority: medium
-Agent: Refactor
-Reason: Default-team handling is still implemented in more than one module. The
-access-control bugs around `everyone` have been fixed, but a shared helper would
-reduce future regression risk.
-Files: `packages/proxy/src/http/runtime-plugin-policy.ts`;
-`packages/proxy/src/http/local-api-scope.ts`;
-`packages/proxy/src/http/proxy-identity.ts`; new
-`packages/proxy/src/http/team-scope.ts`; related tests under
-`packages/proxy/test/`
-Depends on: none
-Steps:
-1. Extract shared helpers for default-team detection, effective non-default team
-   IDs, readable data teams, and policy teams.
-2. Replace local ad-hoc team filtering in runtime plugin policy, local API scope,
-   and proxy identity with the shared helper.
-3. Add focused unit tests for the helper, including `["everyone"]`,
-   `["everyone", "alpha"]`, multiple non-default teams, empty team lists, admin,
-   manager, and member cases.
-Tests: Add `packages/proxy/test/team-scope.test.ts` and keep the existing
-policy/scope route regressions passing.
-Verify: `node --experimental-strip-types --experimental-sqlite --disable-warning=ExperimentalWarning --import ./packages/proxy/test/setup.ts --test --test-concurrency=1 packages/proxy/test/team-scope.test.ts packages/proxy/test/plugin-effective-runtime.test.ts packages/proxy/test/identity-usage-scope.test.ts`
-Done when: Team-scope behavior has one implementation, one test suite, and no
-remaining first-team/default-team ad-hoc access-control decisions in the
-affected modules.
+- Plugin action output schemas are enforced before API responses are returned.
+- Project graph actions derive or load graph snapshots without requiring a prior
+  dashboard data load.
+- Project graph cache entries are scoped, TTL-bound, size-bound, and testable.
+- Dashboard plugin policy editing now covers capabilities, actions, and
+  descriptor-defined settings.
+- Built-in plugin module registration is checked against descriptor v2 ids.
+
+## Remaining work
+
+- Replace raw inline plugin pages or harden CSP with strict hash/nonce handling.
+- Add plugin performance budgets, timeout handling, and slow-operation events.
+- Add sanitized plugin error taxonomy with non-sensitive correlation ids.
+- Make descriptor v2 the single canonical source for all remaining registry,
+  policy, catalog, and dashboard metadata.
+- Define and document one project graph freshness and persistence model.
+- Add a built-in plugin contract test matrix across descriptors, actions,
+  policy behavior, output schemas, and sanitizer behavior.
+- Split plugin implementation files by responsibility where they still mix
+  descriptors, actions, storage, UI rendering, DTOs, and helpers.
+
+## Release notes
+
+- Do not ship with `.env` in the workspace root. The sensitive workspace check
+  intentionally fails when that file exists.
+- Run the full release gate after the local `.env` is moved or removed.

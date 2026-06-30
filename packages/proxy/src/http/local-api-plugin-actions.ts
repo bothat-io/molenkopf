@@ -1,11 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { EventBus } from "../../../core/src/events/event-bus.ts";
 import { findPlugin } from "../../../core/src/plugins/plugin-catalog.ts";
+import { validatePluginActionOutput } from "../../../core/src/plugins/plugin-action-output.ts";
 import { pluginView } from "./local-api-state.ts";
 import type { PluginActionDescriptor } from "../../../core/src/plugins/plugin-descriptor-v2.ts";
-import { validatePluginSettings } from "../../../core/src/plugins/plugin-settings-schema.ts";
 import { pluginPolicySchemaVersion, parsePluginPolicyState, resolveActionPermission, resolvePluginActionRole } from "../../../core/src/plugins/plugin-policy.ts";
-import { normalizePluginSettings } from "../../../core/src/plugins/plugin-settings-schema.ts";
+import { normalizePluginSettings, validatePluginSettings } from "../../../core/src/plugins/plugin-settings-schema.ts";
 import { builtinPluginDescriptorV2 } from "./plugin-platform.ts";
 import { readJson, writeJson } from "./local-api-io.ts";
 import { persistRuntimeSettings } from "./runtime-settings.ts";
@@ -69,6 +69,8 @@ export async function runPluginAction(req: IncomingMessage, res: ServerResponse,
     const fallback = result.error === "plugin_action_not_found" ? "plugin_action_not_found" : "plugin_runtime_failed";
     return writeJson(res, result.status ?? 500, { error: result.error === "plugin_action_not_found" ? "plugin_action_not_found" : fallback });
   }
+  const output = validatePluginActionOutput(action.outputSchema, result.payload);
+  if (!output.ok) return writeJson(res, 500, { error: "plugin_action_invalid_output" });
   const safe = safePluginOutput(pluginId, result.payload, action.outputSafety);
   if (action.auditEvent) emitActionAudit(events, pluginId, action, user);
   writeJson(res, 200, safe);

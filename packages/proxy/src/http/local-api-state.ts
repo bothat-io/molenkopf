@@ -169,6 +169,8 @@ export function pluginView(plugin: MolenkopfPlugin, state: RuntimeState) {
     lifecycleStatus: enabled ? (lifecycle?.status ?? "enabled") : "disabled",
     lifecycleError: enabled ? lifecycle?.error : undefined,
     defaultMaxRisk: descriptor?.defaultPolicy.maxRisk,
+    capabilities: descriptor ? [...descriptor.capabilities] : [...plugin.permissions],
+    settingsSchema: descriptor?.settingsSchema,
     actions: descriptor?.actions.map((action) => ({
       id: action.id,
       label: action.label,

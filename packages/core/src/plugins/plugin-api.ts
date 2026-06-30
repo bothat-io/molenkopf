@@ -94,6 +94,7 @@ export type PluginActionContext = {
   userId?: string;
   teamIds: string[];
   scope: string;
+  manifests?: AuditManifest[];
 };
 
 export type PluginRuntimeContext = {

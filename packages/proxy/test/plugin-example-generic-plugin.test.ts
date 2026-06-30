@@ -2,6 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
 import { once } from "node:events";
+import { mkdtemp, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { startProxy } from "../src/http/server.ts";
 import { builtinPluginDescriptorsV2 } from "../../core/src/plugins/builtin-plugin-descriptors-v2.ts";
 import { builtinPluginModules } from "../../core/src/plugins/builtin-plugin-modules.ts";
@@ -13,9 +16,10 @@ test("example plugin fixture works through generic registry, page, data, and act
   const restore = registerExamplePlugin();
   const upstream = createServer((req, res) => { req.resume(); res.writeHead(200, {}); res.end("{}"); });
   const port = await listenOn(upstream);
+  const dataDir = await mkdtemp(join(tmpdir(), "molenkopf-example-plugin-"));
   let proxy;
   try {
-    proxy = await startProxy({ port: 0, target: `http://127.0.0.1:${port}/v1` });
+    proxy = await startProxy({ port: 0, target: `http://127.0.0.1:${port}/v1`, dataDir });
     const base = `http://127.0.0.1:${proxy.port}`;
     const setup = await post(base, "/__molenkopf/setup-admin", { username: "admin", password: "admin-secret" });
     assert.equal(setup.status, 200);
@@ -48,6 +52,7 @@ test("example plugin fixture works through generic registry, page, data, and act
   } finally {
     if (proxy) await proxy.close();
     upstream.close();
+    await rm(dataDir, { recursive: true, force: true });
     restore();
   }
 });

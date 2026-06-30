@@ -1,5 +1,10 @@
+import { createServer, type Server } from "node:http";
+import { once } from "node:events";
 import test from "node:test";
 import assert from "node:assert/strict";
+import { emptyPolicyState } from "../../core/src/plugins/plugin-policy-types.ts";
+import type { RuntimeState } from "../src/http/runtime-types.ts";
+import { runPluginAction } from "../src/http/local-api-plugin-actions.ts";
 import { postAuth, putAuth, setupAdmin, startPolicyProxy } from "./plugin-policy-api-test-utils.ts";
 
 test("generic plugin action route returns contract errors for missing, disabled, and actionless plugins", async () => {
@@ -53,6 +58,33 @@ test("plugin action route enforces confirmation and emits descriptor audit event
   }
 });
 
+test("plugin action route rejects invalid plugin output before returning it", async () => {
+  const server = createServer((req, res) => runPluginAction(
+    req,
+    res,
+    { pluginPolicyState: emptyPolicyState() } as RuntimeState,
+    undefined,
+    {
+      action: async () => ({
+        ok: true,
+        payload: { results: [{ authorization: "Bearer abcdefghijklmnop" }] }
+      })
+    } as never
+  ));
+  const base = `http://127.0.0.1:${await listenOn(server)}`;
+  try {
+    const res = await fetch(`${base}/__molenkopf/plugins/project-graph-plugin/actions/graph.query`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ query: "openai", limit: 5 })
+    });
+    assert.equal(res.status, 500);
+    assert.deepEqual(await res.json(), { error: "plugin_action_invalid_output" });
+  } finally {
+    await closeServer(server);
+  }
+});
+
 async function readUntil(reader: ReadableStreamDefaultReader<Uint8Array>, text: string): Promise<string> {
   const decoder = new TextDecoder();
   let buffer = "";
@@ -64,4 +96,16 @@ async function readUntil(reader: ReadableStreamDefaultReader<Uint8Array>, text: 
   }
   if (!buffer.includes(text)) throw new Error(`event stream did not include ${text}`);
   return buffer;
+}
+
+async function listenOn(server: Server): Promise<number> {
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  return typeof address === "object" && address ? address.port : 0;
+}
+
+async function closeServer(server: Server): Promise<void> {
+  if (!server.listening) return;
+  await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
 }
