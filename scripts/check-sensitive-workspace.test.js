@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { sensitiveWorkspaceFailures } from "./check-sensitive-workspace.js";
@@ -23,6 +23,18 @@ test("sensitive workspace check rejects real root env files", async () => {
     const failures = sensitiveWorkspaceFailures(root);
     assert.ok(failures.includes("forbidden environment file in workspace root: .env"));
     assert.ok(failures.includes("forbidden environment file in workspace root: .env.local"));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("sensitive workspace check rejects root env files even when gitignored", async () => {
+  const root = await mkdtemp(join(tmpdir(), "molenkopf-sensitive-gitignored-"));
+  try {
+    await mkdir(join(root, ".git"));
+    await writeFile(join(root, ".gitignore"), ".env\n");
+    await writeFile(join(root, ".env"), "MOLENKOPF_SESSION_SECRET=secret\n");
+    assert.deepEqual(sensitiveWorkspaceFailures(root), ["forbidden environment file in workspace root: .env"]);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

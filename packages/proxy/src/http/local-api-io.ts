@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { randomBytes } from "node:crypto";
 import { CONTROL_PLANE_LIMITS } from "./runtime-types.ts";
 
 export class LocalApiError extends Error {
@@ -78,12 +79,25 @@ export function jsonHeaders(headers: Record<string, string> = {}): Record<string
 }
 
 export function writeHtml(res: ServerResponse, html: string): void {
+  const nonce = randomBytes(16).toString("base64");
   res.writeHead(200, securityHeaders({
     "content-type": "text/html; charset=utf-8",
     "cache-control": "no-store",
-    "content-security-policy": "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'",
+    "content-security-policy": [
+      "default-src 'none'",
+      `script-src 'self' 'nonce-${nonce}'`,
+      "style-src 'self' 'unsafe-inline'",
+      "connect-src 'self'",
+      "img-src 'self' data:",
+      "base-uri 'none'",
+      "frame-ancestors 'none'"
+    ].join("; "),
   }));
-  res.end(html);
+  res.end(addScriptNonce(html, nonce));
+}
+
+function addScriptNonce(html: string, nonce: string): string {
+  return html.replace(/<script(?![^>]*\bnonce=)([^>]*)>/gi, `<script nonce="${nonce}"$1>`);
 }
 
 function securityHeaders(headers: Record<string, string>): Record<string, string> {

@@ -25,8 +25,12 @@ test("serves a plugin's own page from its plugin folder", async () => {
     const cookie = await cookieFor(base);
     const page = await pluginFetch(base, "context-compressor-plugin", cookie);
     assert.equal(page.status, 200);
+    const csp = page.headers.get("content-security-policy") ?? "";
+    assert.match(csp, /script-src 'self' 'nonce-[^']+'/);
+    assert.doesNotMatch(csp, /script-src[^;]*unsafe-inline/);
     const html = await page.text();
     assert.match(html, /Context compression/);
+    assert.match(html, /<script nonce="[^"]+">/);
     assert.match(html, /Projects \/ API keys/);
     assert.match(html, /Input tokens/);
     assert.match(html, /Output tokens/);

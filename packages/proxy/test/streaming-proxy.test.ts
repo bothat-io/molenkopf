@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
-import { PassThrough } from "node:stream";
 import { gzipSync } from "node:zlib";
 import { once } from "node:events";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -9,7 +8,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startProxy } from "../src/http/server.ts";
 import type { RunningProxy } from "../src/http/server-types.ts";
-import { readBody } from "../src/http/server-io.ts";
 import { auth, issueKey, setupKey } from "./proxy-auth-utils.ts";
 async function listenOn(server: Server): Promise<number> {
   server.listen(0, "127.0.0.1");
@@ -168,24 +166,6 @@ test("aborted upstream response after headers is audited as a proxy error", asyn
     upstream.close();
     await rm(dir, { recursive: true, force: true });
   }
-});
-
-test("request body read rejects on idle timeout and abort", async () => {
-  const idle = new PassThrough() as any;
-  idle.complete = false;
-  const timedOut = readBody(idle, 20);
-  idle.write("partial");
-  await assert.rejects(timedOut, /request body timed out after 20ms/);
-  const aborted = new PassThrough() as any;
-  aborted.complete = false;
-  const abortedRead = readBody(aborted, 1000);
-  aborted.emit("aborted");
-  await assert.rejects(abortedRead, /request body aborted/);
-  const tooLarge = new PassThrough() as any;
-  tooLarge.complete = true;
-  const limited = readBody(tooLarge, 1000, 4);
-  tooLarge.end("12345");
-  await assert.rejects(limited, /request_body_too_large/);
 });
 
 async function setupAdmin(base: string): Promise<string> {

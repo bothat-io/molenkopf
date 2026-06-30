@@ -1,7 +1,6 @@
 import { redactSecrets } from "../security/secret-redactor.ts";
 import type { AuditManifest } from "./audit-store.ts";
 import { optionalContentFingerprints, safeContentFingerprints } from "./audit-fingerprints.ts";
-
 export function normalizedManifest(manifest: AuditManifest): AuditManifest {
   if (!isAuditManifest(manifest)) throw new Error("invalid audit manifest");
   const safe: AuditManifest = {
@@ -33,6 +32,7 @@ export function normalizedManifest(manifest: AuditManifest): AuditManifest {
 	  assignNumber(safe, "cacheReadTokens", manifest.cacheReadTokens);
 	  assignNumber(safe, "cacheCreationTokens", manifest.cacheCreationTokens);
 	  assignNumber(safe, "reasoningTokens", manifest.reasoningTokens);
+	  if (safeUsageSource(manifest.usageSource)) safe.usageSource = manifest.usageSource;
 	  assignNumber(safe, "cacheablePrefixBytes", manifest.cacheablePrefixBytes);
 	  assignNumber(safe, "toolCount", manifest.toolCount);
 	  assignNumber(safe, "toolSchemaBytes", manifest.toolSchemaBytes);
@@ -52,7 +52,6 @@ export function normalizedManifest(manifest: AuditManifest): AuditManifest {
   const durationMs = finiteOptional(manifest.durationMs);
   const upstreamInputTokens = finiteOptional(manifest.upstreamInputTokens);
   const upstreamOutputTokens = finiteOptional(manifest.upstreamOutputTokens);
-
   if (manifest.providerId) safe.providerId = redactedToken(text(manifest.providerId, "provider"), "provider");
   if (manifest.requestedModel) safe.requestedModel = redactedToken(text(manifest.requestedModel, "model"), "model");
   if (manifest.requestedReasoning) safe.requestedReasoning = redactedToken(text(manifest.requestedReasoning, "reasoning"), "reasoning");
@@ -63,7 +62,6 @@ export function normalizedManifest(manifest: AuditManifest): AuditManifest {
   if (upstreamOutputTokens !== undefined) safe.upstreamOutputTokens = upstreamOutputTokens;
   return safe;
 }
-
 export function isAuditManifest(value: unknown): value is AuditManifest {
   const item = value as AuditManifest;
   return Boolean(item && typeof item === "object" && typeof item.requestId === "string" && typeof item.timestamp === "string"
@@ -76,6 +74,7 @@ export function isAuditManifest(value: unknown): value is AuditManifest {
 	    && finiteOptionalNumber(item.potentialCompressedItems) && finiteOptionalNumber(item.potentialSavedTokens) && finiteOptionalNumber(item.potentialSavedBytes)
 	    && finiteOptionalNumber(item.protectedSourceTokens) && finiteOptionalNumber(item.protectedDiffTokens)
 	    && finiteOptionalNumber(item.cachedTokens) && finiteOptionalNumber(item.cacheReadTokens) && finiteOptionalNumber(item.cacheCreationTokens) && finiteOptionalNumber(item.reasoningTokens)
+	    && (item.usageSource === undefined || safeUsageSource(item.usageSource))
 	    && finiteOptionalNumber(item.cacheablePrefixBytes) && finiteOptionalNumber(item.toolCount) && finiteOptionalNumber(item.toolSchemaBytes) && finiteOptionalNumber(item.toolSchemaTokens)
 	    && optionalHash(item.staticPrefixHash) && optionalHash(item.toolSchemaHash) && optionalBoolean(item.hasTimestampNoise) && optionalBoolean(item.hasRandomIdNoise)
 	    && optionalContentFingerprints(item.contentFingerprints)
@@ -144,6 +143,8 @@ function redactedToken(value: string, fallback: string): string {
 function safeSource(value: string): NonNullable<AuditManifest["client"]>["source"] {
   return value === "user" || value === "agent" || value === "api_key" || value === "unattributed" ? value : "unattributed";
 }
+
+function safeUsageSource(value: unknown): value is NonNullable<AuditManifest["usageSource"]> { return value === "provider_response" || value === "cli_event" || value === "estimated_cli" || value === "mixed_cli_event_estimate"; }
 
 function safePath(path: string): string {
   try {

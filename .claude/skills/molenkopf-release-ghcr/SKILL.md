@@ -1,15 +1,40 @@
 ---
 name: molenkopf-release-ghcr
-description: Molenkopf release workflow memory for GHCR Docker publishing, protected npm publishing, preview testing, SemVer tag handling, and README update timing. Use when changing release.yml, tagging releases, publishing containers, testing GHCR images, publishing npm packages, or documenting install instructions.
+description: Molenkopf release workflow memory for preview-to-main PR promotion, GHCR Docker publishing, protected npm publishing, preview testing, SemVer tag handling, and README update timing. Use when changing release.yml, targeting preview, merging to main, tagging releases, publishing containers, testing GHCR images, bumping versions, publishing npm packages, or documenting install instructions.
 ---
 
 # Molenkopf GHCR Release Workflow
 
 Use this workflow when working on Molenkopf releases or Docker publishing.
 
+## Agent Rule
+
+- Read this skill before integration, preview, main, Docker, or version work.
+- State the active step by number and name while working.
+- Do not merge locally into `preview` or `main`.
+- Do not push directly to `preview` or `main` unless the user explicitly asks
+  for a repository-maintainer exception.
+- Use GitHub PRs for all branch promotion.
+
+## Preview To Main Flow
+
+1. Work on a fix or release branch.
+2. Commit only intentional files; keep ignored artifacts such as `fixme.md`,
+   `.env`, and local ZIPs out of commits.
+3. Push the branch and open a GitHub PR into `preview`.
+4. Wait for preview PR checks, including Docker/release gates when configured.
+5. Merge into `preview` only through GitHub after the PR is green.
+6. Keep `preview` as the persistent integration branch; do not delete or locally
+   fast-forward it as a substitute for PR promotion.
+7. When preview is accepted, open a second GitHub PR from `preview` into `main`.
+8. Merge into `main` only through GitHub after the main PR is green.
+9. Make version bumps such as `0.2.0` in a release PR or a clearly scoped
+   release commit, not hidden inside unrelated fixes.
+
 ## Current Policy
 
 - Treat `main` as the source for official releases.
+- Treat `preview` as the persistent integration branch before `main`.
 - Keep npm publishing manual and protected.
 - Ship Docker automatically from official SemVer tags; ship npm manually after
   the same release commit has passed validation.

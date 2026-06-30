@@ -71,6 +71,7 @@ export function buildManifest(requestId: string, method: string, path: string, t
     cacheReadTokens: usage?.cacheReadTokens,
     cacheCreationTokens: usage?.cacheCreationTokens,
     reasoningTokens: usage?.reasoningTokens,
+    usageSource: usage?.source,
     timings
   };
 }

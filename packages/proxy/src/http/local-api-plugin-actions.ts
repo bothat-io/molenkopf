@@ -14,6 +14,8 @@ import type { PluginHost } from "./plugin-host.ts";
 import type { RuntimeState } from "./runtime-types.ts";
 import { safePluginOutput } from "./plugin-output-safety.ts";
 import { resolveEffectivePluginPolicy } from "./runtime-plugin-policy.ts";
+import type { AuditStore } from "../../../core/src/manifest/audit-store.ts";
+import { scopedManifests } from "./plugin-data.ts";
 
 export async function togglePlugin(req: IncomingMessage, res: ServerResponse, state: RuntimeState, pluginHost?: PluginHost) {
   const body = await readJson(req);
@@ -36,7 +38,7 @@ export async function togglePlugin(req: IncomingMessage, res: ServerResponse, st
   writeJson(res, 200, pluginView(plugin, state));
 }
 
-export async function runPluginAction(req: IncomingMessage, res: ServerResponse, state: RuntimeState, user: AuthUser | undefined, pluginHost?: PluginHost, events?: EventBus) {
+export async function runPluginAction(req: IncomingMessage, res: ServerResponse, state: RuntimeState, user: AuthUser | undefined, audit: AuditStore, pluginHost?: PluginHost, events?: EventBus) {
   const path = new URL(req.url ?? "/", "http://local").pathname;
   const match = path.match(/^\/__molenkopf\/plugins\/([^/]+)\/actions\/([^/]+)$/);
   if (!match) return writeJson(res, 404, { error: "plugin_action_not_found" });
@@ -64,7 +66,8 @@ export async function runPluginAction(req: IncomingMessage, res: ServerResponse,
   const settings = validatePluginSettings(action.inputSchema, rawActionPayload);
   if (!settings.ok) return writeJson(res, 400, { error: "plugin_settings_invalid", warnings: settings.errors });
   const normalized = normalizePluginSettings(action.inputSchema, rawActionPayload);
-  const result = await pluginHost.action(pluginId, actionId, normalized as Record<string, unknown>, user?.id, user?.teamIds) as { ok: boolean; status?: number; error?: string; payload: unknown };
+  const manifests = await scopedManifests(audit, state, user);
+  const result = await pluginHost.action(pluginId, actionId, normalized as Record<string, unknown>, user?.id, user?.teamIds, manifests) as { ok: boolean; status?: number; error?: string; payload: unknown };
   if (!result.ok) {
     const fallback = result.error === "plugin_action_not_found" ? "plugin_action_not_found" : "plugin_runtime_failed";
     return writeJson(res, result.status ?? 500, { error: result.error === "plugin_action_not_found" ? "plugin_action_not_found" : fallback });

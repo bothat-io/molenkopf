@@ -33,7 +33,7 @@ export async function buildPluginData(id: string, audit: AuditStore, state: Runt
   return { status: 200, payload: safePluginOutput(id, result.payload, scope) };
 }
 
-async function scopedManifests(audit: AuditStore, state: RuntimeState, user?: AuthUser): Promise<AuditManifest[]> {
+export async function scopedManifests(audit: AuditStore, state: RuntimeState, user?: AuthUser): Promise<AuditManifest[]> {
   const page = await audit.listPage({ limit: 200, newestFirst: true, filter: auditFilterForUser(state, user) });
   return auditViews(page.items).filter(isAgentTraffic).reverse();
 }

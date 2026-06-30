@@ -5,7 +5,8 @@ import assert from "node:assert/strict";
 import { emptyPolicyState } from "../../core/src/plugins/plugin-policy-types.ts";
 import type { RuntimeState } from "../src/http/runtime-types.ts";
 import { runPluginAction } from "../src/http/local-api-plugin-actions.ts";
-import { postAuth, putAuth, setupAdmin, startPolicyProxy } from "./plugin-policy-api-test-utils.ts";
+import type { AuditStore } from "../../core/src/manifest/audit-store.ts";
+import { cookieFrom, post, postAuth, putAuth, setupAdmin, startPolicyProxy } from "./plugin-policy-api-test-utils.ts";
 
 test("generic plugin action route returns contract errors for missing, disabled, and actionless plugins", async () => {
   const env = await startPolicyProxy("molenkopf-plugin-action-router-");
@@ -64,6 +65,7 @@ test("plugin action route rejects invalid plugin output before returning it", as
     res,
     { pluginPolicyState: emptyPolicyState() } as RuntimeState,
     undefined,
+    emptyAuditStore(),
     {
       action: async () => ({
         ok: true,
@@ -82,6 +84,29 @@ test("plugin action route rejects invalid plugin output before returning it", as
     assert.deepEqual(await res.json(), { error: "plugin_action_invalid_output" });
   } finally {
     await closeServer(server);
+  }
+});
+
+test("plugin action manifests are scoped to the caller audit visibility", async () => {
+  const env = await startPolicyProxy("molenkopf-plugin-action-scope-");
+  try {
+    const admin = await setupAdmin(env.base);
+    await postAuth(env.base, "/__molenkopf/identity/teams", { id: "alpha", name: "Alpha" }, admin);
+    await postAuth(env.base, "/__molenkopf/identity/teams", { id: "beta", name: "Beta" }, admin);
+    await postAuth(env.base, "/__molenkopf/identity/users", { id: "bob", displayName: "Bob", password: "bob-secret", role: "member", teamIds: ["alpha"] }, admin);
+    await postAuth(env.base, "/__molenkopf/identity/users", { id: "ana", displayName: "Ana", password: "ana-secret", role: "member", teamIds: ["beta"] }, admin);
+    const bobKey = await postAuth(env.base, "/__molenkopf/keys", { owner: "bob", project: "project-one", teamId: "alpha" }, admin).then((res) => res.json());
+    const anaKey = await postAuth(env.base, "/__molenkopf/keys", { owner: "ana", project: "project-two", teamId: "beta" }, admin).then((res) => res.json());
+    await fetch(`${env.base}/v1/messages`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${bobKey.secret}` }, body: "{}" });
+    await fetch(`${env.base}/v1/messages`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${anaKey.secret}` }, body: "{}" });
+
+    const bob = cookieFrom(await post(env.base, "/__molenkopf/login", { username: "bob", password: "bob-secret" }));
+    const response = await postAuth(env.base, "/__molenkopf/plugins/project-graph-plugin/actions/graph.query", { query: "project", limit: 10 }, bob);
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.doesNotMatch(JSON.stringify(payload), /project-two/);
+  } finally {
+    await env.close();
   }
 });
 
@@ -108,4 +133,8 @@ async function listenOn(server: Server): Promise<number> {
 async function closeServer(server: Server): Promise<void> {
   if (!server.listening) return;
   await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+}
+
+function emptyAuditStore(): AuditStore {
+  return { listPage: async () => ({ items: [], skippedCorrupt: 0 }) } as unknown as AuditStore;
 }

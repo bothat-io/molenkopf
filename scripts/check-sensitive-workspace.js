@@ -1,5 +1,4 @@
 import { readdirSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 const allowedEnvFiles = new Set([".env.example"]);
@@ -17,18 +16,9 @@ export function sensitiveWorkspaceFailures(root = process.cwd()) {
   const failures = [];
   for (const entry of readdirSync(root, { withFileTypes: true })) {
     if (!entry.isFile()) continue;
-    if ((entry.name === ".env" || (entry.name.startsWith(".env.") && !allowedEnvFiles.has(entry.name))) && !gitIgnored(root, entry.name)) {
+    if (entry.name === ".env" || (entry.name.startsWith(".env.") && !allowedEnvFiles.has(entry.name))) {
       failures.push(`forbidden environment file in workspace root: ${entry.name}`);
     }
   }
   return failures;
-}
-
-function gitIgnored(root, name) {
-  try {
-    execFileSync("git", ["-C", root, "check-ignore", "-q", "--", name], { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
 }

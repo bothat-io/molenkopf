@@ -19,7 +19,7 @@ export type PluginHost = {
   stop: (reason?: string) => Promise<void>;
   audit: (manifest: AuditManifest, pluginIds?: readonly string[]) => Promise<void>;
   data: (id: string, ctx: PluginDataContext) => Promise<DataResult>;
-  action: (id: string, actionId: string, input: Record<string, unknown>, userId?: string, teamIds?: readonly string[]) => Promise<DataResult>;
+  action: (id: string, actionId: string, input: Record<string, unknown>, userId?: string, teamIds?: readonly string[], manifests?: readonly AuditManifest[]) => Promise<DataResult>;
   setRequestPlugins: (requestId: string, pluginIds: readonly string[]) => void;
 };
 
@@ -79,11 +79,11 @@ export function createPluginHost(state: RuntimeState, deps: { store: RetrievalSt
       if (!fn) return { ok: false, status: 404, error: "plugin_data_not_found" };
       try { return { ok: true, payload: await fn(ctx, runtime(id)) }; } catch { warn(deps.events, id, "getData"); return { ok: false, status: 500, error: "plugin_data_failed" }; }
     },
-    async action(id, actionId, input, userId, teamIds = []) {
+    async action(id, actionId, input, userId, teamIds = [], manifests = []) {
       const fn = modules[id]?.executeAction;
       if (!fn) return { ok: false, status: 404, error: "plugin_action_not_found" };
       try {
-        const context: PluginActionContext = { actionId, input: input as PluginJson, userId, teamIds: [...teamIds], scope: "local-api", manifests: state.latest ? [state.latest] : [] };
+        const context: PluginActionContext = { actionId, input: input as PluginJson, userId, teamIds: [...teamIds], scope: "local-api", manifests: [...manifests] };
         return { ok: true, payload: await fn(context, runtime(id)) };
       } catch {
         warn(deps.events, id, `action:${actionId}`);

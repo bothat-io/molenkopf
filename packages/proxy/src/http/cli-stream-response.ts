@@ -1,10 +1,12 @@
 import type { ServerResponse } from "node:http";
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
+import type { UsageTotals } from "../../../core/src/manifest/usage-meter.ts";
 import { estimateTokens } from "../../../core/src/utils/tokens.ts";
 import { executeCliProvider } from "../runtime/cli-executor.ts";
 import { cliRequest } from "../runtime/cli-request.ts";
 import { isOpenAiResponses, wantsStream } from "../runtime/cli-provider.ts";
 import type { CliOutputEvent } from "../runtime/cli-output-events.ts";
+import { mergedCliUsage } from "../runtime/cli-usage.ts";
 import { visibleCliStepLabel } from "./cli-progress-label.ts";
 import { anthropicStep, anthropicStreamDone, anthropicStreamStart, anthropicTextDelta, openAiMessageStart, openAiProgress, openAiStep, openAiStreamDone, openAiStreamStart, openAiTextDelta, streamError, type OpenAiStreamState } from "./cli-sse-format.ts";
 import { endSse, writeSse, writeSseHeaders } from "./cli-sse-writer.ts";
@@ -13,7 +15,7 @@ const CLI_STREAM_PROGRESS_INTERVAL_MS = 2000;
 
 export type CliStreamResult = {
   status: number;
-  usage?: { inputTokens?: number; outputTokens?: number };
+  usage?: UsageTotals;
 };
 export type CliStreamOptions = { onEvent?: (event: CliOutputEvent) => void };
 
@@ -47,7 +49,7 @@ async function streamOpenAiCliProvider(provider: ProviderConfig, body: string, r
   res.once("close", onClose);
   let streamedText = "";
   try {
-    const output = await executeCliProvider(provider, request.prompt, request.runModel, {
+    const cli = await executeCliProvider(provider, request.prompt, request.runModel, {
       signal: abort.signal,
       onEvent: (event) => {
         options.onEvent?.(event);
@@ -59,7 +61,8 @@ async function streamOpenAiCliProvider(provider: ProviderConfig, body: string, r
         }
       }
     });
-    const usage = { inputTokens: estimateTokens(request.prompt), outputTokens: estimateTokens(output) };
+    const output = cli.output;
+    const usage = mergedCliUsage(request.prompt, output, cli.usage);
     if (!streamedText && output) writeSse(res, openAiMessageStart(requestId, streamState) + openAiTextDelta(requestId, streamState, output));
     endSse(res, openAiStreamDone(requestId, request.responseModel, output, usage, streamState));
     return { status: 200, usage };
@@ -89,7 +92,7 @@ async function streamAnthropicCliProvider(provider: ProviderConfig, body: string
   const onClose = () => { clientClosed = true; abort.abort(); };
   res.once("close", onClose);
   try {
-    const output = await executeCliProvider(provider, request.prompt, request.runModel, {
+    const cli = await executeCliProvider(provider, request.prompt, request.runModel, {
       signal: abort.signal,
       onEvent: (event) => {
         options.onEvent?.(event);
@@ -101,7 +104,8 @@ async function streamAnthropicCliProvider(provider: ProviderConfig, body: string
         }
       }
     });
-    const usage = { inputTokens, outputTokens: estimateTokens(output) };
+    const output = cli.output;
+    const usage = mergedCliUsage(request.prompt, output, cli.usage);
     if (!streamedText && output) writeSse(res, anthropicTextDelta(output));
     endSse(res, anthropicStreamDone(usage));
     return { status: 200, usage };

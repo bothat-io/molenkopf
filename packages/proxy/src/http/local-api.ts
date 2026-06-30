@@ -118,7 +118,7 @@ export async function handleLocalRequest(req: IncomingMessage, res: ServerRespon
     if (path === "/__molenkopf/identity/teams/remove") return removeIdentityTeam(req, res, state);
     if (path === "/__molenkopf/retention/purge") return purgeRetention(req, res, audit, state);
     const pluginAction = path.match(/^\/__molenkopf\/plugins\/([^/]+)\/actions\/([^/]+)$/);
-    if (pluginAction && req.method === "POST") return runPluginAction(req, res, state, user, pluginHost, events);
+    if (pluginAction && req.method === "POST") return runPluginAction(req, res, state, user, audit, pluginHost, events);
     const pluginData = path.match(/^\/__molenkopf\/plugins\/([^/]+)\/data$/);
     if (pluginData) return writePluginData(res, pluginData[1], audit, state, user, pluginHost);
     const pluginPage = path.match(/^\/__molenkopf\/plugins\/([^/]+)\/page$/);

@@ -35,7 +35,7 @@ export type AuditManifest = {
   durationMs?: number;
   upstreamInputTokens?: number;
   upstreamOutputTokens?: number;
-  cachedTokens?: number; cacheReadTokens?: number; cacheCreationTokens?: number; reasoningTokens?: number; timings?: Record<string, number>; staticPrefixHash?: string; toolSchemaHash?: string; cacheablePrefixBytes?: number; hasTimestampNoise?: boolean; hasRandomIdNoise?: boolean; toolCount?: number; toolSchemaBytes?: number; toolSchemaTokens?: number;
+  cachedTokens?: number; cacheReadTokens?: number; cacheCreationTokens?: number; reasoningTokens?: number; usageSource?: "provider_response" | "cli_event" | "estimated_cli" | "mixed_cli_event_estimate"; timings?: Record<string, number>; staticPrefixHash?: string; toolSchemaHash?: string; cacheablePrefixBytes?: number; hasTimestampNoise?: boolean; hasRandomIdNoise?: boolean; toolCount?: number; toolSchemaBytes?: number; toolSchemaTokens?: number;
 };
 export type AuditRetention = { maxFiles?: number; maxBytes?: number; maxAgeMs?: number };
 export type AuditStoreOptions = { retention?: AuditRetention; now?: () => Date };
