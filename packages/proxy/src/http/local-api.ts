@@ -25,6 +25,7 @@ import { auditFilterForUser } from "./local-api-scope.ts";
 import { purgeRetention } from "./local-api-retention.ts";
 import type { PluginHost } from "./plugin-host.ts";
 import { runPluginAction } from "./local-api-plugin-actions.ts";
+import { streamEvents } from "./local-api-events.ts";
 
 const DEV_REVISION_PATH = "/__molenkopf/dev/revision";
 const PUBLIC_PATHS = new Set(["/__molenkopf/health", "/__molenkopf/login", "/__molenkopf/logout", "/__molenkopf/me", "/__molenkopf/setup-admin", DEV_REVISION_PATH]);
@@ -83,7 +84,7 @@ export async function handleLocalRequest(req: IncomingMessage, res: ServerRespon
     }
     if (path === "/__molenkopf/audit/summary") return audit.listPage({ limit: 1000, newestFirst: true, filter: auditFilterForUser(state, user) }).then((page) => writeJson(res, 200, summarizeAudit(auditViews(page.items))));
     if (path === "/__molenkopf/consumers") return writeJson(res, 200, buildConsumers(state, user));
-    if (path === "/__molenkopf/events") return streamEvents(res, events);
+    if (path === "/__molenkopf/events") return streamEvents(req, res, events, state);
     if (path === "/__molenkopf/plugins/toggle") return togglePlugin(req, res, state, pluginHost);
     if (path === "/__molenkopf/providers/select") return selectProvider(req, res, state);
     if (path === "/__molenkopf/providers/weight") return setProviderWeight(req, res, state);
@@ -117,7 +118,7 @@ export async function handleLocalRequest(req: IncomingMessage, res: ServerRespon
     if (path === "/__molenkopf/identity/teams/remove") return removeIdentityTeam(req, res, state);
     if (path === "/__molenkopf/retention/purge") return purgeRetention(req, res, audit, state);
     const pluginAction = path.match(/^\/__molenkopf\/plugins\/([^/]+)\/actions\/([^/]+)$/);
-    if (pluginAction && req.method === "POST") return runPluginAction(req, res, state, user, pluginHost);
+    if (pluginAction && req.method === "POST") return runPluginAction(req, res, state, user, audit, pluginHost, events);
     const pluginData = path.match(/^\/__molenkopf\/plugins\/([^/]+)\/data$/);
     if (pluginData) return writePluginData(res, pluginData[1], audit, state, user, pluginHost);
     const pluginPage = path.match(/^\/__molenkopf\/plugins\/([^/]+)\/page$/);
@@ -159,7 +160,9 @@ function methodAllowed(method: string, path: string): boolean {
 }
 
 function isPluginPolicyAdminPath(path: string): boolean {
-  return path === "/__molenkopf/plugin-policies/global" || /^\/__molenkopf\/plugin-policies\/teams\/[^/]+$/.test(path);
+  return path === "/__molenkopf/plugin-policies/global" ||
+    /^\/__molenkopf\/plugin-policies\/teams\/[^/]+$/.test(path) ||
+    /^\/__molenkopf\/plugin-policies\/effective\/[^/]+(?:\/[^/]+)?$/.test(path);
 }
 
 function writeDevRevision(res: ServerResponse) {
@@ -176,15 +179,4 @@ function writePluginPage(res: ServerResponse, id: string) {
 async function writePluginData(res: ServerResponse, id: string, audit: AuditStore, state: RuntimeState, user: AuthUser | undefined, pluginHost: PluginHost) {
   const result = await buildPluginData(id, audit, state, user, pluginHost);
   writeJson(res, result.status, result.payload);
-}
-
-function streamEvents(res: ServerResponse, events: EventBus) {
-  res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
-  res.write(": connected\n\n");
-  const heartbeat = setInterval(() => res.write(": heartbeat\n\n"), 25000);
-  const unsubscribe = events.subscribe((event) => res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`));
-  res.on("close", () => {
-    clearInterval(heartbeat);
-    unsubscribe();
-  });
 }

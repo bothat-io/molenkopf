@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { cleanKeyLabel, cleanKeyProject, issueApiKey, listKeys, revokeKey } from "../../../core/src/identity/api-keys.ts";
 import { normalizeBudget } from "../../../core/src/identity/budget.ts";
 import { canCreateOwnKey, canRevokeOwnKey } from "../../../core/src/identity/key-permissions.ts";
+import { DEFAULT_TEAM_ID, isDefaultTeamId, nonDefaultTeamIds } from "../../../core/src/identity/team-scope.ts";
 import { viewKey, viewUser, type User } from "../../../core/src/identity/types.ts";
 import { emptyUsage } from "./runtime-state.ts";
 import { orgCostUsed, orgTokensUsed, usageForPeriod, userUsageKey } from "./usage-accounting.ts";
@@ -72,19 +73,20 @@ export async function updateKeyHandler(req: IncomingMessage, res: ServerResponse
   const project = typeof body.project === "string" ? cleanKeyProject(body.project) : undefined;
   if (!project) return writeJson(res, 400, { error: "project_required" });
   const previous = { ...key };
-  if (typeof body.agentLabel === "string") key.agentLabel = cleanKeyLabel(body.agentLabel);
-  key.project = project;
+  const next = { ...key, project };
+  if (typeof body.agentLabel === "string") next.agentLabel = cleanKeyLabel(body.agentLabel);
   if ("teamId" in body) {
     const teamId = validKeyTeam(state, key.ownerUserId, body.teamId);
     if (teamId === false) return writeJson(res, 400, { error: "invalid_key_team" });
     if (teamId === undefined && requiresExplicitTeam(state, key.ownerUserId)) return writeJson(res, 400, { error: "team_required" });
-    key.teamId = teamId;
+    next.teamId = teamId;
   }
+  state.identity.data.keys[id] = next;
   try { await state.identity.save(); } catch {
     state.identity.data.keys[id] = previous;
     return writeJson(res, 500, { error: "persist_failed" });
   }
-  writeJson(res, 200, { ok: true, key: viewKey(key) });
+  writeJson(res, 200, { ok: true, key: viewKey(next) });
 }
 
 export function usageHandler(_req: IncomingMessage, res: ServerResponse, state: RuntimeState, user: AuthUser | undefined) {
@@ -108,7 +110,7 @@ function validKeyTeam(state: RuntimeState, owner: string, value: unknown): strin
   if (typeof value !== "string") return false;
   const team = state.identity?.getTeam(value.trim());
   const user = state.identity?.getUser(owner);
-  if (team?.id === "everyone" && nonDefaultTeamIds(user?.teamIds ?? []).length) return false;
+  if (isDefaultTeamId(team?.id) && nonDefaultTeamIds(user?.teamIds ?? []).length) return false;
   return team && user?.teamIds.includes(team.id) ? team.id : false;
 }
 
@@ -117,12 +119,8 @@ function requiresExplicitTeam(state: RuntimeState, owner: string): boolean {
   return nonDefaultTeamIds(teamIds).length > 1;
 }
 
-function nonDefaultTeamIds(teamIds: string[]): string[] {
-  return teamIds.filter((id) => id !== "everyone");
-}
-
 function readableTeam(user: User | undefined, teamId: string, managerIds: string[]): boolean {
   if (!user) return false;
-  if (user.teamIds.includes(teamId)) return true;
+  if (teamId !== DEFAULT_TEAM_ID && user.teamIds.includes(teamId)) return true;
   return user.role === "manager" && managerIds.includes(user.id);
 }

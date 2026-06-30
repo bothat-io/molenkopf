@@ -67,3 +67,11 @@ Common blocked reasons:
 - Team policy read/write: admin
 - Manager team-policy rights are deferred
 - Member cannot edit policy in MVP
+
+## Runtime surfaces
+
+- `enabled: false` disables plugin lifecycle hooks, request hooks, and actions.
+- Workspace data endpoints are read-only and are governed by effective read
+  capabilities plus normal audit scoping.
+- A disabled plugin can still expose historical workspace data when the caller's
+  effective policy keeps the required read capability.

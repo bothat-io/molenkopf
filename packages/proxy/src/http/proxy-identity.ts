@@ -1,5 +1,6 @@
 import { authenticateKey, touchKey } from "../../../core/src/identity/api-keys.ts";
 import type { IdentityStore } from "../../../core/src/identity/identity-store.ts";
+import { scopedIdentityTeamIds } from "../../../core/src/identity/team-scope.ts";
 import { agentIdFromHeaders, clientIdForUser, deriveClientIdentity, safeSubjectId, type ClientIdentity } from "./client-identity.ts";
 import { effectiveProviderAllowlist } from "./provider-access.ts";
 
@@ -40,7 +41,7 @@ export function resolveClientIdentity(identity: IdentityStore | undefined, heade
     const key = authenticateKey(identity, secret);
     if (key) {
       const owner = identity.getUser(key.ownerUserId);
-      const teamIds = owner ? scopedTeamIds(owner.teamIds, key.teamId) : [];
+      const teamIds = owner ? scopedIdentityTeamIds(owner.teamIds, key.teamId) : [];
       const agentId = agentIdFromHeaders(headers);
       const client: ClientIdentity = {
         id: clientIdForUser(key.ownerUserId),
@@ -68,11 +69,4 @@ function maybeTouch(store: IdentityStore, key: { lastUsedAt?: string }): void {
     touchKey(store, key as any);
     void store.save().catch(() => { /* last-used persistence must not crash auth */ });
   }
-}
-
-function scopedTeamIds(ownerTeamIds: string[], keyTeamId: string | undefined): string[] {
-  const explicitTeams = ownerTeamIds.filter((id) => id !== "everyone");
-  if (!keyTeamId) return explicitTeams.length ? explicitTeams : ownerTeamIds;
-  if (keyTeamId === "everyone" && explicitTeams.length) return explicitTeams;
-  return ownerTeamIds.includes(keyTeamId) ? [keyTeamId] : [];
 }

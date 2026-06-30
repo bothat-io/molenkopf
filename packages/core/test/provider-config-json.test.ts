@@ -45,6 +45,25 @@ test("parses JSON provider config with env credential refs", () => {
   assert.deepEqual(config.agents[0].enabledPluginIds, ["context-compressor-plugin"]);
 });
 
+test("infers Anthropic auth from kind, protocol, and normalized host", () => {
+  const config = parseMolenkopfConfigJson(JSON.stringify({
+    schemaVersion: 1,
+    providers: [
+      { id: "claude-proxy", kind: "anthropic", baseUrl: "https://llm-proxy.example/v1", auth: { credentialRef: "env:ANTHROPIC_PROXY_KEY" } },
+      { id: "claude-upper", baseUrl: "https://API.ANTHROPIC.COM/v1", auth: { credentialRef: "env:ANTHROPIC_UPPER_KEY" } },
+      { id: "claude-explicit", kind: "anthropic", baseUrl: "https://llm-proxy.example/v1", auth: { scheme: "bearer", credentialRef: "env:CLAUDE_PROXY_KEY" } },
+      { id: "openai-proxy", baseUrl: "https://llm-proxy.example/openai", auth: { credentialRef: "env:OPENAI_PROXY_KEY" } }
+    ]
+  }));
+
+  assert.equal(config.providers.find((item) => item.id === "claude-proxy")?.protocol, "anthropic-messages");
+  assert.equal(config.providers.find((item) => item.id === "claude-proxy")?.authScheme, "x-api-key");
+  assert.equal(config.providers.find((item) => item.id === "claude-upper")?.protocol, "anthropic-messages");
+  assert.equal(config.providers.find((item) => item.id === "claude-upper")?.authScheme, "x-api-key");
+  assert.equal(config.providers.find((item) => item.id === "claude-explicit")?.authScheme, "bearer");
+  assert.equal(config.providers.find((item) => item.id === "openai-proxy")?.authScheme, "bearer");
+});
+
 test("rejects unsafe provider target URLs", () => {
   assert.throws(() => parseMolenkopfConfigJson(JSON.stringify({
     schemaVersion: 1,
@@ -165,4 +184,9 @@ test("rejects malformed policy and agent records", () => {
     schemaVersion: 1,
     providers: [{ id: "cli", kind: "cli-claude", inputMode: "argument" }]
   })), /unsafe CLI inputMode/);
+
+  assert.throws(() => parseMolenkopfConfigJson(JSON.stringify({
+    schemaVersion: 1,
+    providers: [{ id: "cli", kind: "cli-claude", inputMode: "args" }]
+  })), /invalid CLI inputMode/);
 });

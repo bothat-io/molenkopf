@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { builtinPluginDescriptors } from "../src/plugins/plugin-descriptor.ts";
+import { builtinPluginDescriptorsV2 } from "../src/plugins/builtin-plugin-descriptors-v2.ts";
+import { builtinPluginModules } from "../src/plugins/builtin-plugin-modules.ts";
 import { pluginCatalog } from "../src/plugins/plugin-catalog.ts";
 import { staticPluginPipeline } from "../src/plugins/static-pipeline.ts";
 
@@ -23,6 +25,22 @@ test("descriptor registry does not import executable plugin modules", () => {
   const pluginDescriptor = readFileSync("packages/core/src/plugins/plugin-descriptor.ts", "utf8");
   assert.doesNotMatch(descriptorRegistry, /\/plugin\.ts/);
   assert.doesNotMatch(pluginDescriptor, /builtin-plugin-modules/);
+});
+
+test("descriptor v2 ids are canonical for catalog, modules, and default policies", () => {
+  const v2ById = new Map(builtinPluginDescriptorsV2.map((plugin) => [plugin.id, plugin]));
+  assert.deepEqual([...v2ById.keys()].sort(), pluginCatalog.map((plugin) => plugin.id).sort());
+  assert.deepEqual(Object.keys(builtinPluginModules).sort(), [...v2ById.keys()].sort());
+  for (const catalogPlugin of pluginCatalog) {
+    const descriptor = v2ById.get(catalogPlugin.id);
+    assert.ok(descriptor, `${catalogPlugin.id} has no descriptor v2`);
+    assert.equal(catalogPlugin.name, descriptor.name);
+    assert.equal(catalogPlugin.category, descriptor.category);
+    assert.deepEqual(catalogPlugin.dataScopes ?? [], descriptor.dataScopes ?? []);
+    assert.deepEqual(descriptor.defaultPolicy.actions, descriptor.actions.map((action) => action.id));
+    assert.deepEqual(descriptor.defaultPolicy.capabilities, descriptor.capabilities);
+    assert.equal(descriptor.defaultPolicy.settings, descriptor.settingsSchema);
+  }
 });
 
 test("plugin modules live in plugin folders", () => {

@@ -1,4 +1,6 @@
-export type CliStreamUsage = { inputTokens?: number; outputTokens?: number };
+import type { UsageTotals } from "../../../core/src/manifest/usage-meter.ts";
+
+export type CliStreamUsage = UsageTotals;
 export type OpenAiStreamState = { reasoningParts: string[]; messageStarted: boolean };
 
 export function openAiStreamStart(requestId: string, model: string): string {
@@ -41,7 +43,6 @@ export function openAiMessageStart(requestId: string, state: OpenAiStreamState):
 }
 
 export function openAiStreamDone(requestId: string, model: string, text: string, usage: CliStreamUsage, state: OpenAiStreamState): string {
-  const input = usage.inputTokens ?? 0, output = usage.outputTokens ?? 0;
   const item = messageItem(requestId, text);
   const outputIndex = messageOutputIndex(state);
   const responseOutput = state.reasoningParts.length ? [reasoningItem(requestId, state.reasoningParts), item] : [item];
@@ -52,10 +53,23 @@ export function openAiStreamDone(requestId: string, model: string, text: string,
     sse("response.output_item.done", { type: "response.output_item.done", output_index: outputIndex, item }),
     sse("response.completed", {
       type: "response.completed",
-      response: { id: requestId, object: "response", model, status: "completed", output: responseOutput, output_text: text, usage: { input_tokens: input, output_tokens: output, total_tokens: input + output, prompt_tokens: input, completion_tokens: output } }
+      response: { id: requestId, object: "response", model, status: "completed", output: responseOutput, output_text: text, usage: openAiUsage(usage) }
     }),
     "data: [DONE]\n\n"
   ].join("");
+}
+
+function openAiUsage(usage: CliStreamUsage): Record<string, unknown> {
+  const input = usage.inputTokens ?? 0, output = usage.outputTokens ?? 0;
+  return {
+    input_tokens: input,
+    output_tokens: output,
+    total_tokens: input + output,
+    prompt_tokens: input,
+    completion_tokens: output,
+    ...(usage.cachedTokens !== undefined ? { input_tokens_details: { cached_tokens: usage.cachedTokens } } : {}),
+    ...(usage.reasoningTokens !== undefined ? { output_tokens_details: { reasoning_tokens: usage.reasoningTokens } } : {})
+  };
 }
 
 export function openAiFailure(requestId: string, model: string): string {

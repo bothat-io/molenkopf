@@ -17,7 +17,20 @@ export type PluginView = {
   permissions?: string[]; hooks?: string[]; traffic?: { reads?: string[]; mutates?: string[] };
   pipelineIndex?: number; order?: number; pagePath?: string; dataPath?: string; dataScopes?: string[]; description?: string;
   defaultMaxRisk?: string;
+  capabilities?: string[];
+  settingsSchema?: PluginSettingSchema;
   actions?: { id: string; label: string; risk: string; requiredRole: string; sideEffects: string[] }[];
+};
+export type PluginSettingSchema = {
+  type: "object" | "boolean" | "string" | "integer" | "number" | "enum" | "array";
+  properties?: Record<string, PluginSettingSchema>;
+  items?: PluginSettingSchema;
+  values?: string[];
+  default?: unknown;
+  minimum?: number;
+  maximum?: number;
+  minLength?: number;
+  maxLength?: number;
 };
 export type PluginPolicyOverride = { enabled?: boolean; maxRisk?: string; capabilities?: string[]; actions?: string[]; settings?: Record<string, unknown> };
 export type GlobalPluginPolicyView = {

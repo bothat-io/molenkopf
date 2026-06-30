@@ -28,12 +28,14 @@ export type AuditManifest = {
   compressionCandidates?: number; compressionSkipped?: number; skipReasons?: Record<string, number>; contentKindCounts?: Record<string, number>;
   originalBytes?: number; forwardedBytes?: number; compressionRatio?: number;
   potentialCompressedItems?: number; potentialSavedTokens?: number; potentialSavedBytes?: number;
+  protectedSourceTokens?: number; protectedDiffTokens?: number;
   contentFingerprints?: AuditContentFingerprint[];
+  effectivePluginIds?: string[]; compressorMode?: string; zeroSavingsReasons?: string[];
   statusCode?: number;
   durationMs?: number;
   upstreamInputTokens?: number;
   upstreamOutputTokens?: number;
-  cachedTokens?: number; cacheReadTokens?: number; cacheCreationTokens?: number; reasoningTokens?: number; timings?: Record<string, number>; staticPrefixHash?: string; toolSchemaHash?: string; cacheablePrefixBytes?: number; hasTimestampNoise?: boolean; hasRandomIdNoise?: boolean; toolCount?: number; toolSchemaBytes?: number; toolSchemaTokens?: number;
+  cachedTokens?: number; cacheReadTokens?: number; cacheCreationTokens?: number; reasoningTokens?: number; usageSource?: "provider_response" | "cli_event" | "estimated_cli" | "mixed_cli_event_estimate"; timings?: Record<string, number>; staticPrefixHash?: string; toolSchemaHash?: string; cacheablePrefixBytes?: number; hasTimestampNoise?: boolean; hasRandomIdNoise?: boolean; toolCount?: number; toolSchemaBytes?: number; toolSchemaTokens?: number;
 };
 export type AuditRetention = { maxFiles?: number; maxBytes?: number; maxAgeMs?: number };
 export type AuditStoreOptions = { retention?: AuditRetention; now?: () => Date };

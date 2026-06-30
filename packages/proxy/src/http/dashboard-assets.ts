@@ -44,7 +44,7 @@ export async function handleDashboardFaviconRequest(req: IncomingMessage, res: S
 async function serveIndex(res: ServerResponse) {
   const file = join(distDir(), "index.html");
   if (!existsSync(file)) return writeText(res, 503, missingBuildHtml(), "text/html; charset=utf-8");
-  res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+  res.writeHead(200, dashboardHeaders({ "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }));
   res.end(await readFile(file));
 }
 
@@ -53,7 +53,7 @@ function serveDistPath(routePath: string, immutable: boolean, res: ServerRespons
   if (!safe) return writeText(res, 400, "bad request");
   const file = existingDistPath(safe) ?? existingPublicAsset(safe);
   if (!file) return writeText(res, 404, "not found");
-  res.writeHead(200, { "content-type": contentType(file), "cache-control": immutable ? "public, max-age=31536000, immutable" : "no-store" });
+  res.writeHead(200, dashboardHeaders({ "content-type": contentType(file), "cache-control": immutable ? "public, max-age=31536000, immutable" : "no-store" }));
   createReadStream(file).pipe(res);
 }
 
@@ -125,8 +125,17 @@ function contentType(file: string): string {
 }
 
 function writeText(res: ServerResponse, status: number, body: string, type = "text/plain; charset=utf-8") {
-  res.writeHead(status, { "content-type": type, "cache-control": "no-store" });
+  res.writeHead(status, dashboardHeaders({ "content-type": type, "cache-control": "no-store" }));
   res.end(body);
+}
+
+function dashboardHeaders(headers: Record<string, string>): Record<string, string> {
+  return {
+    ...headers,
+    "content-security-policy": "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+    "referrer-policy": "no-referrer",
+    "x-content-type-options": "nosniff"
+  };
 }
 
 function missingBuildHtml() {

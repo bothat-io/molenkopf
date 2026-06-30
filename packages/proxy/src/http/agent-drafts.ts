@@ -95,8 +95,9 @@ function rawCredentialField(input: Record<string, unknown>): string | undefined 
 function viewDraft(draft: AgentDraftMetadata, state: RuntimeState): AgentDraftView {
   const { tokenHash, ...rest } = draft;
   const usage = state.usageByAgent[clientIdForAgent(draft.id)] ?? emptyUsage();
-  const view: AgentDraftView = { ...rest, enabledPluginIds: [...draft.enabledPluginIds], tokenHashPresent: Boolean(tokenHash), usage: { ...usage } };
-  if (tokenHash) view.tokenFingerprint = tokenHash.slice(0, 15);
+  const tokenHashString = typeof tokenHash === "string" && tokenHash ? tokenHash : undefined;
+  const view: AgentDraftView = { ...rest, enabledPluginIds: [...draft.enabledPluginIds], tokenHashPresent: Boolean(tokenHashString), usage: { ...usage } };
+  if (tokenHashString) view.tokenFingerprint = tokenHashString.slice(0, 15);
   return view;
 }
 

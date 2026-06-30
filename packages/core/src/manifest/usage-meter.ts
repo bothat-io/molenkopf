@@ -5,7 +5,10 @@ export type UsageTotals = {
   cacheReadTokens?: number;
   cacheCreationTokens?: number;
   reasoningTokens?: number;
+  source?: UsageSource;
 };
+
+export type UsageSource = "provider_response" | "cli_event" | "estimated_cli" | "mixed_cli_event_estimate";
 
 const MAX_TOKEN_VALUE = 1_000_000_000;
 const MAX_BUFFER_CHARS = 2_000_000;
@@ -17,6 +20,7 @@ export function createUsageMeter() {
   let cacheRead: number | undefined;
   let cacheCreation: number | undefined;
   let reasoning: number | undefined;
+  let source: UsageSource | undefined;
   let buffer = "";
   let sseBuffer = "";
   return {
@@ -33,17 +37,20 @@ export function createUsageMeter() {
       if (cacheRead !== undefined) result.cacheReadTokens = cacheRead;
       if (cacheCreation !== undefined) result.cacheCreationTokens = cacheCreation;
       if (reasoning !== undefined) result.reasoningTokens = reasoning;
+      if (source !== undefined) result.source = source;
       return result;
     }
   };
 
   function applyUsage(usage: UsageTotals | undefined) {
+    if (!usage) return;
     input = maxToken(input, usage?.inputTokens);
     output = maxToken(output, usage?.outputTokens);
     cached = maxToken(cached, usage?.cachedTokens);
     cacheRead = maxToken(cacheRead, usage?.cacheReadTokens);
     cacheCreation = maxToken(cacheCreation, usage?.cacheCreationTokens);
     reasoning = maxToken(reasoning, usage?.reasoningTokens);
+    source = usage.source ?? source;
   }
 }
 
@@ -82,10 +89,10 @@ function parseSseEvent(raw: string): SseEvent | undefined {
 
 function eventUsage(event: SseEvent): UsageTotals | undefined {
   if (!isRecord(event.data)) return undefined;
-  if (event.type === "message_start" && isRecord(event.data.message)) return usageObject(event.data.message.usage);
-  if (event.type === "message_delta") return usageObject(event.data.usage);
-  if (isRecord(event.data.response)) return usageObject(event.data.response.usage);
-  return usageObject(event.data.usage);
+  if (event.type === "message_start" && isRecord(event.data.message)) return usageFromObject(event.data.message.usage);
+  if (event.type === "message_delta") return usageFromObject(event.data.usage);
+  if (isRecord(event.data.response)) return usageFromObject(event.data.response.usage);
+  return usageFromObject(event.data.usage);
 }
 
 function jsonUsage(text: string): UsageTotals | undefined {
@@ -93,22 +100,35 @@ function jsonUsage(text: string): UsageTotals | undefined {
   if (!trimmed || (trimmed[0] !== "{" && trimmed[0] !== "[")) return undefined;
   try {
     const parsed = JSON.parse(trimmed);
-    return isRecord(parsed) ? usageObject(parsed.usage) : undefined;
+    return isRecord(parsed) ? usageFromObject(parsed.usage) : undefined;
   } catch {
     return undefined;
   }
 }
 
-function usageObject(value: unknown): UsageTotals | undefined {
+export function usageFromObject(value: unknown): UsageTotals | undefined {
   if (!isRecord(value)) return undefined;
-  return {
-    inputTokens: token(value.input_tokens) ?? token(value.prompt_tokens),
-    outputTokens: token(value.output_tokens) ?? token(value.completion_tokens),
-    cachedTokens: nestedToken(value.prompt_tokens_details, "cached_tokens"),
-    cacheReadTokens: token(value.cache_read_input_tokens),
-    cacheCreationTokens: token(value.cache_creation_input_tokens),
-    reasoningTokens: nestedToken(value.completion_tokens_details, "reasoning_tokens")
-  };
+  const result: UsageTotals = {};
+  assignToken(result, "inputTokens", token(value.input_tokens) ?? token(value.prompt_tokens));
+  assignToken(result, "outputTokens", token(value.output_tokens) ?? token(value.completion_tokens));
+  assignToken(result, "cachedTokens", nestedToken(value.input_tokens_details, "cached_tokens") ?? nestedToken(value.prompt_tokens_details, "cached_tokens") ?? token(value.cached_input_tokens));
+  assignToken(result, "cacheReadTokens", token(value.cache_read_input_tokens));
+  assignToken(result, "cacheCreationTokens", token(value.cache_creation_input_tokens));
+  assignToken(result, "reasoningTokens", nestedToken(value.output_tokens_details, "reasoning_tokens") ?? nestedToken(value.completion_tokens_details, "reasoning_tokens") ?? token(value.reasoning_output_tokens));
+  return hasUsage(result) ? { ...result, source: "provider_response" } : undefined;
+}
+
+function assignToken(target: UsageTotals, key: keyof UsageTotals, value: number | undefined): void {
+  if (value !== undefined) (target as Record<string, unknown>)[key] = value;
+}
+
+function hasUsage(value: UsageTotals): boolean {
+  return value.inputTokens !== undefined
+    || value.outputTokens !== undefined
+    || value.cachedTokens !== undefined
+    || value.cacheReadTokens !== undefined
+    || value.cacheCreationTokens !== undefined
+    || value.reasoningTokens !== undefined;
 }
 
 function nestedToken(value: unknown, key: string): number | undefined {

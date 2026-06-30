@@ -1,0 +1,11 @@
+*.js text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+*.png binary
+*.ico binary
+*.woff2 binary
+bin/molenkopf.js text eol=lf
+bin/launcher.js text eol=lf

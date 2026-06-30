@@ -42,11 +42,7 @@
   .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}
   .stats b{display:block;font-size:13px}
   .stats span{font-size:12px;color:var(--muted)}
-  @media(max-width:980px){
-    .grid,.two,.stats{grid-template-columns:1fr}
-    header{display:block}
-    .state{margin-top:12px}
-  }
+  @media(max-width:980px){.grid,.two,.stats{grid-template-columns:1fr}header{display:block}.state{margin-top:12px}}
 </style>
 </head>
 <body>
@@ -63,6 +59,7 @@
     <div class="panel"><h2>Buckets</h2><div id="buckets"></div></div>
     <div class="panel"><h2>Budget and unavailable metrics</h2><div id="budget"></div></div>
   </section>
+  <section class="panel"><h2>Compression diagnostics</h2><div id="compression"></div></section>
   <section class="panel"><h2>Repeated token pressure</h2><div id="repeated"></div></section>
   <section class="panel"><h2>Optimization plans</h2><div id="plans"></div></section>
   <section class="panel"><h2>Recommendations</h2><div id="recommendations"></div></section>
@@ -115,11 +112,33 @@ function renderMetrics(data){
   const cards=[
     ["Requests",observations.requests],["Provider input",providerValue(observations,"providerReportedInputTokens"),providerHint(observations)],
     ["Provider output",providerValue(observations,"providerReportedOutputTokens"),providerHint(observations)],["Confirmed saved",observations.savedTokens,savedHint],["Potential saved",observations.potentialSavedTokens||0],
+    ["Compression status",statusText(observations.compressionStatus),statusHint(observations)],
+    ["Protected coding context",num((observations.protectedSourceTokens||0)+(observations.protectedDiffTokens||0)),"source and diff tokens kept out of savings"],
     ["Local original",observations.originalTokens??0],["Local forwarded",observations.forwardedTokens??0],
     ["Budget pressure",budgets.pressure||"low"],["Provider cache tokens",metricText(data.providerCacheTokens," tokens"),metricHint(data.providerCacheTokens)],
     ["Estimated cost",metricText(data.estimatedCostEur," EUR"),metricHint(data.estimatedCostEur)],["Recommendations",(data.recommendations||[]).length]
   ];
   $("metrics").innerHTML=cards.map(([k,v,hint])=>`<div class="metric"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div>${hint?`<div class="hint">${esc(hint)}</div>`:""}</div>`).join("");
+}
+function statusText(value){return String(value||"no-candidate").replaceAll("-"," ")}
+function statusHint(observations){
+  const ids=(observations.effectivePluginIds||[]).join(", ")||"no active transformer";
+  const modes=(observations.compressorModes||[]).join(", ")||"none";
+  return `plugins: ${ids}; modes: ${modes}`;
+}
+function renderCompressionDiagnostics(observations){
+  const reasons=Object.entries(observations.zeroSavingsReasons||{});
+  const pressure=[["Protected source",num(observations.protectedSourceTokens||0)],["Protected diff",num(observations.protectedDiffTokens||0)],["Status",statusText(observations.compressionStatus)]];
+  const reasonHtml=reasons.length
+    ? reasons.map(([key,value])=>`<span class="plugin-tag">${esc(reasonText(key))}: ${num(value)}</span>`).join("")
+    : '<span class="plugin-tag">No zero-savings reasons recorded</span>';
+  $("compression").innerHTML=`<div class="list">${
+    row("Compression status","Active transformer, observer, blocked, or no-candidate state",{html:stats(pressure)})
+  }${
+    row("Effective transformer plugins","Sanitized plugin ids and compressor modes",{html:stats([["Plugins",(observations.effectivePluginIds||[]).join(", ")||"none"],["Modes",(observations.compressorModes||[]).join(", ")||"none"]])})
+  }${
+    row("Zero-savings diagnostics","Sanitized reasons only; raw request content is never rendered",{html:`<div class="plugin-tag-list">${reasonHtml}</div>`})
+  }</div>`;
 }
 function renderBuckets(items){
   if(!items?.length){
@@ -148,10 +167,7 @@ function renderRepeated(items){
   $("repeated").innerHTML=`<div class="list">${items.slice(0,10).map((item)=>row(item.project,item.endpoint,{html:stats([["Requests",num(item.requests)],["Input pressure",num(item.repeatedInputTokens)],["Confidence",item.confidence||"low"],["Evidence",reasonText(item.reason)]])})).join("")}</div>`;
 }
 function renderRecommendations(items){
-  if(!items?.length){
-    $("recommendations").innerHTML='<div class="empty">No recommendations yet.</div>';
-    return;
-  }
+  if(!items?.length){$("recommendations").innerHTML='<div class="empty">No recommendations yet.</div>';return}
   $("recommendations").innerHTML=`<div class="list">${items.map((item)=>row(kindLabels[item.kind]||item.kind,item.id,{badge:severityText(item.severity),badgeWarn:item.severity==="yellow",html:`<div class="muted">${esc(item.summary)}</div><div class="action">${esc(item.action||"Review this finding before changing routing.")}</div>`})).join("")}</div>`;
 }
 function renderPlans(items){
@@ -165,16 +181,17 @@ async function load(){
   const button=$("refresh");
   button.disabled=true;
   try{
-    const data=await loadData();
-    if(data.loadError){
-      $("state").innerHTML=`Data unavailable <span class="badge">error</span><div class="muted">${esc(data.loadError)}</div>`;
-      ["metrics","buckets","budget","repeated","recommendations"].forEach((id)=>$(id).innerHTML='<div class="empty warn">Plugin data unavailable. Refresh after the proxy returns a valid data response.</div>');
+      const data=await loadData();
+      if(data.loadError){
+        $("state").innerHTML=`Data unavailable <span class="badge">error</span><div class="muted">${esc(data.loadError)}</div>`;
+      ["metrics","buckets","budget","compression","repeated","recommendations"].forEach((id)=>$(id).innerHTML='<div class="empty warn">Plugin data unavailable. Refresh after the proxy returns a valid data response.</div>');
       $("plans").innerHTML='<div class="empty warn">Plugin data unavailable.</div>';
       return;
     }
     const windowText=data.snapshot?.from&&data.snapshot?.to?` Window: ${esc(data.snapshot.from)} to ${esc(data.snapshot.to)}.`:" Window unavailable.";
     $("state").innerHTML=`Observe and recommend <span class="badge">read only</span><div class="muted">Recent snapshot: ${num(data.snapshot?.observedRequests)} of ${num(data.snapshot?.limit)} max requests.${windowText} This workspace reports budgets, token pressure, and unavailable metrics without changing routing or request bodies.</div>`;
     renderMetrics(data);
+    renderCompressionDiagnostics(data.observations||{});
     renderBuckets(data.buckets);
     renderBudget(data);
     renderRepeated(data.repeatedContext);

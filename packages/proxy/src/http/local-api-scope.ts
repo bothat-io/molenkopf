@@ -1,4 +1,5 @@
 import type { AuditManifest } from "../../../core/src/manifest/audit-store.ts";
+import { nonDefaultTeamIds } from "../../../core/src/identity/team-scope.ts";
 import type { RuntimeState } from "./runtime-types.ts";
 import { authRequired, canManage, type AuthUser } from "./auth-state.ts";
 
@@ -35,7 +36,7 @@ function manifestAllowed(manifest: AuditManifest, user: AuthUser, teams: Set<str
 }
 
 function readableTeamIds(state: RuntimeState, user: AuthUser): Set<string> {
-  const ids = new Set(user.teamIds);
+  const ids = new Set(nonDefaultTeamIds(user.teamIds));
   for (const team of Object.values(state.identity?.data.teams ?? {})) {
     if (team.managerIds.includes(user.id)) ids.add(team.id);
   }

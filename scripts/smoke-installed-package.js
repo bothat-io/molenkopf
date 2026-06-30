@@ -1,5 +1,4 @@
 import { mkdtemp, readdir, rm } from "node:fs/promises";
-import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -16,11 +15,10 @@ try {
   runNpm(["init", "-y"], dir, "ignore");
   await rm(consumer, { recursive: true, force: true });
   runNpm(["install", join(root, tarball)], dir, "ignore");
-  const packageDir = join(dir, "node_modules", ...packageName().split("/"));
-  const bin = join(packageDir, "bin", "molenkopf.js");
+  const bin = join(dir, "node_modules", ".bin", process.platform === "win32" ? "molenkopf.cmd" : "molenkopf");
   const before = await tempRuntimeDirs();
-  execFileSync(process.execPath, [bin, "--help"], { cwd: dir, stdio: "pipe" });
-  execFileSync(process.execPath, [bin, "self-test"], { cwd: dir, stdio: "pipe" });
+  runCommand(bin, ["--help"], dir, "pipe");
+  runCommand(bin, ["self-test"], dir, "pipe");
   const leaked = (await tempRuntimeDirs()).filter((name) => !before.includes(name));
   if (leaked.length) throw new Error(`temporary runtime leaked: ${leaked.join(", ")}`);
   console.log("installed package smoke ok");
@@ -34,9 +32,10 @@ async function tempRuntimeDirs() {
 
 function runNpm(args, cwd, stdio) {
   if (npmCli) return execFileSync(process.execPath, [npmCli, ...args], { cwd, stdio });
-  return execFileSync(process.platform === "win32" ? "npm.cmd" : "npm", args, { cwd, stdio, shell: process.platform === "win32" });
+  return runCommand(process.platform === "win32" ? "npm.cmd" : "npm", args, cwd, stdio);
 }
 
-function packageName() {
-  return JSON.parse(readFileSync(join(root, "package.json"), "utf8")).name;
+function runCommand(command, args, cwd, stdio) {
+  if (process.platform !== "win32") return execFileSync(command, args, { cwd, stdio });
+  return execFileSync(process.env.ComSpec || "cmd.exe", ["/d", "/s", "/c", command, ...args], { cwd, stdio });
 }

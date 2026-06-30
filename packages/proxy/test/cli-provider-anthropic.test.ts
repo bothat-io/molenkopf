@@ -87,7 +87,7 @@ test("Claude CLI stream-json events stream visible steps and text deltas", async
       "  console.log(JSON.stringify({ type: 'tool_use', name: 'Read' }));",
       "  console.log(JSON.stringify({ type: 'content_block_delta', delta: { text: 'alpha ' } }));",
       "  console.log(JSON.stringify({ type: 'content_block_delta', delta: { text: 'beta' } }));",
-      "  console.log(JSON.stringify({ type: 'result', result: 'alpha beta' }));",
+      "  console.log(JSON.stringify({ type: 'result', usage: { input_tokens: 30, output_tokens: 9, cache_read_input_tokens: 20 }, result: 'alpha beta' }));",
       "});"
     ].join("\n"));
     proxy = await startProxy({
@@ -128,6 +128,11 @@ test("Claude CLI stream-json events stream visible steps and text deltas", async
     assert.match(text, /alpha /);
     assert.match(text, /beta/);
     assert.match(text, /event: message_stop/);
+    const latest = await fetch(`${base}/__molenkopf/requests/latest`, { headers: { cookie: admin } }).then((r) => r.json() as Promise<any>);
+    assert.equal(latest.upstreamInputTokens, 30);
+    assert.equal(latest.upstreamOutputTokens, 9);
+    assert.equal(latest.cacheReadTokens, 20);
+    assert.equal(latest.usageSource, "cli_event");
   } finally {
     if (proxy) await proxy.close();
     await rm(dir, { recursive: true, force: true });
