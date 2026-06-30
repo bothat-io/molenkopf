@@ -160,7 +160,9 @@ function methodAllowed(method: string, path: string): boolean {
 }
 
 function isPluginPolicyAdminPath(path: string): boolean {
-  return path === "/__molenkopf/plugin-policies/global" || /^\/__molenkopf\/plugin-policies\/teams\/[^/]+$/.test(path);
+  return path === "/__molenkopf/plugin-policies/global" ||
+    /^\/__molenkopf\/plugin-policies\/teams\/[^/]+$/.test(path) ||
+    /^\/__molenkopf\/plugin-policies\/effective\/[^/]+(?:\/[^/]+)?$/.test(path);
 }
 
 function writeDevRevision(res: ServerResponse) {

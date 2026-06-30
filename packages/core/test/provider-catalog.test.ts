@@ -41,6 +41,21 @@ test("builds multiple named provider profiles from env without storing credentia
   assert.doesNotMatch(JSON.stringify(views), /fixture-openai-main-secret|fixture-anthropic-team-secret/);
 });
 
+test("env providers infer Anthropic auth from protocol and normalized host", () => {
+  const providers = buildProviderCatalog("http://127.0.0.1:9999/v1", [], {
+    MOLENKOPF_PROVIDER_IDS: "claude-protocol, claude-upper",
+    MOLENKOPF_PROVIDER_CLAUDE_PROTOCOL_TARGET: "https://llm-proxy.example/v1",
+    MOLENKOPF_PROVIDER_CLAUDE_PROTOCOL_PROTOCOL: "anthropic-messages",
+    MOLENKOPF_PROVIDER_CLAUDE_PROTOCOL_CREDENTIAL_ENV: "CLAUDE_PROTOCOL_KEY",
+    MOLENKOPF_PROVIDER_CLAUDE_UPPER_TARGET: "https://API.ANTHROPIC.COM/v1",
+    MOLENKOPF_PROVIDER_CLAUDE_UPPER_CREDENTIAL_ENV: "CLAUDE_UPPER_KEY"
+  });
+
+  assert.equal(providers.find((item) => item.id === "claude-protocol")?.authScheme, "x-api-key");
+  assert.equal(providers.find((item) => item.id === "claude-upper")?.protocol, "anthropic-messages");
+  assert.equal(providers.find((item) => item.id === "claude-upper")?.authScheme, "x-api-key");
+});
+
 test("explicit provider catalogs do not mix env provider blocks", () => {
   const env = {
     MOLENKOPF_PROVIDER_IDS: "env-openai",

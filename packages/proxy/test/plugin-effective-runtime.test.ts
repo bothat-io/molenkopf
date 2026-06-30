@@ -141,6 +141,46 @@ test("multiple specific team policies merge restrictively", () => {
   assert.deepEqual(policy?.actions, []);
 });
 
+test("multiple specific team plugin settings merge restrictively regardless of order", () => {
+  const state = {
+    pluginEnabled: { "context-compressor-plugin": true },
+    pluginPolicyState: {
+      pluginPolicySchemaVersion,
+      globalPluginPolicy: {
+        "context-compressor-plugin": {
+          enabled: true,
+          settings: {
+            mode: "transform",
+            maxBodyBytes: 16384,
+            minSavedTokens: 0,
+            allowedKinds: ["json", "log", "stacktrace"]
+          }
+        }
+      },
+      teamPluginPolicies: [
+        {
+          teamId: "alpha",
+          pluginId: "context-compressor-plugin",
+          overrides: { settings: { mode: "transform", maxBodyBytes: 4096, minSavedTokens: 100, allowedKinds: ["json", "log"] } }
+        },
+        {
+          teamId: "beta",
+          pluginId: "context-compressor-plugin",
+          overrides: { settings: { mode: "observe", maxBodyBytes: 8192, minSavedTokens: 50, allowedKinds: ["json", "stacktrace"] } }
+        }
+      ]
+    }
+  } as any;
+
+  const forward = resolveEffectivePluginPolicy(state, "context-compressor-plugin", ["alpha", "beta"]);
+  const reverse = resolveEffectivePluginPolicy(state, "context-compressor-plugin", ["beta", "alpha"]);
+  assert.equal(forward?.settings.mode, "observe");
+  assert.equal(forward?.settings.maxBodyBytes, 4096);
+  assert.equal(forward?.settings.minSavedTokens, 100);
+  assert.deepEqual(forward?.settings.allowedKinds, ["json"]);
+  assert.deepEqual(reverse?.settings, forward?.settings);
+});
+
 test("global plugin status helpers follow policy state", () => {
   const state = {
     pluginEnabled: { "token-optimizer-plugin": true },

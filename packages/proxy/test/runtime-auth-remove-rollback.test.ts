@@ -7,7 +7,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRuntimeState } from "../src/http/runtime-state.ts";
-import { removeProvider, selectProvider } from "../src/http/local-api-provider-actions.ts";
+import { removeProvider, selectProvider, updateProvider } from "../src/http/local-api-provider-actions.ts";
 import { persistRuntimeSettings } from "../src/http/runtime-settings.ts";
 
 test("runtime-auth provider removal preserves auth files when settings persist fails", async () => {
@@ -47,6 +47,34 @@ test("provider selection restores runtime settings when runtime-auth state write
   assert.equal(state.activeProviderId, "default");
   const settings = JSON.parse(await readFile(join(dir, "runtime-settings.json"), "utf8"));
   assert.equal(settings.activeProviderId, "default");
+  await rm(dir, { recursive: true, force: true });
+});
+
+test("provider update restores runtime settings after late runtime-auth metadata failure", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "molenkopf-runtime-update-fail-"));
+  const runtimeRoot = join(dir, "runtime-auth");
+  const authPath = join(runtimeRoot, "claude-fail");
+  await mkdir(runtimeRoot, { recursive: true });
+  await writeFile(authPath, "not-a-directory");
+  const state = createRuntimeState({
+    target: "http://127.0.0.1:9/v1",
+    dataDir: dir,
+    activeProviderId: "claude-fail",
+    providers: [{
+      id: "claude-fail", name: "Claude Fail", kind: "cli", target: "cli://claude-fail",
+      runtime: "claude", cliCommand: "claude", cliArgs: ["--print"], cliInputMode: "stdin",
+      authScheme: "none", credentialRef: "none", runtimeAuthDir: authPath, enabled: true
+    }]
+  }, "127.0.0.1");
+  await persistRuntimeSettings(state);
+
+  const result = await call((req, res) => updateProvider(req, res, state), { id: "claude-fail", enabled: false });
+  assert.equal(result.status, 500);
+  assert.equal(result.json.error, "persist_failed");
+  assert.equal(state.activeProviderId, "claude-fail");
+  assert.equal(state.providers.find((provider) => provider.id === "claude-fail")?.enabled, true);
+  const settings = JSON.parse(await readFile(join(dir, "runtime-settings.json"), "utf8"));
+  assert.equal(settings.activeProviderId, "claude-fail");
   await rm(dir, { recursive: true, force: true });
 });
 

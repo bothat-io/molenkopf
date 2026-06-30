@@ -1,4 +1,5 @@
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
+import { inferredCredentialAuthScheme } from "../../../core/src/providers/provider-auth.ts";
 import { validateProviderTarget } from "../../../core/src/security/target-policy.ts";
 import { hasCredential, originOf } from "./provider-action-helpers.ts";
 import { validEnv } from "./provider-input.ts";
@@ -57,5 +58,5 @@ function clearCredential(provider: ProviderConfig): void {
 
 function credentialAuthScheme(provider: ProviderConfig): ProviderConfig["authScheme"] {
   if (provider.kind === "local") return "none";
-  return provider.protocol === "anthropic-messages" || provider.target.includes("anthropic") ? "x-api-key" : "bearer";
+  return inferredCredentialAuthScheme(true, { protocol: provider.protocol, target: provider.target });
 }

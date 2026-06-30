@@ -115,6 +115,10 @@ export async function updateProvider(req: IncomingMessage, res: ServerResponse, 
     if (beforeLocalCredential && !isLocalProviderCredentialRef(update.provider.credentialRef, update.provider.id)) await removeLocalProviderCredential(state.dataDir, before.id);
   } catch {
     restoreProviderRouting(state, previous);
+    await persistProviderRouting(state).catch(() => {});
+    if (before.runtimeAuthDir && before.runtime) {
+      await persistRuntimeAuthProvider(state.dataDir, before, previous.activeProviderId === before.id, previous.routingMode).catch(() => {});
+    }
     if (storedNewCredential) await restoreLocalCredential(state.dataDir, before);
     return writeJson(res, 500, { error: "persist_failed" });
   }

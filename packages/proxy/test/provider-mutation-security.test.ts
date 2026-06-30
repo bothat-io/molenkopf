@@ -67,6 +67,9 @@ test("provider credential updates set auth scheme after initial credentialless s
     const view = updated.items.find((item: any) => item.id === "later-auth");
     assert.equal(view.credentialRef, "env:OPENAI_LATER_KEY");
     assert.equal(view.authScheme, "bearer");
+    assert.equal((await post(base, "/__molenkopf/providers/add", { id: "later-anthropic", kind: "anthropic", target: "https://llm-proxy.example/v1" }, admin)).status, 200);
+    const anthropic = await post(base, "/__molenkopf/providers/update", { id: "later-anthropic", credentialEnv: "ANTHROPIC_LATER_KEY" }, admin).then((r) => r.json());
+    assert.equal(anthropic.items.find((item: any) => item.id === "later-anthropic").authScheme, "x-api-key");
   } finally {
     await proxy.close();
     await rm(dir, { recursive: true, force: true });

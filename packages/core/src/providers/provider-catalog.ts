@@ -1,4 +1,5 @@
 import { validateProviderTarget } from "../security/target-policy.ts";
+import { inferredCredentialAuthScheme, isAnthropicStyleProvider } from "./provider-auth.ts";
 
 export type ProviderKind = "api" | "local" | "cli";
 
@@ -143,6 +144,7 @@ function providerFromEnv(id: string, env: Record<string, string | undefined>): P
   const target = checkedTarget.value;
   if (!target || !checkedTarget.safe) return undefined;
   const credentialEnv = env[`${prefix}CREDENTIAL_ENV`]?.trim();
+  const providerProtocol = protocol(env[`${prefix}PROTOCOL`], kind, target);
   return {
     id,
     name: env[`${prefix}NAME`]?.trim() || id,
@@ -150,8 +152,8 @@ function providerFromEnv(id: string, env: Record<string, string | undefined>): P
     target,
     credentialEnv: credentialEnv || undefined,
     credentialRef: credentialEnv ? `env:${credentialEnv}` : "none",
-    authScheme: authScheme(env[`${prefix}AUTH`], target, credentialEnv),
-    protocol: protocol(env[`${prefix}PROTOCOL`], kind, target),
+    authScheme: authScheme(env[`${prefix}AUTH`], { protocol: providerProtocol, target }, credentialEnv),
+    protocol: providerProtocol,
     enabled: env[`${prefix}ENABLED`]?.toLowerCase() !== "false"
   };
 }
@@ -167,17 +169,16 @@ function safeTarget(value: string | undefined, fallback = "", allowPrivate = fal
   }
 }
 
-function authScheme(value: string | undefined, target: string, credentialEnv?: string): ProviderConfig["authScheme"] {
+function authScheme(value: string | undefined, provider: { protocol?: ProviderConfig["protocol"]; target?: string }, credentialEnv?: string): ProviderConfig["authScheme"] {
   if (value === "bearer" || value === "x-api-key" || value === "none") return value;
-  if (!credentialEnv) return "none";
-  return target.includes("anthropic") ? "x-api-key" : "bearer";
+  return inferredCredentialAuthScheme(credentialEnv, provider);
 }
 
 function protocol(value: string | undefined, kind: ProviderKind, target: string): ProviderConfig["protocol"] {
   if (value === "openai-responses" || value === "anthropic-messages" || value === "openai-chat" || value === "ollama-tags") return value;
   if (kind === "local" && target.includes("11434")) return "ollama-tags";
   if (kind === "local") return "openai-chat";
-  return target.includes("anthropic") ? "anthropic-messages" : "openai-responses";
+  return isAnthropicStyleProvider({ target }) ? "anthropic-messages" : "openai-responses";
 }
 
 function splitCsv(value: string | undefined): string[] {

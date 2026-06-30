@@ -2,6 +2,7 @@
 import { rename } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
+import { inferredCredentialAuthScheme } from "../../../core/src/providers/provider-auth.ts";
 import { validateProviderTarget } from "../../../core/src/security/target-policy.ts";
 import { defaultDataDir } from "../../../core/src/storage/local-paths.ts";
 import { ensurePrivateDir, writePrivateFile } from "../../../core/src/storage/private-state.ts";
@@ -120,7 +121,8 @@ function cleanProvider(value: unknown): PersistedProvider | undefined {
   const localCredentialRef = isLocalProviderCredentialRef(item.credentialRef, id) ? item.credentialRef : undefined;
   const credentialEnv = localCredentialRef ? undefined : cleanEnv(item.credentialEnv);
   const credentialRef = localCredentialRef ?? (credentialEnv ? `env:${credentialEnv}` : "none");
-  return cleanBaseProvider(id, item, kind, target, { credentialEnv, credentialRef, authScheme: cleanAuth(item.authScheme, target, Boolean(credentialEnv || localCredentialRef)), protocol: cleanProtocol(item.protocol) });
+  const protocol = cleanProtocol(item.protocol);
+  return cleanBaseProvider(id, item, kind, target, { credentialEnv, credentialRef, authScheme: cleanAuth(item.authScheme, target, Boolean(credentialEnv || localCredentialRef), protocol), protocol });
 }
 
 function cleanCliProvider(id: string, item: Record<string, unknown>): PersistedProvider | undefined {
@@ -166,10 +168,9 @@ function cleanIdArray(value: unknown): string[] | undefined {
 
 function cleanEnv(value: unknown): string | undefined { return typeof value === "string" && /^[A-Z_][A-Z0-9_]*$/i.test(value) ? value : undefined; }
 
-function cleanAuth(value: unknown, target: string, credentialConfigured?: boolean): ProviderConfig["authScheme"] {
+function cleanAuth(value: unknown, target: string, credentialConfigured?: boolean, protocol?: ProviderConfig["protocol"]): ProviderConfig["authScheme"] {
   if (value === "bearer" || value === "x-api-key" || value === "none") return value;
-  if (!credentialConfigured) return "none";
-  return target.includes("anthropic") ? "x-api-key" : "bearer";
+  return inferredCredentialAuthScheme(credentialConfigured, { protocol, target });
 }
 
 function cleanProtocol(value: unknown): ProviderConfig["protocol"] | undefined { return value === "openai-responses" || value === "anthropic-messages" || value === "openai-chat" || value === "ollama-tags" ? value : undefined; }

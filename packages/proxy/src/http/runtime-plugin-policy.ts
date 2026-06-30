@@ -1,5 +1,8 @@
 import { findPlugin, pluginCatalog, type MolenkopfPlugin } from "../../../core/src/plugins/plugin-catalog.ts";
+import { defaultSettings, resolveSettingsPolicy } from "../../../core/src/plugins/plugin-policy-settings.ts";
 import { parsePluginPolicyState, resolveTeamPolicies, type PluginPolicyStore, type ResolvedPluginPolicy } from "../../../core/src/plugins/plugin-policy.ts";
+import type { PluginDescriptorV2 } from "../../../core/src/plugins/plugin-descriptor-v2.ts";
+import { effectivePolicyTeamIds } from "../../../core/src/identity/team-scope.ts";
 import { builtinPluginDescriptorV2 } from "./plugin-platform.ts";
 
 export type { PluginPolicyStore };
@@ -78,30 +81,32 @@ function collectEnabledPluginIds(state: RuntimeRequestState): string[] {
 
 function resolvePolicyMap(state: RuntimeRequestState, descriptors: ReturnType<typeof builtinPluginDescriptorV2>, teamIds?: readonly string[]): Map<string, ResolvedPluginPolicy> {
   const policyState = state.pluginPolicyState ?? { pluginPolicySchemaVersion: 1, globalPluginPolicy: {}, teamPluginPolicies: [] };
-  const effective = effectiveTeamIds(teamIds);
+  const effective = effectivePolicyTeamIds(teamIds);
   if (!effective.length) return resolveTeamPolicies(policyState, descriptors, undefined as unknown as string);
   const maps = effective.map((teamId) => resolveTeamPolicies(policyState, descriptors, teamId));
   if (maps.length === 1) return maps[0];
-  return new Map(descriptors.map((descriptor) => [descriptor.id, mergePolicies(maps.map((map) => map.get(descriptor.id)).filter(Boolean) as ResolvedPluginPolicy[])]));
+  return new Map(descriptors.map((descriptor) => [
+    descriptor.id,
+    mergePolicies(descriptor, maps.map((map) => map.get(descriptor.id)).filter(Boolean) as ResolvedPluginPolicy[])
+  ]));
 }
 
-function effectiveTeamIds(teamIds: readonly string[] | undefined): string[] {
-  const ids = [...new Set((teamIds ?? []).filter((id): id is string => typeof id === "string" && id.length > 0))];
-  const specific = ids.filter((id) => id !== "everyone");
-  return specific.length ? specific : ids;
-}
-
-function mergePolicies(policies: ResolvedPluginPolicy[]): ResolvedPluginPolicy {
+function mergePolicies(descriptor: PluginDescriptorV2, policies: ResolvedPluginPolicy[]): ResolvedPluginPolicy {
   const [first, ...rest] = policies;
   let merged = { ...first, capabilities: [...first.capabilities], actions: [...first.actions], blockedReasons: [...first.blockedReasons] };
   for (const next of rest) {
+    const settingsBlocked: string[] = [];
+    const settingsSource: ResolvedPluginPolicy["source"]["settings"] = {};
+    const settings = resolveSettingsPolicy(descriptor.settingsSchema, defaultSettings(descriptor.settingsSchema), merged.settings, next.settings, settingsSource, settingsBlocked);
     merged = {
       ...merged,
       enabled: merged.enabled && next.enabled,
       maxRisk: lowerRisk(merged.maxRisk, next.maxRisk),
       capabilities: intersect(merged.capabilities, next.capabilities),
       actions: intersect(merged.actions, next.actions),
-      blockedReasons: [...new Set([...merged.blockedReasons, ...next.blockedReasons, "merged_team_policy"])]
+      settings,
+      source: { ...merged.source, settings: settingsSource },
+      blockedReasons: [...new Set([...merged.blockedReasons, ...next.blockedReasons, ...settingsBlocked, "merged_team_policy"])]
     };
   }
   return merged;
