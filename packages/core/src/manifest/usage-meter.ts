@@ -135,6 +135,10 @@ function nestedToken(value: unknown, key: string): number | undefined {
   return isRecord(value) ? token(value[key]) : undefined;
 }
 
+function nestedToken(value: unknown, key: string): number | undefined {
+  return isRecord(value) ? token(value[key]) : undefined;
+}
+
 function token(value: unknown): number | undefined {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= MAX_TOKEN_VALUE ? value : undefined;
 }

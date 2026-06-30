@@ -177,6 +177,13 @@ function renderPlans(items){
   }
   $("plans").innerHTML=`<div class="list">${items.map((item)=>row(item.kind,item.id,{badge:item.confidence||"low",badgeWarn:item.confidence==="medium",html:`<div class="muted">${esc(item.summary)}</div><div class="action">${esc(item.action)}</div><div class="muted">Requires admin confirmation: ${esc(item.requiresConfirmation?"yes":"no")}</div>`})).join("")}</div>`;
 }
+function renderPlans(items){
+  if(!items?.length){
+    $("plans").innerHTML='<div class="empty">No optimization plans yet.</div>';
+    return;
+  }
+  $("plans").innerHTML=`<div class="list">${items.map((item)=>row(item.kind,item.id,{badge:item.confidence||"low",badgeWarn:item.confidence==="medium",html:`<div class="muted">${esc(item.summary)}</div><div class="action">${esc(item.action)}</div><div class="muted">Requires admin confirmation: ${esc(item.requiresConfirmation?"yes":"no")}</div>`})).join("")}</div>`;
+}
 async function load(){
   const button=$("refresh");
   button.disabled=true;
