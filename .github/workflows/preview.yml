@@ -5,6 +5,10 @@ on:
     branches: [preview]
   workflow_dispatch:
 
+concurrency:
+  group: preview-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   packages: write
@@ -29,6 +33,11 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Push preview image
         run: |
+          remote_sha="$(git ls-remote origin refs/heads/preview | awk '{print $1}')"
+          if [ "$remote_sha" != "$GITHUB_SHA" ]; then
+            echo "preview moved to $remote_sha; skipping stale image publish for $GITHUB_SHA"
+            exit 0
+          fi
           image="ghcr.io/${{ github.repository }}"
           short_sha="${GITHUB_SHA::7}"
           docker tag molenkopf:preview "$image:preview"

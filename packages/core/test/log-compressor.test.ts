@@ -90,6 +90,19 @@ test("keeps compiler, npm, and docker failure signals", () => {
   assert.match(result.text, /exit_code: 1/);
 });
 
+test("scrubs sensitive command arguments from CI summaries", () => {
+  const lines = [
+    "$ npm test --token raw-secret --api-key=another-secret",
+    ...Array.from({ length: 260 }, (_, i) => `2026-01-01T00:00:00Z progress ${i} resolved package ${i}`),
+    "FAIL packages/core/test/security.test.ts",
+    "exit code 1"
+  ];
+  const result = compressLog(lines.join("\n"), "molenkopf://sha256/command");
+  assert.ok(result.compressed);
+  assert.match(result.text, /command: npm test --token \[REDACTED_SECRET:cli_arg\] --api-key=\[REDACTED_SECRET:cli_arg\]/);
+  assert.doesNotMatch(result.text, /raw-secret|another-secret/);
+});
+
 test("preserves late expected and received details when early assertions fill the budget", () => {
   const lines = [
     "$ npm test",
