@@ -89,5 +89,5 @@ function byRetrievalId(manifests: readonly AuditManifest[]): RepeatedContextFind
 }
 
 function safeRetrievalId(value: string): boolean {
-  return /^molenkopf:\/\/sha256\/[a-z0-9._:-]+$/i.test(value);
+  return /^molenkopf:\/\/sha256\/[a-f0-9]{64}$/i.test(value);
 }

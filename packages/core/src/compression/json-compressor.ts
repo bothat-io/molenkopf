@@ -9,6 +9,7 @@ const MAX_DEPTH = 4;
 const MAX_OBJECT_KEYS = 40;
 const MAX_STRING_CHARS = 240;
 const MAX_IMPORTANT_ITEMS = 10;
+const PROTECTED_TEXT_KEYS = /^(?:content|text|prompt|message|messages|doc|document|documentation|note|notes|markdown|md|diff|patch|code|source|input)$/i;
 
 export function compressJsonText(input: string, retrieveId: string): JsonCompressionResult {
   let parsed: unknown;
@@ -17,7 +18,7 @@ export function compressJsonText(input: string, retrieveId: string): JsonCompres
   } catch {
     return { text: input, compressed: false, compressorName: "json" };
   }
-  if (containsProtectedSource(parsed)) return { text: input, compressed: false, compressorName: "json" };
+  if (containsProtectedText(parsed)) return { text: input, compressed: false, compressorName: "json" };
   if (Array.isArray(parsed) && parsed.length > 40) {
     return compressedResult(input, summarizeArray(parsed, retrieveId));
   }
@@ -100,24 +101,24 @@ function truncateString(value: string): string {
   return `${value.slice(0, MAX_STRING_CHARS)}...[truncated ${value.length - MAX_STRING_CHARS} chars]`;
 }
 
-function containsProtectedSource(value: unknown): boolean {
-  const stack: { value: unknown; depth: number }[] = [{ value, depth: 0 }];
+function containsProtectedText(value: unknown): boolean {
+  const stack: { value: unknown; key?: string; depth: number }[] = [{ value, depth: 0 }];
   while (stack.length) {
     const current = stack.pop()!;
     if (typeof current.value === "string") {
-      if (current.value.length >= 400 && protectedText(current.value)) return true;
+      if (current.value.length >= 400 && protectedText(current.value, current.key)) return true;
       continue;
     }
     if (!current.value || typeof current.value !== "object" || current.depth > 8) continue;
     if (Array.isArray(current.value)) {
-      for (let i = current.value.length - 1; i >= 0; i--) stack.push({ value: current.value[i], depth: current.depth + 1 });
+      for (let i = current.value.length - 1; i >= 0; i--) stack.push({ value: current.value[i], key: current.key, depth: current.depth + 1 });
       continue;
     }
     const item = current.value as Record<string, unknown>;
     const path = stringValue(item.path) ?? stringValue(item.file) ?? stringValue(item.filename) ?? stringValue(item.name);
     const content = stringValue(item.content) ?? stringValue(item.source) ?? stringValue(item.code) ?? stringValue(item.diff) ?? stringValue(item.patch);
-    if (path && content && sourcePath(path) && protectedText(content)) return true;
-    for (const entry of Object.values(item).reverse()) stack.push({ value: entry, depth: current.depth + 1 });
+    if (path && content && sourcePath(path) && protectedText(content, "content")) return true;
+    for (const [key, entry] of Object.entries(item).reverse()) stack.push({ value: entry, key, depth: current.depth + 1 });
   }
   return false;
 }
@@ -130,9 +131,16 @@ function sourcePath(value: string): boolean {
   return /\.(?:ts|tsx|js|jsx|mjs|cjs|py|go|rs|java|rb|sql|diff|patch|c|cc|cpp|h|hpp|cs|php|swift|kt|kts)$/i.test(value);
 }
 
-function protectedText(value: string): boolean {
+function protectedText(value: string, key?: string): boolean {
   const kind = classifyContent(value);
-  return kind === "source_code" || kind === "diff";
+  if (kind === "source_code" || kind === "diff" || kind === "markdown") return true;
+  return kind === "plain_text" && Boolean(key && PROTECTED_TEXT_KEYS.test(key) && looksLikeProse(value));
+}
+
+function looksLikeProse(value: string): boolean {
+  const words = value.match(/\b[A-Za-z][A-Za-z'-]{2,}\b/g) ?? [];
+  if (words.length < 20) return false;
+  return /[.!?]\s|\n/.test(value);
 }
 
 function arrayKeys(items: unknown[]): { items: string[]; omitted: number } {
