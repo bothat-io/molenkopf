@@ -36,6 +36,9 @@ export type PluginContext = {
   potentialSavedTokens?: number;
   potentialSavedBytes?: number;
   contentFingerprints?: AuditManifest["contentFingerprints"];
+  effectivePluginIds?: string[];
+  compressorMode?: string;
+  zeroSavingsReasons?: string[];
   notes: string[];
   block?: { status: number; error: string };
   usageOf: (consumerId: string) => ConsumerUsage;
@@ -104,6 +107,9 @@ function applyModuleResult(ctx: PluginContext, result: PluginRequestResult): voi
   if (result.potentialSavedTokens !== undefined) ctx.potentialSavedTokens = (ctx.potentialSavedTokens ?? 0) + result.potentialSavedTokens;
   if (result.potentialSavedBytes !== undefined) ctx.potentialSavedBytes = (ctx.potentialSavedBytes ?? 0) + result.potentialSavedBytes;
   if (result.contentFingerprints) ctx.contentFingerprints = [...(ctx.contentFingerprints ?? []), ...result.contentFingerprints].slice(0, 50);
+  if (result.effectivePluginIds) ctx.effectivePluginIds = [...new Set([...(ctx.effectivePluginIds ?? []), ...result.effectivePluginIds])].slice(0, 20);
+  if (result.compressorMode) ctx.compressorMode = result.compressorMode;
+  if (result.zeroSavingsReasons) ctx.zeroSavingsReasons = [...new Set([...(ctx.zeroSavingsReasons ?? []), ...result.zeroSavingsReasons])].slice(0, 20);
   if (result.notes) result.notes.forEach(ctx.note);
 }
 
@@ -159,6 +165,9 @@ function restore(before: PipelineSnapshot, ctx: PluginContext): void {
   ctx.potentialSavedTokens = before.potentialSavedTokens;
   ctx.potentialSavedBytes = before.potentialSavedBytes;
   ctx.contentFingerprints = before.contentFingerprints ? [...before.contentFingerprints] : undefined;
+  ctx.effectivePluginIds = before.effectivePluginIds ? [...before.effectivePluginIds] : undefined;
+  ctx.compressorMode = before.compressorMode;
+  ctx.zeroSavingsReasons = before.zeroSavingsReasons ? [...before.zeroSavingsReasons] : undefined;
   ctx.notes = [...before.notes];
   ctx.block = before.block ? { ...before.block } : undefined;
 }

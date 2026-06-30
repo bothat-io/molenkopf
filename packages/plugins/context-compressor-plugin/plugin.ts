@@ -36,7 +36,10 @@ export const plugin: MolenkopfPluginModule = {
 	      potentialCompressedItems: result.potentialCompressedItems,
 	      potentialSavedTokens: result.potentialSavedTokens,
 	      potentialSavedBytes: result.potentialSavedBytes,
-	      contentFingerprints: result.contentFingerprints
+	      contentFingerprints: result.contentFingerprints,
+	      effectivePluginIds: result.compressedItems > 0 || result.potentialCompressedItems > 0 ? [runtime.pluginId] : [],
+	      compressorMode: result.compressorMode,
+	      zeroSavingsReasons: result.zeroSavingsReasons
 	    };
   },
 	  getData(ctx, runtime) {

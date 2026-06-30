@@ -31,6 +31,9 @@ export type PluginMetrics = {
   potentialSavedTokens?: number;
   potentialSavedBytes?: number;
   contentFingerprints?: AuditManifest["contentFingerprints"];
+  effectivePluginIds?: string[];
+  compressorMode?: string;
+  zeroSavingsReasons?: string[];
 };
 
 export type PluginLifecycleContext = {

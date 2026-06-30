@@ -29,6 +29,7 @@ export type AuditManifest = {
   originalBytes?: number; forwardedBytes?: number; compressionRatio?: number;
   potentialCompressedItems?: number; potentialSavedTokens?: number; potentialSavedBytes?: number;
   contentFingerprints?: AuditContentFingerprint[];
+  effectivePluginIds?: string[]; compressorMode?: string; zeroSavingsReasons?: string[];
   statusCode?: number;
   durationMs?: number;
   upstreamInputTokens?: number;

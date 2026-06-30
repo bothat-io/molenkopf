@@ -1,34 +1,68 @@
-# Plugin platform follow-up backlog
+# Token Optimizer Follow-Ups
 
-This file tracks remaining plugin hardening work after the v0.1.6 release
-preparation batch. Keep entries short and move implementation detail into tests
-or docs when work starts.
+The current branch now proves that safe coding-agent operational output can
+produce real confirmed savings, and protected source/diff context does not
+produce fake savings. Remaining work should stay in small, tested batches.
 
-## Completed in the current hardening batch
+## High Priority
 
-- Plugin action output schemas are enforced before API responses are returned.
-- Project graph actions derive or load graph snapshots without requiring a prior
-  dashboard data load.
-- Project graph cache entries are scoped, TTL-bound, size-bound, and testable.
-- Dashboard plugin policy editing now covers capabilities, actions, and
-  descriptor-defined settings.
-- Built-in plugin module registration is checked against descriptor v2 ids.
+- [ ] Add request-level optimizer effectiveness fields.
+  Track sanitized `effectivePluginIds`, skip reasons, and compressor mode per
+  request without storing request bodies or raw policy objects.
 
-## Remaining work
+- [ ] Add a first-class "why zero savings" diagnostic.
+  Explain disabled compressor, observe-only mode, retrieval unavailable, no
+  candidates, protected source/diff, thresholds, candidate limits, body limits,
+  and compression-not-smaller outcomes.
 
-- Replace raw inline plugin pages or harden CSP with strict hash/nonce handling.
-- Add plugin performance budgets, timeout handling, and slow-operation events.
-- Add sanitized plugin error taxonomy with non-sensitive correlation ids.
-- Make descriptor v2 the single canonical source for all remaining registry,
-  policy, catalog, and dashboard metadata.
-- Define and document one project graph freshness and persistence model.
-- Add a built-in plugin contract test matrix across descriptors, actions,
-  policy behavior, output schemas, and sanitizer behavior.
-- Split plugin implementation files by responsibility where they still mix
-  descriptors, actions, storage, UI rendering, DTOs, and helpers.
+- [ ] Add protected coding-context pressure metrics.
+  Track source and diff pressure separately from compressible candidate
+  pressure. Never count protected pressure as potential savings.
 
-## Release notes
+- [ ] Build dashboard controls for context-compressor settings.
+  Expose mode, thresholds, body limits, candidate limits, and allowed kinds
+  through existing descriptor-defined settings with server-side validation.
 
-- Do not ship with `.env` in the workspace root. The sensitive workspace check
-  intentionally fails when that file exists.
-- Run the full release gate after the local `.env` is moved or removed.
+- [ ] Convert the token optimizer page into an actionable control surface.
+  Keep mutation in `context-compressor-plugin`; make `token-optimizer-plugin`
+  clearly act as advisor/control surface for the active transformer.
+
+- [ ] Add operator-facing compression status in the plugin overview.
+  Distinguish active transformer, passive observer, blocked, ineffective,
+  observe-only, and no-candidate states.
+
+## Medium Priority
+
+- [ ] Improve operational-block detection for more agent outputs.
+  Cover pytest, cargo, go test, Maven, Gradle, dotnet, CI logs, repeated
+  warnings, and long stack traces while preserving safe-mode source protection.
+
+- [ ] Add safe repeated-block optimization inside a forwarded request.
+  Replace later exact duplicates of safe operational blocks with explicit
+  same-request markers. Keep source/diff protected by default.
+
+- [ ] Add prompt-cache diagnostics for source-heavy coding-agent traffic.
+  Report stable prefix and tool schema readiness without logging raw prompts or
+  tools, and avoid claiming confirmed savings without provider cache counters.
+
+- [ ] Improve compression performance budgets.
+  Keep body and candidate limits enforced before expensive work, avoid duplicate
+  scans where practical, and record sanitized duration warnings.
+
+- [ ] Harden retrieval-store safety for compressed originals.
+  Verify redaction before storage, bounded metadata, retention behavior, and no
+  raw original rendering in dashboard output.
+
+- [ ] Add request-window clarity to optimizer metrics.
+  Label recent snapshot metrics versus all-time overview metrics and show route
+  bucket coverage.
+
+- [ ] Update docs to match actual optimizer behavior.
+  Document active versus observer plugins, safe compressible kinds, protected
+  source/diff behavior, transform mode, and zero-savings troubleshooting.
+
+## Release Gate
+
+- [ ] Add an end-to-end optimizer smoke workflow after dashboard settings land.
+  It should prove safe operational-output savings and protected source/diff
+  explanations through one deterministic release check.

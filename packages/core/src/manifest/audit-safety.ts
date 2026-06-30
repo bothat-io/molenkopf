@@ -43,6 +43,9 @@ export function normalizedManifest(manifest: AuditManifest): AuditManifest {
 	  if (typeof manifest.hasRandomIdNoise === "boolean") safe.hasRandomIdNoise = manifest.hasRandomIdNoise;
 	  if (manifest.skipReasons) safe.skipReasons = safeCountRecord(manifest.skipReasons);
 	  if (manifest.contentKindCounts) safe.contentKindCounts = safeCountRecord(manifest.contentKindCounts);
+	  if (manifest.effectivePluginIds) safe.effectivePluginIds = safeTokenList(manifest.effectivePluginIds);
+	  if (manifest.compressorMode) safe.compressorMode = redactedToken(text(manifest.compressorMode, "unknown"), "unknown");
+	  if (manifest.zeroSavingsReasons) safe.zeroSavingsReasons = safeTokenList(manifest.zeroSavingsReasons);
 	  const statusCode = finiteOptional(manifest.statusCode);
   const durationMs = finiteOptional(manifest.durationMs);
   const upstreamInputTokens = finiteOptional(manifest.upstreamInputTokens);
@@ -75,6 +78,9 @@ export function isAuditManifest(value: unknown): value is AuditManifest {
 	    && optionalContentFingerprints(item.contentFingerprints)
 	    && optionalTimings(item.timings)
 	    && optionalCountRecord(item.skipReasons) && optionalCountRecord(item.contentKindCounts)
+	    && (item.effectivePluginIds === undefined || stringArray(item.effectivePluginIds))
+	    && (item.compressorMode === undefined || typeof item.compressorMode === "string")
+	    && (item.zeroSavingsReasons === undefined || stringArray(item.zeroSavingsReasons))
 	    && stringArray(item.retrievalIds) && stringArray(item.compressorsUsed) && stringArray(item.warnings));
 	}
 
@@ -162,13 +168,9 @@ function finiteOptionalNumber(value: unknown): boolean {
   return value === undefined || (typeof value === "number" && Number.isFinite(value));
 }
 
-function optionalBoolean(value: unknown): boolean {
-  return value === undefined || typeof value === "boolean";
-}
+function optionalBoolean(value: unknown): boolean { return value === undefined || typeof value === "boolean"; }
 
-function optionalHash(value: unknown): boolean {
-  return value === undefined || safeHash(value);
-}
+function optionalHash(value: unknown): boolean { return value === undefined || safeHash(value); }
 
 function safeHash(value: unknown): value is string {
   return typeof value === "string" && /^[a-f0-9]{64}$/i.test(value);
@@ -178,9 +180,7 @@ function optionalCountRecord(value: unknown): value is Record<string, number> {
   return value === undefined || Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.values(value).every((item) => typeof item === "number" && Number.isFinite(item)));
 }
 
-function optionalTimings(value: unknown): value is Record<string, number> {
-  return value === undefined || Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.values(value).every((item) => typeof item === "number" && Number.isFinite(item)));
-}
+function optionalTimings(value: unknown): value is Record<string, number> { return optionalCountRecord(value); }
 
 function safeCountRecord(value: Record<string, number>): Record<string, number> {
   const out: Record<string, number> = {};
@@ -190,3 +190,5 @@ function safeCountRecord(value: Record<string, number>): Record<string, number> 
   }
   return out;
 }
+
+function safeTokenList(value: string[]): string[] { return value.map((item) => redactedToken(String(item), "item")).filter(Boolean).slice(0, 20); }
