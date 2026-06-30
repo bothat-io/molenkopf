@@ -7,7 +7,7 @@ test("token optimizer builds admin-confirmed optimization plans from evidence", 
     [
       { compressionCandidates: 4, compressedItems: 1, compressionSkipped: 3, skipReasons: { below_min_saved_percent: 2 }, hasTimestampNoise: true, cacheReadTokens: 0, toolSchemaTokens: 800 } as any
     ],
-    { requests: 3, inputTokens: 1200, outputTokens: 300, providerReportedInputTokens: 1200, providerReportedOutputTokens: 300, originalTokens: 1500, forwardedTokens: 1300, cachedTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0, savedTokens: 200, potentialSavedTokens: 0 },
+    { requests: 3, inputTokens: 1200, outputTokens: 300, providerReportedInputTokens: 1200, providerReportedOutputTokens: 300, providerUsageAvailable: true, originalTokens: 1500, forwardedTokens: 1300, cachedTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0, savedTokens: 200, potentialSavedTokens: 0 },
     [{ project: "alpha", endpoint: "POST /v1/responses", requests: 3, repeatedInputTokens: 1200, averageInputTokens: 400, confidence: "low", reason: "content_fingerprints_unavailable" }],
     { totalTokens: { state: "available", value: 1500, source: "provider_reported" }, budgetLimit: { state: "unavailable", reason: "no_plugin_budget_limit_configured" }, pressure: "low", warnings: [] }
   );
@@ -20,7 +20,7 @@ test("token optimizer builds admin-confirmed optimization plans from evidence", 
 test("token optimizer plans transform enablement from observed potential savings", () => {
   const plans = buildOptimizationPlans(
     [{ compressionCandidates: 2, compressionSkipped: 2 } as any],
-    { requests: 2, inputTokens: 0, outputTokens: 0, providerReportedInputTokens: 0, providerReportedOutputTokens: 0, originalTokens: 800, forwardedTokens: 800, cachedTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0, savedTokens: 0, potentialSavedTokens: 300 },
+    { requests: 2, inputTokens: 0, outputTokens: 0, providerReportedInputTokens: 0, providerReportedOutputTokens: 0, providerUsageAvailable: false, originalTokens: 800, forwardedTokens: 800, cachedTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0, savedTokens: 0, potentialSavedTokens: 300 },
     [],
     { totalTokens: { state: "unavailable", reason: "usage_unavailable" }, budgetLimit: { state: "unavailable", reason: "no_plugin_budget_limit_configured" }, pressure: "low", warnings: [] }
   );
@@ -33,7 +33,7 @@ test("token optimizer plans transform enablement from observed potential savings
 test("token optimizer plans output-heavy review without mutating traffic", () => {
   const plans = buildOptimizationPlans(
     [],
-    { requests: 4, inputTokens: 900, outputTokens: 1800, providerReportedInputTokens: 900, providerReportedOutputTokens: 1800, originalTokens: 900, forwardedTokens: 900, cachedTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0, savedTokens: 0, potentialSavedTokens: 0 },
+    { requests: 4, inputTokens: 900, outputTokens: 1800, providerReportedInputTokens: 900, providerReportedOutputTokens: 1800, providerUsageAvailable: true, originalTokens: 900, forwardedTokens: 900, cachedTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0, savedTokens: 0, potentialSavedTokens: 0 },
     [],
     { totalTokens: { state: "available", value: 2700, source: "provider_reported" }, budgetLimit: { state: "unavailable", reason: "no_plugin_budget_limit_configured" }, pressure: "low", warnings: [] }
   );

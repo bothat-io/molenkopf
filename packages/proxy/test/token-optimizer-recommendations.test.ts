@@ -4,7 +4,7 @@ import { buildRecommendations } from "../../plugins/token-optimizer-plugin/recom
 
 test("token optimizer creates conservative token-pressure recommendations and budget warnings", () => {
   const recommendations = buildRecommendations(
-    { requests: 3, inputTokens: 1200, outputTokens: 300, providerReportedInputTokens: 1200, providerReportedOutputTokens: 300, originalTokens: 1300, forwardedTokens: 1200, cachedTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0, savedTokens: 0, potentialSavedTokens: 0 },
+    { requests: 3, inputTokens: 1200, outputTokens: 300, providerReportedInputTokens: 1200, providerReportedOutputTokens: 300, providerUsageAvailable: true, originalTokens: 1300, forwardedTokens: 1200, cachedTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0, savedTokens: 0, potentialSavedTokens: 0 },
     [{ id: "a", label: "POST /v1/responses", project: "alpha", requests: 3, inputTokens: 700, outputTokens: 100, originalTokens: 800, forwardedTokens: 700, savedTokens: 100, potentialSavedTokens: 0, savedPercent: 13 }],
     [{ project: "alpha", endpoint: "POST /v1/responses", requests: 3, repeatedInputTokens: 1200, averageInputTokens: 400, confidence: "low", reason: "content_fingerprints_unavailable" }],
     {
@@ -25,7 +25,7 @@ test("token optimizer creates conservative token-pressure recommendations and bu
 
 test("token optimizer reports potential compression without claiming confirmed savings", () => {
   const recommendations = buildRecommendations(
-    { requests: 1, inputTokens: 0, outputTokens: 0, providerReportedInputTokens: 0, providerReportedOutputTokens: 0, originalTokens: 900, forwardedTokens: 900, cachedTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0, savedTokens: 0, potentialSavedTokens: 300 },
+    { requests: 1, inputTokens: 0, outputTokens: 0, providerReportedInputTokens: 0, providerReportedOutputTokens: 0, providerUsageAvailable: false, originalTokens: 900, forwardedTokens: 900, cachedTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0, savedTokens: 0, potentialSavedTokens: 300 },
     [], [],
     { totalTokens: { state: "unavailable", reason: "usage_unavailable" }, budgetLimit: { state: "unavailable", reason: "no_plugin_budget_limit_configured" }, pressure: "low", warnings: [] }
   );
@@ -37,7 +37,7 @@ test("token optimizer reports potential compression without claiming confirmed s
 
 test("token optimizer describes fingerprint-backed repeated context as high evidence", () => {
   const recommendations = buildRecommendations(
-    { requests: 2, inputTokens: 0, outputTokens: 0, providerReportedInputTokens: 0, providerReportedOutputTokens: 0, originalTokens: 0, forwardedTokens: 0, cachedTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0, savedTokens: 0, potentialSavedTokens: 0 },
+    { requests: 2, inputTokens: 0, outputTokens: 0, providerReportedInputTokens: 0, providerReportedOutputTokens: 0, providerUsageAvailable: false, originalTokens: 0, forwardedTokens: 0, cachedTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0, savedTokens: 0, potentialSavedTokens: 0 },
     [], [{ project: "alpha", endpoint: "POST /v1/responses", requests: 2, repeatedInputTokens: 500, averageInputTokens: 250, confidence: "high", reason: "matching_content_fingerprint" }],
     { totalTokens: { state: "unavailable", reason: "usage_unavailable" }, budgetLimit: { state: "unavailable", reason: "no_plugin_budget_limit_configured" }, pressure: "low", warnings: [] }
   );
@@ -47,7 +47,7 @@ test("token optimizer describes fingerprint-backed repeated context as high evid
 
 test("token optimizer describes retrieval-backed repeated context as high evidence", () => {
   const recommendations = buildRecommendations(
-    { requests: 2, inputTokens: 0, outputTokens: 0, providerReportedInputTokens: 0, providerReportedOutputTokens: 0, originalTokens: 0, forwardedTokens: 0, cachedTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0, savedTokens: 0, potentialSavedTokens: 0 },
+    { requests: 2, inputTokens: 0, outputTokens: 0, providerReportedInputTokens: 0, providerReportedOutputTokens: 0, providerUsageAvailable: false, originalTokens: 0, forwardedTokens: 0, cachedTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0, savedTokens: 0, potentialSavedTokens: 0 },
     [], [{ project: "alpha", endpoint: "POST /v1/responses", requests: 2, repeatedInputTokens: 500, averageInputTokens: 250, confidence: "high", reason: "matching_retrieval_id" }],
     { totalTokens: { state: "unavailable", reason: "usage_unavailable" }, budgetLimit: { state: "unavailable", reason: "no_plugin_budget_limit_configured" }, pressure: "low", warnings: [] }
   );

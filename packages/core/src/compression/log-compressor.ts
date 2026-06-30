@@ -43,7 +43,7 @@ export function compressLog(input: string, retrieveId: string): CompressionResul
     else {
       flushRepeat(output, repeatCount, retrieveId);
       repeatCount = 0;
-      if (!NOISE.test(line) || SIGNAL.test(line)) output.push(line);
+      if (!NOISE.test(line) || SIGNAL.test(line)) output.push(scrubSensitiveCommandArgs(line));
       else output.push(`[molenkopf omitted: noisy ${shape} retrieve=${retrieveId}]`);
     }
     previousShape = shape;
@@ -79,17 +79,17 @@ function ciSummary(lines: string[]): string[] {
   let command = "", cwd = "", exitCode = "";
   for (const line of lines) {
     const commandMatch = !command ? COMMAND.exec(line) : undefined;
-    if (commandMatch) command = commandMatch[1].trim();
+    if (commandMatch) command = scrubSensitiveCommandArgs(commandMatch[1].trim());
     const cwdMatch = !cwd ? /^\s*(?:cwd|working directory)[:=]\s*(.+)$/i.exec(line) : undefined;
     if (cwdMatch) cwd = cwdMatch[1].trim();
     const exitMatch = /exit code[: ]+(\d+)/i.exec(line);
     if (exitMatch) exitCode = exitMatch[1];
-    if (/^\s*(?:FAIL|FAILED|--- FAIL:)\b/i.test(line) || /\bFAILED\b.*::/.test(line)) pushLimited(failed, line.trim(), 12);
-    if (/\b(?:AssertionError|Expected|Received|assert|npm ERR!|error TS\d+|failed to solve|panicked at)\b/i.test(line)) pushLimited(assertions, line.trim(), 16);
-    if (APP_FRAME.test(line)) pushLimited(frames, line.trim(), 16);
-    if (/^\s*(?:stderr|error)[:>]/i.test(line) || /\b(?:npm ERR!|error TS\d+|failed to solve)\b/i.test(line)) pushLimited(stderr, line.trim(), 12);
+    if (/^\s*(?:FAIL|FAILED|--- FAIL:)\b/i.test(line) || /\bFAILED\b.*::/.test(line)) pushLimited(failed, scrubSensitiveCommandArgs(line.trim()), 12);
+    if (/\b(?:AssertionError|Expected|Received|assert|npm ERR!|error TS\d+|failed to solve|panicked at)\b/i.test(line)) pushLimited(assertions, scrubSensitiveCommandArgs(line.trim()), 16);
+    if (APP_FRAME.test(line)) pushLimited(frames, scrubSensitiveCommandArgs(line.trim()), 16);
+    if (/^\s*(?:stderr|error)[:>]/i.test(line) || /\b(?:npm ERR!|error TS\d+|failed to solve)\b/i.test(line)) pushLimited(stderr, scrubSensitiveCommandArgs(line.trim()), 12);
   }
-  for (const line of lines.slice(-40)) if (SIGNAL.test(line) || /\b(?:tests?|summary|passed)\b/i.test(line)) pushLimited(final, line.trim(), 12);
+  for (const line of lines.slice(-40)) if (SIGNAL.test(line) || /\b(?:tests?|summary|passed)\b/i.test(line)) pushLimited(final, scrubSensitiveCommandArgs(line.trim()), 12);
   return [
     command ? `command: ${command}` : "",
     cwd ? `cwd: ${cwd}` : "",
@@ -108,6 +108,13 @@ function pushLimited(items: string[], value: string, max: number): void {
 
 function section(name: string, lines: string[]): string {
   return lines.length ? `${name}:\n${lines.map((line) => `- ${line}`).join("\n")}` : "";
+}
+
+function scrubSensitiveCommandArgs(line: string): string {
+  return line
+    .replace(/(\s-H\s+["']?(?:Authorization|Cookie|X-Api-Key):\s*)[^"'\n]+(["']?)/gi, "$1[REDACTED_SECRET:cli_arg]$2")
+    .replace(/(^|\s)(--?(?:token|api[-_]?key|password|passwd|secret|authorization|auth|cookie|refresh[-_]?token|access[-_]?token))=("[^"]*"|'[^']*'|[^\s]+)/gi, "$1$2=[REDACTED_SECRET:cli_arg]")
+    .replace(/(^|\s)(--?(?:token|api[-_]?key|password|passwd|secret|authorization|auth|cookie|refresh[-_]?token|access[-_]?token))\s+("[^"]*"|'[^']*'|[^\s]+)/gi, "$1$2 [REDACTED_SECRET:cli_arg]");
 }
 
 function flushRepeat(output: string[], count: number, retrieveId: string): void {
