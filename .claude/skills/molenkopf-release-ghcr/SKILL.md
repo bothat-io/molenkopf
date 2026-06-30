@@ -17,6 +17,8 @@ Use this workflow when working on Molenkopf releases or Docker publishing.
 - Do not push directly to `preview` or `main` unless the user explicitly asks
   for a repository-maintainer exception.
 - Use GitHub PRs for all branch promotion.
+- After every GitHub merge, tag, or release workflow, sync local branch state
+  before reporting that the step is complete or starting npm publishing.
 - Keep guiding the user through the release. After each step, report what passed,
   what is blocked, and the exact next step.
 
@@ -72,6 +74,17 @@ Use this workflow when working on Molenkopf releases or Docker publishing.
   preview push workflows. State that this is the repo-compatible substitute for
   the blocked `preview` to `main` PR.
 - Close the blocked direct PR as superseded only after the substitute PR exists.
+
+## Local Branch Sync Rule
+
+- After a GitHub merge to `main`, fetch `origin main --tags --prune`, then
+  compare `main...origin/main`.
+- If local `main` is ahead/behind because GitHub used squash history, create a
+  backup branch from local `main` before changing it.
+- Then set local `main` exactly to `origin/main`, verify the expected release tag
+  points to that commit, and report the backup branch name.
+- Do not run `release:verify` or npm publish instructions while local `main`
+  still shows ahead/behind.
 
 ## Current Policy
 
