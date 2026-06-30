@@ -62,6 +62,16 @@ test("does not truncate source code stored under generic JSON string keys", () =
   assert.equal(result.text, json);
 });
 
+test("does not truncate long prose or markdown stored in JSON strings", () => {
+  const prose = Array.from({ length: 80 }, (_, i) => `This is a product note paragraph ${i} with non-operational context for a human reviewer.`).join("\n");
+  const markdown = Array.from({ length: 80 }, (_, i) => `- checklist item ${i} that should remain readable`).join("\n");
+  for (const json of [JSON.stringify({ notes: prose }), JSON.stringify({ document: markdown })]) {
+    const result = compressJsonText(json, "molenkopf://sha256/prose");
+    assert.equal(result.compressed, false);
+    assert.equal(result.text, json);
+  }
+});
+
 test("does not summarize arrays when later items contain source files", () => {
   const source = Array.from({ length: 220 }, (_, i) => `const value${i}: number = ${i};`).join("\n");
   const arr = Array.from({ length: 140 }, (_, i) => ({ path: `logs/row-${i}.txt`, content: `ok ${i}` }));

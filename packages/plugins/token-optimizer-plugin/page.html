@@ -107,11 +107,14 @@
   function stats(items){
     return `<div class="stats">${items.map(([label,value])=>`<div><span>${esc(label)}</span><b>${esc(value)}</b></div>`).join("")}</div>`;
   }
+  const providerValue=(observations,key)=>observations.providerUsageAvailable||!observations.requests?num(observations[key]??0):"Unavailable";
+  const providerHint=(observations)=>observations.providerUsageAvailable||!observations.requests?"":"provider usage unavailable";
 function renderMetrics(data){
   const observations=data.observations||{}, budgets=data.budgets||{};
+  const savedHint=observations.savedTokens>0?"":"No confirmed compression savings recorded";
   const cards=[
-    ["Requests",observations.requests],["Provider input",observations.providerReportedInputTokens??observations.inputTokens],
-    ["Provider output",observations.providerReportedOutputTokens??observations.outputTokens],["Confirmed saved",observations.savedTokens,"No compression savings recorded"],["Potential saved",observations.potentialSavedTokens||0],
+    ["Requests",observations.requests],["Provider input",providerValue(observations,"providerReportedInputTokens"),providerHint(observations)],
+    ["Provider output",providerValue(observations,"providerReportedOutputTokens"),providerHint(observations)],["Confirmed saved",observations.savedTokens,savedHint],["Potential saved",observations.potentialSavedTokens||0],
     ["Local original",observations.originalTokens??0],["Local forwarded",observations.forwardedTokens??0],
     ["Budget pressure",budgets.pressure||"low"],["Provider cache tokens",metricText(data.providerCacheTokens," tokens"),metricHint(data.providerCacheTokens)],
     ["Estimated cost",metricText(data.estimatedCostEur," EUR"),metricHint(data.estimatedCostEur)],["Recommendations",(data.recommendations||[]).length]
@@ -169,7 +172,8 @@ async function load(){
       $("plans").innerHTML='<div class="empty warn">Plugin data unavailable.</div>';
       return;
     }
-    $("state").innerHTML=`Observe and recommend <span class="badge">read only</span><div class="muted">Recent snapshot: ${num(data.snapshot?.observedRequests)} of ${num(data.snapshot?.limit)} max requests. This workspace reports budgets, token pressure, and unavailable metrics without changing routing or request bodies.</div>`;
+    const windowText=data.snapshot?.from&&data.snapshot?.to?` Window: ${esc(data.snapshot.from)} to ${esc(data.snapshot.to)}.`:" Window unavailable.";
+    $("state").innerHTML=`Observe and recommend <span class="badge">read only</span><div class="muted">Recent snapshot: ${num(data.snapshot?.observedRequests)} of ${num(data.snapshot?.limit)} max requests.${windowText} This workspace reports budgets, token pressure, and unavailable metrics without changing routing or request bodies.</div>`;
     renderMetrics(data);
     renderBuckets(data.buckets);
     renderBudget(data);
