@@ -26,7 +26,11 @@
 .plugin-settings-form{display:grid;gap:12px}
 .plugin-settings-form label{display:grid;gap:6px}
 .plugin-settings-form label span{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-.plugin-settings-form select{min-height:36px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:7px 10px}
+.plugin-settings-form select,.plugin-settings-form input{min-height:36px;border:1px solid var(--line);border-radius:8px;background:#fff;padding:7px 10px}
+.plugin-checkbox-list,.plugin-settings-schema{display:grid;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px;background:rgba(255,255,255,.55)}
+.plugin-checkbox-list legend,.plugin-settings-schema legend{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:0 4px}
+.plugin-checkbox-list label{display:flex;align-items:center;gap:8px}
+.plugin-checkbox-list input{min-height:auto}
 .plugin-settings-actions{display:flex;gap:8px;flex-wrap:wrap}
 .plugin-inline-form{display:flex;align-items:end;gap:8px;flex-wrap:wrap}
 .plugin-inline-form label{display:grid;gap:6px}

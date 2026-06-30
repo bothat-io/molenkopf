@@ -83,7 +83,7 @@ export function createPluginHost(state: RuntimeState, deps: { store: RetrievalSt
       const fn = modules[id]?.executeAction;
       if (!fn) return { ok: false, status: 404, error: "plugin_action_not_found" };
       try {
-        const context: PluginActionContext = { actionId, input: input as PluginJson, userId, teamIds: [...teamIds], scope: "local-api" };
+        const context: PluginActionContext = { actionId, input: input as PluginJson, userId, teamIds: [...teamIds], scope: "local-api", manifests: state.latest ? [state.latest] : [] };
         return { ok: true, payload: await fn(context, runtime(id)) };
       } catch {
         warn(deps.events, id, `action:${actionId}`);

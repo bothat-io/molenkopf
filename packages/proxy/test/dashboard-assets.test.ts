@@ -32,6 +32,9 @@ test("dashboard production dist serves known assets without SPA fallback", async
     const traversal = await fetch(`${base}/__molenkopf/dashboard/assets/..%2Findex.html`);
 
     assert.equal(index.headers.get("content-type"), "text/html; charset=utf-8");
+    assert.equal(index.headers.get("content-security-policy"), "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'none'; frame-ancestors 'none'");
+    assert.equal(index.headers.get("referrer-policy"), "no-referrer");
+    assert.equal(index.headers.get("x-content-type-options"), "nosniff");
     assert.equal(await index.text(), "<!doctype html><div id=\"root\">dashboard</div>");
     assert.equal(favicon.headers.get("content-type"), "image/png");
     assert.deepEqual([...new Uint8Array(await favicon.arrayBuffer())], [0x89, 0x50, 0x4e, 0x47]);
@@ -41,7 +44,10 @@ test("dashboard production dist serves known assets without SPA fallback", async
     assert.deepEqual([...new Uint8Array(await rootFavicon.arrayBuffer())], [0x00, 0x00, 0x01, 0x00]);
     assert.equal(await logo.text(), "logo-bytes");
     assert.equal(js.headers.get("content-type"), "text/javascript; charset=utf-8");
+    assert.equal(js.headers.get("cache-control"), "public, max-age=31536000, immutable");
+    assert.equal(js.headers.get("x-content-type-options"), "nosniff");
     assert.equal(missing.status, 404);
+    assert.equal(missing.headers.get("content-security-policy"), "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'none'; frame-ancestors 'none'");
     assert.equal(malformed.status, 400);
     assert.equal(traversal.status, 400);
   } finally {

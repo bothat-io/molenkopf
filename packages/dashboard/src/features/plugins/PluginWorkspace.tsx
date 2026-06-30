@@ -4,18 +4,18 @@ import { ActionGroup } from "../../components/actions/ActionGroup";
 import { CollapsibleGroup, CollapsiblePanel } from "../../components/data/CollapsibleGroup";
 import { DashboardSection } from "../../components/layout/DashboardSection";
 import type { DashboardData, PluginView, TeamView } from "../../app/types";
-import { GlobalPluginSettingsForm, TeamPluginSettingsForm } from "./PluginSettingsForm";
+import { GlobalPluginSettingsForm, TeamPluginSettingsForm, type GlobalDraft, type TeamDraft } from "./PluginSettingsForm";
 import { PluginInfoCard, PluginWorkspaceSummary, isSafePluginPagePath, pluginActionLabels, pluginEffect, pluginMetric } from "./PluginWorkspaceMeta";
+import { pluginDefaultMaxRisk, pluginPolicyOptions, policySettings, riskValue, teamPluginDraft } from "./PluginWorkspacePolicy";
 import "./PluginPanels.css";
 
 type Risk = "green" | "yellow" | "orange" | "red";
-type TeamDraft = { enabledMode: "inherit" | "override"; enabled: boolean; maxRiskMode: "inherit" | "override"; maxRisk: Risk };
 
 export function PluginWorkspace(props: {
   data: DashboardData;
   teams: TeamView[];
   onPluginToggle: (id: string, enabled: boolean) => void;
-  onSaveGlobalPluginPolicy: (pluginId: string, value: { enabled: boolean; maxRisk: Risk }) => Promise<void> | void;
+  onSaveGlobalPluginPolicy: (pluginId: string, value: GlobalDraft) => Promise<void> | void;
   onSaveTeamPluginPolicy: (teamId: string, pluginId: string, value: TeamDraft) => Promise<void> | void;
   onResetTeamPluginPolicy: (teamId: string, pluginId: string) => Promise<void> | void;
 }) {
@@ -46,7 +46,7 @@ function PluginRow(props: {
   data: DashboardData;
   team?: TeamView;
   onPluginToggle: (id: string, enabled: boolean) => void;
-  onSaveGlobalPluginPolicy: (pluginId: string, value: { enabled: boolean; maxRisk: Risk }) => Promise<void> | void;
+  onSaveGlobalPluginPolicy: (pluginId: string, value: GlobalDraft) => Promise<void> | void;
   onSaveTeamPluginPolicy: (teamId: string, pluginId: string, value: TeamDraft) => Promise<void> | void;
   onResetTeamPluginPolicy: (teamId: string, pluginId: string) => Promise<void> | void;
 }) {
@@ -61,6 +61,9 @@ function PluginRow(props: {
   const blockedReasons = team ? effective?.policy.blockedReasons || [] : [];
   const defaultMaxRisk = pluginDefaultMaxRisk(plugin);
   const globalMaxRisk = riskValue(globalPolicy.maxRisk) || defaultMaxRisk;
+  const { availableCapabilities, availableActions, settingsSchema } = pluginPolicyOptions(plugin);
+  const globalSettings = policySettings(globalPolicy.settings, plugin);
+  const effectiveSettings = effective?.policy.settings || globalSettings;
   const sourceLabel = team ? (effective?.teamOverrideExists ? "Team override active" : "Inherited from global") : "Global default";
   return <CollapsibleGroup
     title={plugin.id}
@@ -136,17 +139,21 @@ function PluginRow(props: {
           <p>{team ? "Edit team overrides here. Plugin pages stay separate and only show plugin data." : "Edit the global plugin default policy here."}</p>
         </div>
         {team ? <TeamPluginSettingsForm
-          draft={{
-            enabledMode: teamPolicy.enabled === undefined ? "inherit" : "override",
-            enabled: Boolean(teamPolicy.enabled ?? effective?.policy.enabled ?? true),
-            maxRiskMode: teamPolicy.maxRisk === undefined ? "inherit" : "override",
-            maxRisk: riskValue(teamPolicy.maxRisk) || riskValue(effective?.policy.maxRisk) || globalMaxRisk
-          }}
+          draft={teamPluginDraft({ teamPolicy, effective, globalMaxRisk, availableCapabilities, availableActions, effectiveSettings })}
+          availableCapabilities={availableCapabilities}
+          availableActions={availableActions}
+          settingsSchema={settingsSchema}
           onSave={(value) => props.onSaveTeamPluginPolicy(team.id, plugin.id, value)}
           onReset={() => props.onResetTeamPluginPolicy(team.id, plugin.id)}
         /> : <GlobalPluginSettingsForm
           enabled={Boolean(globalPolicy.enabled ?? enabled)}
           maxRisk={globalMaxRisk}
+          capabilities={globalPolicy.capabilities || availableCapabilities}
+          actions={globalPolicy.actions || availableActions}
+          settings={globalSettings}
+          availableCapabilities={availableCapabilities}
+          availableActions={availableActions}
+          settingsSchema={settingsSchema}
           onSave={(value) => props.onSaveGlobalPluginPolicy(plugin.id, value)}
         />}
         <div className="plugin-inline-note">
@@ -157,19 +164,6 @@ function PluginRow(props: {
       </div>
     </div>
   </CollapsibleGroup>;
-}
-
-export function pluginDefaultMaxRisk(plugin: PluginView): Risk {
-  return riskValue(plugin.defaultMaxRisk) || maxActionRisk(plugin) || "green";
-}
-
-function riskValue(value: unknown): Risk | undefined { return value === "green" || value === "yellow" || value === "orange" || value === "red" ? value : undefined; }
-
-function maxActionRisk(plugin: PluginView): Risk | undefined {
-  const order: Risk[] = ["green", "yellow", "orange", "red"];
-  let max = -1;
-  for (const action of plugin.actions || []) max = Math.max(max, order.indexOf(action.risk as Risk));
-  return max >= 0 ? order[max] : undefined;
 }
 
 function PluginActions({ plugin, onToggle }: { plugin: PluginView; onToggle: (id: string, enabled: boolean) => void }) {

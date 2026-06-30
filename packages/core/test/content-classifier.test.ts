@@ -16,3 +16,17 @@ test("does not classify long ordinary prose as log output", () => {
   const prose = Array.from({ length: 240 }, (_, i) => `This is specification paragraph ${i} with ordinary requirements and context.`).join("\n");
   assert.equal(classifyContent(prose), "plain_text");
 });
+
+test("classifies TypeScript build output as operational output", () => {
+  const output = "$ npm run typecheck\n" + Array.from({ length: 20 }, (_, i) =>
+    `packages/core/src/file-${i}.ts:${i + 1}:7 - error TS2322: value ${i} is not assignable`
+  ).join("\n");
+  assert.equal(classifyContent(output), "shell_output");
+});
+
+test("classifies common coding-agent test runners as operational output", () => {
+  const commands = ["pytest tests", "cargo test", "go test ./...", "mvn test", "gradle test", "dotnet test"];
+  for (const command of commands) {
+    assert.equal(classifyContent(`$ ${command}\nFAILED suite\nexit code 1`), "shell_output");
+  }
+});

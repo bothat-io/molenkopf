@@ -21,7 +21,13 @@ test("token optimizer summarizes request and token observations", () => {
     cacheCreationTokens: 10,
     reasoningTokens: 7,
     savedTokens: 60,
-    potentialSavedTokens: 25
+    potentialSavedTokens: 25,
+    protectedSourceTokens: 11,
+    protectedDiffTokens: 13,
+    zeroSavingsReasons: { observe_only: 1 },
+    effectivePluginIds: ["context-compressor-plugin"],
+    compressorModes: ["transform", "observe"],
+    compressionStatus: "active-transformer"
   });
 });
 
@@ -44,6 +50,11 @@ function manifest(input: number, output: number, original: number, forwarded: nu
     estimatedCompressedTokens: forwarded,
     estimatedSavedTokens: saved,
     potentialSavedTokens: saved > 0 ? 25 : 0,
+    protectedSourceTokens: saved > 0 ? 11 : 0,
+    protectedDiffTokens: saved > 0 ? 13 : 0,
+    effectivePluginIds: ["context-compressor-plugin"],
+    compressorMode: saved > 0 ? "transform" : "observe",
+    zeroSavingsReasons: saved > 0 ? [] : ["observe_only"],
     cachedTokens: saved > 0 ? 50 : 0,
     cacheReadTokens: saved > 0 ? 40 : 0,
     cacheCreationTokens: saved > 0 ? 10 : 0,

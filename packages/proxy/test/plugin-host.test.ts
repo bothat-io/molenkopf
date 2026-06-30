@@ -83,6 +83,28 @@ test("plugin host records sanitized lifecycle failures and serializes event hook
   assert.deepEqual(order, ["start:1", "end:1", "start:2", "end:2"]);
 });
 
+test("policy-disabled plugins skip host lifecycle and request hooks", async () => {
+  const calls: string[] = [];
+  const state = createRuntimeState({ target: "http://127.0.0.1:1/v1" }, "127.0.0.1");
+  state.pluginPolicyState.globalPluginPolicy["token-optimizer-plugin"] = { enabled: false };
+  const events = new EventBus();
+  const host = createPluginHost(state, { store: new RetrievalStore(), events }, {
+    "token-optimizer-plugin": {
+      onStart: () => { calls.push("start"); },
+      onEvent: () => { calls.push("event"); },
+      onAudit: () => { calls.push("audit"); }
+    }
+  });
+  await host.start(8787);
+  host.setRequestPlugins("disabled", ["token-optimizer-plugin"]);
+  events.emit("request_started", { requestId: "disabled", data: { path: "/v1/responses" } });
+  await host.audit(manifest("disabled"), ["token-optimizer-plugin"]);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await host.stop();
+  assert.deepEqual(calls, []);
+  assert.equal(state.pluginLifecycle["token-optimizer-plugin"], undefined);
+});
+
 test("request plugin policy gates event and audit hooks", async () => {
   const calls: string[] = [];
   const state = createRuntimeState({ target: "http://127.0.0.1:1/v1" }, "127.0.0.1");

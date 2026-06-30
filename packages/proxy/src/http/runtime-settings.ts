@@ -2,11 +2,13 @@
 import { rename } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
+import { inferredCredentialAuthScheme } from "../../../core/src/providers/provider-auth.ts";
 import { validateProviderTarget } from "../../../core/src/security/target-policy.ts";
 import { defaultDataDir } from "../../../core/src/storage/local-paths.ts";
 import { ensurePrivateDir, writePrivateFile } from "../../../core/src/storage/private-state.ts";
 import { isLocalProviderCredentialRef } from "./provider-credential-store.ts";
-import { CONTROL_PLANE_LIMITS, type AgentDraftMetadata, type RoutingMode, type RuntimeState } from "./runtime-types.ts";
+import { type AgentDraftMetadata, type RoutingMode, type RuntimeState } from "./runtime-types.ts";
+import { cleanDrafts, persistedDraft } from "./runtime-settings-drafts.ts";
 export type RuntimeSettings = {
   activeProviderId?: string;
   routingMode?: RoutingMode;
@@ -97,11 +99,6 @@ function cleanBudgets(value: unknown): Record<string, number> | undefined {
   return out;
 }
 
-function cleanDrafts(value: unknown): AgentDraftMetadata[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  return value.slice(0, CONTROL_PLANE_LIMITS.agentDrafts).filter(isDraft).map(persistedDraft);
-}
-
 function cleanProviders(value: unknown): PersistedProvider[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const seen = new Set<string>(), out: PersistedProvider[] = [];
@@ -124,7 +121,8 @@ function cleanProvider(value: unknown): PersistedProvider | undefined {
   const localCredentialRef = isLocalProviderCredentialRef(item.credentialRef, id) ? item.credentialRef : undefined;
   const credentialEnv = localCredentialRef ? undefined : cleanEnv(item.credentialEnv);
   const credentialRef = localCredentialRef ?? (credentialEnv ? `env:${credentialEnv}` : "none");
-  return cleanBaseProvider(id, item, kind, target, { credentialEnv, credentialRef, authScheme: cleanAuth(item.authScheme, target, Boolean(credentialEnv || localCredentialRef)), protocol: cleanProtocol(item.protocol) });
+  const protocol = cleanProtocol(item.protocol);
+  return cleanBaseProvider(id, item, kind, target, { credentialEnv, credentialRef, authScheme: cleanAuth(item.authScheme, target, Boolean(credentialEnv || localCredentialRef), protocol), protocol });
 }
 
 function cleanCliProvider(id: string, item: Record<string, unknown>): PersistedProvider | undefined {
@@ -170,24 +168,11 @@ function cleanIdArray(value: unknown): string[] | undefined {
 
 function cleanEnv(value: unknown): string | undefined { return typeof value === "string" && /^[A-Z_][A-Z0-9_]*$/i.test(value) ? value : undefined; }
 
-function cleanAuth(value: unknown, target: string, credentialConfigured?: boolean): ProviderConfig["authScheme"] {
+function cleanAuth(value: unknown, target: string, credentialConfigured?: boolean, protocol?: ProviderConfig["protocol"]): ProviderConfig["authScheme"] {
   if (value === "bearer" || value === "x-api-key" || value === "none") return value;
-  if (!credentialConfigured) return "none";
-  return target.includes("anthropic") ? "x-api-key" : "bearer";
+  return inferredCredentialAuthScheme(credentialConfigured, { protocol, target });
 }
 
 function cleanProtocol(value: unknown): ProviderConfig["protocol"] | undefined { return value === "openai-responses" || value === "anthropic-messages" || value === "openai-chat" || value === "ollama-tags" ? value : undefined; }
-
-function isDraft(value: unknown): value is AgentDraftMetadata {
-  if (!value || typeof value !== "object") return false;
-  const item = value as AgentDraftMetadata;
-  return idOk(item.id) && idOk(item.providerId) && typeof item.label === "string" && Array.isArray(item.enabledPluginIds) && item.status === "draft";
-}
-
-function persistedDraft(draft: AgentDraftMetadata): AgentDraftMetadata {
-  const copy: AgentDraftMetadata = { ...draft, enabledPluginIds: [...draft.enabledPluginIds] };
-  if (!copy.tokenHash) delete copy.tokenHashAlgorithm;
-  return copy;
-}
 
 function idOk(value: unknown): value is string { return typeof value === "string" && /^[a-z0-9][a-z0-9._:-]{0,63}$/i.test(value); }

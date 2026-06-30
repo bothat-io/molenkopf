@@ -37,6 +37,30 @@ test("concurrent setup attempts create exactly one administrator", async () => {
   }
 });
 
+test("admin event streams close after the opening session loses admin access", async () => {
+  const proxy = await startProxy({ port: 0, target: "http://127.0.0.1:9/v1", dataDir: await freshDataDir("event-revoke") });
+  const base = `http://127.0.0.1:${proxy.port}`;
+  try {
+    const admin = cookieFrom(await post(base, "/__molenkopf/setup-admin", { username: "admin", password: "admin-secret" }));
+    await post(base, "/__molenkopf/identity/users", { id: "admin2", password: "admin2-secret", role: "admin", teamIds: ["everyone"] }, admin);
+    const admin2 = cookieFrom(await post(base, "/__molenkopf/login", { username: "admin2", password: "admin2-secret" }));
+    const stream = await fetch(`${base}/__molenkopf/events`, { headers: { cookie: admin } });
+    assert.equal(stream.status, 200);
+    assert.ok(stream.body);
+    const reader = stream.body.getReader();
+    try {
+      assert.match(textOf((await readStream(reader)).value), /connected/);
+      assert.equal((await post(base, "/__molenkopf/identity/users", { id: "admin", role: "member" }, admin2)).status, 200);
+      await fetch(`${base}/v1/test`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      assert.equal((await readStream(reader)).done, true);
+    } finally {
+      await reader.cancel().catch(() => {});
+    }
+  } finally {
+    await proxy.close();
+  }
+});
+
 function post(base: string, path: string, body: unknown, cookie = ""): Promise<Response> {
   return fetch(`${base}${path}`, { method: "POST", headers: { "content-type": "application/json", ...(cookie ? { cookie } : {}) }, body: JSON.stringify(body) });
 }
@@ -47,4 +71,15 @@ function cookieFrom(res: Response): string {
 
 function freshDataDir(name: string): Promise<string> {
   return mkdtemp(join(tmpdir(), `molenkopf-${name}-`));
+}
+
+async function readStream(reader: ReadableStreamDefaultReader<Uint8Array>) {
+  return Promise.race([
+    reader.read(),
+    new Promise<ReadableStreamReadResult<Uint8Array>>((_, reject) => setTimeout(() => reject(new Error("event stream read timed out")), 1000))
+  ]);
+}
+
+function textOf(value: Uint8Array | undefined): string {
+  return new TextDecoder().decode(value);
 }

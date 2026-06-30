@@ -2,10 +2,10 @@ import { plugin as contextCompressorPlugin } from "../../../plugins/context-comp
 import { plugin as projectGraphPlugin } from "../../../plugins/project-graph-plugin/plugin.ts";
 import { plugin as tokenOptimizerPlugin } from "../../../plugins/token-optimizer-plugin/plugin.ts";
 import type { MolenkopfPluginModule } from "./plugin-api.ts";
-import { contextCompressorDescriptor, projectGraphDescriptor, tokenOptimizerDescriptor } from "./builtin-plugin-descriptors.ts";
+import { contextCompressorDescriptorV2, projectGraphDescriptorV2, tokenOptimizerDescriptorV2 } from "./builtin-plugin-descriptors-v2.ts";
 
 export const builtinPluginModules: Record<string, MolenkopfPluginModule> = {
-  [contextCompressorDescriptor.id]: contextCompressorPlugin,
-  [projectGraphDescriptor.id]: projectGraphPlugin,
-  [tokenOptimizerDescriptor.id]: tokenOptimizerPlugin
+  [contextCompressorDescriptorV2.id]: contextCompressorPlugin,
+  [projectGraphDescriptorV2.id]: projectGraphPlugin,
+  [tokenOptimizerDescriptorV2.id]: tokenOptimizerPlugin
 };

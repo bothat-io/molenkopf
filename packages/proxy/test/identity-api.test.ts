@@ -84,6 +84,14 @@ test("admin/open identity API: teams, users, keys, usage, revoke", async () => {
     assert.equal(updated.key.project, "project-alpha/client");
     assert.equal(updated.key.teamId, "alpha");
 
+    const invalidTeamUpdate = await postAuth(base, "/__molenkopf/keys/update", { id: issued.key.id, agentLabel: "bad", project: "bad-project", teamId: "ghost" }, admin);
+    assert.equal(invalidTeamUpdate.status, 400);
+    const afterInvalidKey = await fetch(`${base}/__molenkopf/keys`, { headers: { cookie: admin } }).then((r) => r.json());
+    const preservedKey = afterInvalidKey.items.find((item: any) => item.id === issued.key.id);
+    assert.equal(preservedKey.agentLabel, "win1");
+    assert.equal(preservedKey.project, "project-alpha/client");
+    assert.equal(preservedKey.teamId, "alpha");
+
     const usage = await fetch(`${base}/__molenkopf/usage`, { headers: { cookie: admin } }).then((r) => r.json());
     assert.ok(usage.users.some((u: any) => u.id === "bob"));
     assert.ok(usage.teams.some((t: any) => t.id === "alpha" && t.members === 1));
