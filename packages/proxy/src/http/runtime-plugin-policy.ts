@@ -20,25 +20,13 @@ export function buildRuntimePluginPolicyState(raw: unknown, legacyEnabled?: Reco
 
 export function resolveRequestPluginPolicy(state: RuntimeRequestState, teamId: string | undefined, pluginId: string): ResolvedPluginPolicy | undefined {
   const descriptors = builtinPluginDescriptorV2();
-  const lookup = new Map(resolveTeamPolicies(state.pluginPolicyState ?? {
-    pluginPolicySchemaVersion: 1,
-    globalPluginPolicy: {},
-    teamPluginPolicies: []
-  }, descriptors, teamId));
-  const policy = lookup.get(pluginId);
-  return policy;
+  return resolvePolicyMap(state, descriptors, teamId ? [teamId] : undefined).get(pluginId);
 }
 
 export function resolveRequestPluginIds(state: RuntimeRequestState, teamIds?: readonly string[], agentEnabledPluginIds?: readonly string[]): string[] {
   const descriptors = builtinPluginDescriptorV2();
-  const teamId = teamIds?.[0];
   const agentAllowed = agentEnabledPluginIds === undefined ? undefined : new Set(agentEnabledPluginIds);
-  const policyState = state.pluginPolicyState ?? {
-    pluginPolicySchemaVersion: 1,
-    globalPluginPolicy: {},
-    teamPluginPolicies: []
-  };
-  const policies = resolveTeamPolicies(policyState, descriptors, teamId);
+  const policies = resolvePolicyMap(state, descriptors, teamIds);
   const result: string[] = [];
   for (const [id, policy] of policies) {
     if (!policy.enabled) continue;
@@ -55,12 +43,7 @@ export function resolveEffectivePluginPolicy(
   teamIds?: readonly string[]
 ): ResolvedPluginPolicy | undefined {
   const descriptors = builtinPluginDescriptorV2();
-  const policyState = state.pluginPolicyState ?? {
-    pluginPolicySchemaVersion: 1,
-    globalPluginPolicy: {},
-    teamPluginPolicies: []
-  };
-  const policyById = resolveTeamPolicies(policyState, descriptors, teamIds?.[0]).get(pluginId);
+  const policyById = resolvePolicyMap(state, descriptors, teamIds).get(pluginId);
   if (!policyById) return undefined;
   return { ...policyById };
 }
@@ -82,7 +65,7 @@ export function isPluginAllowedForRequest(
 
 export function isPluginEnabled(state: RuntimeRequestState, id: string): boolean {
   const plugin = pluginCatalog.find((item) => item.id === id);
-  return plugin ? state.pluginEnabled[id] ?? plugin.enabledByDefault : false;
+  return plugin ? resolveEffectivePluginPolicy(state, id)?.enabled ?? plugin.enabledByDefault : false;
 }
 
 export function enabledPluginIds(state: RuntimeRequestState): string[] {
@@ -91,6 +74,46 @@ export function enabledPluginIds(state: RuntimeRequestState): string[] {
 
 function collectEnabledPluginIds(state: RuntimeRequestState): string[] {
   return pluginCatalog.filter((plugin) => isPluginEnabled(state, plugin.id)).map((plugin) => plugin.id);
+}
+
+function resolvePolicyMap(state: RuntimeRequestState, descriptors: ReturnType<typeof builtinPluginDescriptorV2>, teamIds?: readonly string[]): Map<string, ResolvedPluginPolicy> {
+  const policyState = state.pluginPolicyState ?? { pluginPolicySchemaVersion: 1, globalPluginPolicy: {}, teamPluginPolicies: [] };
+  const effective = effectiveTeamIds(teamIds);
+  if (!effective.length) return resolveTeamPolicies(policyState, descriptors, undefined as unknown as string);
+  const maps = effective.map((teamId) => resolveTeamPolicies(policyState, descriptors, teamId));
+  if (maps.length === 1) return maps[0];
+  return new Map(descriptors.map((descriptor) => [descriptor.id, mergePolicies(maps.map((map) => map.get(descriptor.id)).filter(Boolean) as ResolvedPluginPolicy[])]));
+}
+
+function effectiveTeamIds(teamIds: readonly string[] | undefined): string[] {
+  const ids = [...new Set((teamIds ?? []).filter((id): id is string => typeof id === "string" && id.length > 0))];
+  const specific = ids.filter((id) => id !== "everyone");
+  return specific.length ? specific : ids;
+}
+
+function mergePolicies(policies: ResolvedPluginPolicy[]): ResolvedPluginPolicy {
+  const [first, ...rest] = policies;
+  let merged = { ...first, capabilities: [...first.capabilities], actions: [...first.actions], blockedReasons: [...first.blockedReasons] };
+  for (const next of rest) {
+    merged = {
+      ...merged,
+      enabled: merged.enabled && next.enabled,
+      maxRisk: lowerRisk(merged.maxRisk, next.maxRisk),
+      capabilities: intersect(merged.capabilities, next.capabilities),
+      actions: intersect(merged.actions, next.actions),
+      blockedReasons: [...new Set([...merged.blockedReasons, ...next.blockedReasons, "merged_team_policy"])]
+    };
+  }
+  return merged;
+}
+
+function lowerRisk(left: ResolvedPluginPolicy["maxRisk"], right: ResolvedPluginPolicy["maxRisk"]): ResolvedPluginPolicy["maxRisk"] {
+  const order = ["green", "yellow", "orange", "red"];
+  return order.indexOf(left) <= order.indexOf(right) ? left : right;
+}
+
+function intersect(left: readonly string[], right: readonly string[]): string[] {
+  return left.filter((item) => right.includes(item));
 }
 
 function migrateLegacyPluginEnabled(state: PluginPolicyStore, legacyEnabled: Record<string, boolean> | undefined): PluginPolicyStore {

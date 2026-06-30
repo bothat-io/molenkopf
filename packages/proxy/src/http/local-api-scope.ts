@@ -35,7 +35,7 @@ function manifestAllowed(manifest: AuditManifest, user: AuthUser, teams: Set<str
 }
 
 function readableTeamIds(state: RuntimeState, user: AuthUser): Set<string> {
-  const ids = new Set(user.teamIds);
+  const ids = new Set(user.teamIds.filter((id) => id !== "everyone"));
   for (const team of Object.values(state.identity?.data.teams ?? {})) {
     if (team.managerIds.includes(user.id)) ids.add(team.id);
   }

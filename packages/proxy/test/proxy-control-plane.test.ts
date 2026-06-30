@@ -46,8 +46,21 @@ test("control plane stores agent draft metadata without raw tokens", async () =>
     assert.equal(saved.item.tokenHash, undefined);
     assert.doesNotMatch(JSON.stringify(saved), /sk-secret/);
 
+    const policy = await fetch(`${base}/__molenkopf/plugin-policies/global`, {
+      method: "PUT",
+      headers: { "content-type": "application/json", cookie: admin },
+      body: JSON.stringify({ globalPluginPolicy: { "token-optimizer-plugin": { enabled: false } } })
+    });
+    assert.equal(policy.status, 200);
+    const defaulted = await post(`${base}/__molenkopf/agents/draft`, {
+      id: "policy-default",
+      label: "Policy default",
+      providerId: "default"
+    }, admin).then((r) => r.json());
+    assert.ok(!defaulted.item.enabledPluginIds.includes("token-optimizer-plugin"));
+
     const agents = await fetch(`${base}/__molenkopf/agents`, { headers: { cookie: admin } }).then((r) => r.json());
-    assert.equal(agents.items.length, 1);
+    assert.equal(agents.items.length, 2);
     assert.equal(agents.items[0].providerId, "default");
     assert.equal(agents.items[0].kind, "CI agent");
     assert.equal(agents.items[0].tokenHashPresent, true);

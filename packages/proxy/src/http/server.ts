@@ -37,28 +37,28 @@ import { rejectBudget } from "./budget-response.ts";
 import { handleCliModelListResponse } from "./cli-model-list-response.ts";
 import { finishRejectedProxyRequest } from "./rejected-proxy-response.ts";
 import type { ProxyOptions, RunningProxy } from "./server-types.ts";
+import { cleanupFailedStartup, closeRunningProxy } from "./server-lifecycle.ts";
 export async function startProxy(options: ProxyOptions): Promise<RunningProxy> {
-  const host = options.host ?? "127.0.0.1";
-  requirePublicBindFlag(host, options.allowPublicBind);
+  const host = options.host ?? "127.0.0.1"; requirePublicBindFlag(host, options.allowPublicBind);
   const state = createRuntimeState(options, host), identity = new IdentityStore(options.dataDir);
-  await identity.load(); state.identity = identity;
-  const usageSnapshot = new UsageSnapshotStore(options.dataDir), store = new RetrievalStore(options.dataDir), audit = new AuditStore(options.dataDir);
-  await restoreUsage(state, usageSnapshot, audit); state.usageSnapshot = usageSnapshot;
-  const events = new EventBus(), pluginHost = createPluginHost(state, { store, events });
-  await pluginHost.boot();
-  const server = createServer((req, res) => handle(req, res, store, audit, events, state, pluginHost));
-  await listen(server, options.port, host);
-  const address = server.address();
-  const port = typeof address === "object" && address ? address.port : options.port;
-  state.port = port;
-  await pluginHost.start(port);
-  return {
-    port,
-    close: async () => {
-      await pluginHost.stop().catch(() => {}); usageSnapshot.schedule(state); await usageSnapshot.close(); identity.close();
-      await new Promise<void>((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
-    }
-  };
+  const usageSnapshot = new UsageSnapshotStore(options.dataDir);
+  const store = new RetrievalStore(options.dataDir), audit = new AuditStore(options.dataDir);
+  let pluginHost: PluginHost | undefined, server: ReturnType<typeof createServer> | undefined, pluginBooted = false;
+  try {
+    await identity.load(); state.identity = identity;
+    await restoreUsage(state, usageSnapshot, audit); state.usageSnapshot = usageSnapshot;
+    const events = new EventBus(); pluginHost = createPluginHost(state, { store, events });
+    await pluginHost.boot(); pluginBooted = true;
+    server = createServer((req, res) => handle(req, res, store, audit, events, state, pluginHost!));
+    await listen(server, options.port, host);
+    const address = server.address(), port = typeof address === "object" && address ? address.port : options.port;
+    state.port = port;
+    await pluginHost.start(port);
+    return { port, close: () => closeRunningProxy({ pluginHost: pluginHost!, usageSnapshot, identity, state, server: server! }) };
+  } catch (error) {
+    await cleanupFailedStartup({ pluginHost, pluginBooted, usageSnapshot, identity, server });
+    throw error;
+  }
 }
 async function handle(req: IncomingMessage, res: ServerResponse, store: RetrievalStore, audit: AuditStore, events: EventBus, state: RuntimeState, pluginHost: PluginHost) {
   try {

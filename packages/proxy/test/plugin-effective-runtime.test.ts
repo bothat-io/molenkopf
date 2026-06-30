@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createRuntimeState, resolveEffectivePluginPolicy, resolveRequestPluginIds } from "../src/http/runtime-state.ts";
+import { createRuntimeState, enabledPluginIds, isPluginEnabled, resolveEffectivePluginPolicy, resolveRequestPluginIds } from "../src/http/runtime-state.ts";
 import { pluginPolicySchemaVersion, resolveTeamPolicies } from "../../core/src/plugins/plugin-policy.ts";
 import { builtinPluginDescriptorV2 } from "../src/http/plugin-platform.ts";
 
@@ -101,4 +101,56 @@ test("team override cannot enable globally disabled plugin", () => {
   const contextPolicy = resolveTeamPolicies(teamPolicy, descriptors, "team-a").get("context-compressor-plugin");
   assert.ok(contextPolicy);
   assert.equal(contextPolicy?.enabled, false);
+});
+
+test("request policy ignores default everyone when specific teams are present", () => {
+  const state = {
+    pluginEnabled: { "token-optimizer-plugin": true },
+    pluginPolicyState: {
+      pluginPolicySchemaVersion,
+      globalPluginPolicy: { "token-optimizer-plugin": { enabled: true } },
+      teamPluginPolicies: [{
+        teamId: "alpha",
+        pluginId: "token-optimizer-plugin",
+        overrides: { enabled: false }
+      }]
+    }
+  } as any;
+
+  const policy = resolveEffectivePluginPolicy(state, "token-optimizer-plugin", ["everyone", "alpha"]);
+  assert.equal(policy?.enabled, false);
+  assert.ok(!resolveRequestPluginIds(state, ["everyone", "alpha"]).includes("token-optimizer-plugin"));
+});
+
+test("multiple specific team policies merge restrictively", () => {
+  const state = {
+    pluginEnabled: { "project-graph-plugin": true },
+    pluginPolicyState: {
+      pluginPolicySchemaVersion,
+      globalPluginPolicy: { "project-graph-plugin": { enabled: true, maxRisk: "orange" } },
+      teamPluginPolicies: [
+        { teamId: "alpha", pluginId: "project-graph-plugin", overrides: { enabled: true, maxRisk: "orange" } },
+        { teamId: "beta", pluginId: "project-graph-plugin", overrides: { enabled: false, maxRisk: "green", actions: [] } }
+      ]
+    }
+  } as any;
+
+  const policy = resolveEffectivePluginPolicy(state, "project-graph-plugin", ["alpha", "beta"]);
+  assert.equal(policy?.enabled, false);
+  assert.equal(policy?.maxRisk, "green");
+  assert.deepEqual(policy?.actions, []);
+});
+
+test("global plugin status helpers follow policy state", () => {
+  const state = {
+    pluginEnabled: { "token-optimizer-plugin": true },
+    pluginPolicyState: {
+      pluginPolicySchemaVersion,
+      globalPluginPolicy: { "token-optimizer-plugin": { enabled: false } },
+      teamPluginPolicies: []
+    }
+  } as any;
+
+  assert.equal(isPluginEnabled(state, "token-optimizer-plugin"), false);
+  assert.ok(!enabledPluginIds(state).includes("token-optimizer-plugin"));
 });

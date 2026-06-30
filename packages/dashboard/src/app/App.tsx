@@ -68,7 +68,7 @@ export function DashboardApp() {
   useDashboardEventRefresh(eventRefresh, Boolean(user || needsSetup));
   useEffect(() => {
     const tick = () => { if ((user || needsSetup) && shouldPollDashboard(document.visibilityState)) reload({ quiet: true }); };
-    const timer = window.setInterval(tick, 5000);
+    const timer = window.setInterval(tick, 15000);
     const visible = () => { if (document.visibilityState === "visible") tick(); };
     document.addEventListener("visibilitychange", visible);
     return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", visible); };
