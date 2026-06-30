@@ -46,4 +46,42 @@ describe("PluginSettingsForm", () => {
     expect(html).toContain("Reset team overrides");
     expect(html).toContain("disabled=\"\"");
   });
+
+  it("renders context compressor controls from descriptor settings", () => {
+    const html = renderToString(<GlobalPluginSettingsForm
+      enabled={true}
+      maxRisk="green"
+      capabilities={["body:write"]}
+      actions={[]}
+      settings={{
+        mode: "transform",
+        minSavedTokens: 25,
+        minSavedPercent: 10,
+        maxBodyBytes: 8388608,
+        maxCandidatesPerRequest: 16,
+        allowedKinds: ["log", "stacktrace"]
+      }}
+      availableCapabilities={["body:write"]}
+      availableActions={[]}
+      settingsSchema={{
+        type: "object",
+        properties: {
+          mode: { type: "enum", values: ["off", "observe", "transform"], default: "transform" },
+          minSavedTokens: { type: "integer", minimum: 0, maximum: 100000, default: 0 },
+          minSavedPercent: { type: "number", minimum: 0, maximum: 100, default: 0 },
+          maxBodyBytes: { type: "integer", minimum: 1024, maximum: 33554432, default: 8388608 },
+          maxCandidatesPerRequest: { type: "integer", minimum: 1, maximum: 64, default: 16 },
+          allowedKinds: { type: "array", items: { type: "enum", values: ["json", "log", "stacktrace", "shell_output"] }, default: ["json", "log", "stacktrace", "shell_output"] }
+        }
+      }}
+      onSave={() => {}}
+    />);
+    expect(html).toContain("mode");
+    expect(html).toContain("minSavedTokens");
+    expect(html).toContain("minSavedPercent");
+    expect(html).toContain("maxBodyBytes");
+    expect(html).toContain("maxCandidatesPerRequest");
+    expect(html).toContain("allowedKinds");
+    expect(html).toContain("shell_output");
+  });
 });

@@ -3,9 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { AuditStore } from "../../../core/src/manifest/audit-store.ts";
 import { EventBus } from "../../../core/src/events/event-bus.ts";
 import { RequestTimer } from "../../../core/src/observability/request-timing.ts";
-import { requestCacheDiagnostics } from "../../../core/src/cache/request-cache-diagnostics.ts";
 import { type RewriteAudit } from "../../../core/src/pipeline/openai-request-rewriter.ts";
-import { estimateTokens } from "../../../core/src/utils/tokens.ts";
 import { builtinMiddlewares, runRequestPipeline, type PluginContext } from "./plugin-pipeline.ts";
 import { orderIndex } from "./local-api-pipeline.ts";
 import { RetrievalStore } from "../../../core/src/store/retrieval-store.ts";
@@ -38,6 +36,7 @@ import { handleCliModelListResponse } from "./cli-model-list-response.ts";
 import { finishRejectedProxyRequest } from "./rejected-proxy-response.ts";
 import type { ProxyOptions, RunningProxy } from "./server-types.ts";
 import { cleanupFailedStartup, closeRunningProxy } from "./server-lifecycle.ts";
+import { buildProxyAudit } from "./proxy-audit.ts";
 export async function startProxy(options: ProxyOptions): Promise<RunningProxy> {
   const host = options.host ?? "127.0.0.1"; requirePublicBindFlag(host, options.allowPublicBind);
   const state = createRuntimeState(options, host), identity = new IdentityStore(options.dataDir);
@@ -135,13 +134,7 @@ async function handleProxy(req: IncomingMessage, res: ServerResponse, store: Ret
       }
     }
     body = ctx.body;
-    audit = {
-      compressedItems: ctx.compressedItems, estimatedOriginalTokens: estimateTokens(originalBody), estimatedCompressedTokens: estimateTokens(body), estimatedSavedTokens: ctx.savedTokens,
-      redactedSecrets: ctx.redactedSecrets, retrievalIds: ctx.retrievalIds, compressorsUsed: ctx.compressorsUsed, warnings: ctx.notes,
-      compressionCandidates: ctx.compressionCandidates, compressionSkipped: ctx.compressionSkipped, skipReasons: ctx.skipReasons, contentKindCounts: ctx.contentKindCounts,
-      originalBytes: ctx.originalBytes, forwardedBytes: ctx.forwardedBytes, compressionRatio: ctx.compressionRatio,
-      potentialCompressedItems: ctx.potentialCompressedItems, potentialSavedTokens: ctx.potentialSavedTokens, potentialSavedBytes: ctx.potentialSavedBytes, contentFingerprints: ctx.contentFingerprints, ...requestCacheDiagnostics(body, state.sessionSecret)
-    };
+    audit = buildProxyAudit(ctx, originalBody, body, state.sessionSecret);
     if (ctx.compressedItems) events.emit("request_compressed", { requestId, data: { items: ctx.compressedItems } });
   }
   audit = withBudgetWarnings(audit, budget.warnings);

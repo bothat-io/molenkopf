@@ -20,6 +20,8 @@ export type RewriteAudit = {
   potentialCompressedItems?: number;
   potentialSavedTokens?: number;
   potentialSavedBytes?: number;
+  protectedSourceTokens?: number;
+  protectedDiffTokens?: number;
   contentFingerprints?: AuditContentFingerprint[];
   effectivePluginIds?: string[];
   compressorMode?: string;
@@ -51,6 +53,8 @@ export type CompressResult = {
   potentialCompressedItems: number;
   potentialSavedTokens: number;
   potentialSavedBytes: number;
+  protectedSourceTokens: number;
+  protectedDiffTokens: number;
   contentFingerprints: AuditContentFingerprint[];
   effectivePluginIds?: string[];
   compressorMode?: string;

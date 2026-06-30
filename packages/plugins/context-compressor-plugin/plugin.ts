@@ -36,6 +36,8 @@ export const plugin: MolenkopfPluginModule = {
 	      potentialCompressedItems: result.potentialCompressedItems,
 	      potentialSavedTokens: result.potentialSavedTokens,
 	      potentialSavedBytes: result.potentialSavedBytes,
+	      protectedSourceTokens: result.protectedSourceTokens,
+	      protectedDiffTokens: result.protectedDiffTokens,
 	      contentFingerprints: result.contentFingerprints,
 	      effectivePluginIds: result.compressedItems > 0 || result.potentialCompressedItems > 0 ? [runtime.pluginId] : [],
 	      compressorMode: result.compressorMode,
@@ -83,17 +85,19 @@ function numberValue(value: unknown): number | undefined {
 function compressionDiagnostics(manifests: AuditManifest[], storageAvailable: boolean) {
   const skipReasons: Record<string, number> = {};
   const contentKindCounts: Record<string, number> = {};
-  let compressionCandidates = 0, compressionSkipped = 0, originalBytes = 0, forwardedBytes = 0, potentialSavedTokens = 0;
+  let compressionCandidates = 0, compressionSkipped = 0, originalBytes = 0, forwardedBytes = 0, potentialSavedTokens = 0, protectedSourceTokens = 0, protectedDiffTokens = 0;
   for (const manifest of manifests) {
     compressionCandidates += manifest.compressionCandidates ?? 0;
     compressionSkipped += manifest.compressionSkipped ?? 0;
     originalBytes += manifest.originalBytes ?? 0;
     forwardedBytes += manifest.forwardedBytes ?? 0;
     potentialSavedTokens += manifest.potentialSavedTokens ?? 0;
+    protectedSourceTokens += manifest.protectedSourceTokens ?? 0;
+    protectedDiffTokens += manifest.protectedDiffTokens ?? 0;
     mergeCounts(skipReasons, manifest.skipReasons);
     mergeCounts(contentKindCounts, manifest.contentKindCounts);
   }
-  return { storageAvailable, compressionCandidates, compressionSkipped, originalBytes, forwardedBytes, potentialSavedTokens, skipReasons: rows(skipReasons), contentKindCounts: rows(contentKindCounts) };
+  return { storageAvailable, compressionCandidates, compressionSkipped, originalBytes, forwardedBytes, potentialSavedTokens, protectedSourceTokens, protectedDiffTokens, skipReasons: rows(skipReasons), contentKindCounts: rows(contentKindCounts) };
 }
 
 function mergeCounts(target: Record<string, number>, source: Record<string, number> | undefined): void {

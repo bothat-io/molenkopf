@@ -42,11 +42,7 @@
   .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}
   .stats b{display:block;font-size:13px}
   .stats span{font-size:12px;color:var(--muted)}
-  @media(max-width:980px){
-    .grid,.two,.stats{grid-template-columns:1fr}
-    header{display:block}
-    .state{margin-top:12px}
-  }
+  @media(max-width:980px){.grid,.two,.stats{grid-template-columns:1fr}header{display:block}.state{margin-top:12px}}
 </style>
 </head>
 <body>
@@ -63,6 +59,7 @@
     <div class="panel"><h2>Buckets</h2><div id="buckets"></div></div>
     <div class="panel"><h2>Budget and unavailable metrics</h2><div id="budget"></div></div>
   </section>
+  <section class="panel"><h2>Compression diagnostics</h2><div id="compression"></div></section>
   <section class="panel"><h2>Repeated token pressure</h2><div id="repeated"></div></section>
   <section class="panel"><h2>Optimization plans</h2><div id="plans"></div></section>
   <section class="panel"><h2>Recommendations</h2><div id="recommendations"></div></section>
@@ -72,22 +69,8 @@
   const $=(id)=>document.getElementById(id);
   const esc=(v)=>String(v??"").replace(/[&<>"]/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
   const num=(v)=>Number(v||0).toLocaleString("en-US");
-  const reasonLabels={
-    cache_metrics_unavailable:"Cache metrics are not reported yet",
-    pricing_unavailable:"Pricing is not configured",
-    no_plugin_budget_limit_configured:"No plugin budget limit configured",
-    budget_pressure_high:"Budget pressure is high",
-    budget_pressure_medium:"Budget pressure is medium",
-    content_fingerprints_unavailable:"Content fingerprints unavailable",
-    matching_content_fingerprint:"Matching content fingerprint",
-    matching_retrieval_id:"Matching retrieval id"
-  };
-  const kindLabels={
-    compression_candidate:"Compression candidate",
-    repeated_token_pressure:"Repeated token pressure",
-    high_prompt_volume:"High prompt volume",
-    budget_warning:"Budget warning"
-  };
+  const reasonLabels={cache_metrics_unavailable:"Cache metrics are not reported yet",pricing_unavailable:"Pricing is not configured",no_plugin_budget_limit_configured:"No plugin budget limit configured",budget_pressure_high:"Budget pressure is high",budget_pressure_medium:"Budget pressure is medium",content_fingerprints_unavailable:"Content fingerprints unavailable",matching_content_fingerprint:"Matching content fingerprint",matching_retrieval_id:"Matching retrieval id"};
+  const kindLabels={compression_candidate:"Compression candidate",repeated_token_pressure:"Repeated token pressure",high_prompt_volume:"High prompt volume",budget_warning:"Budget warning"};
   const reasonText=(value)=>reasonLabels[value]||String(value||"Unavailable").replaceAll("_"," ");
   const severityText=(value)=>value==="yellow"?"review":value||"info";
   const metricText=(metric,unit="")=>metric&&metric.state==="available"?`${num(metric.value)}${unit}`:"Unavailable";
@@ -115,50 +98,54 @@ function renderMetrics(data){
   const cards=[
     ["Requests",observations.requests],["Provider input",providerValue(observations,"providerReportedInputTokens"),providerHint(observations)],
     ["Provider output",providerValue(observations,"providerReportedOutputTokens"),providerHint(observations)],["Confirmed saved",observations.savedTokens,savedHint],["Potential saved",observations.potentialSavedTokens||0],
+    ["Compression status",statusText(observations.compressionStatus),statusHint(observations)],
+    ["Protected coding context",num((observations.protectedSourceTokens||0)+(observations.protectedDiffTokens||0)),"source and diff tokens kept out of savings"],
     ["Local original",observations.originalTokens??0],["Local forwarded",observations.forwardedTokens??0],
     ["Budget pressure",budgets.pressure||"low"],["Provider cache tokens",metricText(data.providerCacheTokens," tokens"),metricHint(data.providerCacheTokens)],
     ["Estimated cost",metricText(data.estimatedCostEur," EUR"),metricHint(data.estimatedCostEur)],["Recommendations",(data.recommendations||[]).length]
   ];
   $("metrics").innerHTML=cards.map(([k,v,hint])=>`<div class="metric"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div>${hint?`<div class="hint">${esc(hint)}</div>`:""}</div>`).join("");
 }
+function statusText(value){return String(value||"no-candidate").replaceAll("-"," ")}
+function statusHint(observations){
+  const ids=(observations.effectivePluginIds||[]).join(", ")||"no active transformer";
+  const modes=(observations.compressorModes||[]).join(", ")||"none";
+  return `plugins: ${ids}; modes: ${modes}`;
+}
+function renderCompressionDiagnostics(observations){
+  const reasons=Object.entries(observations.zeroSavingsReasons||{});
+  const pressure=[["Protected source",num(observations.protectedSourceTokens||0)],["Protected diff",num(observations.protectedDiffTokens||0)],["Status",statusText(observations.compressionStatus)]];
+  const reasonHtml=reasons.length
+    ? reasons.map(([key,value])=>`<span class="plugin-tag">${esc(reasonText(key))}: ${num(value)}</span>`).join("")
+    : '<span class="plugin-tag">No zero-savings reasons recorded</span>';
+  $("compression").innerHTML=`<div class="list">${
+    row("Compression status","Active transformer, observer, blocked, or no-candidate state",{html:stats(pressure)})
+  }${
+    row("Effective transformer plugins","Sanitized plugin ids and compressor modes",{html:stats([["Plugins",(observations.effectivePluginIds||[]).join(", ")||"none"],["Modes",(observations.compressorModes||[]).join(", ")||"none"]])})
+  }${
+    row("Zero-savings diagnostics","Sanitized reasons only; raw request content is never rendered",{html:`<div class="plugin-tag-list">${reasonHtml}</div>`})
+  }</div>`;
+}
 function renderBuckets(items){
-  if(!items?.length){
-    $("buckets").innerHTML='<div class="empty">No grouped token buckets observed yet.</div>';
-    return;
-  }
+  if(!items?.length){$("buckets").innerHTML='<div class="empty">No grouped token buckets observed yet.</div>';return}
   $("buckets").innerHTML=`<div class="list">${items.slice(0,8).map((item)=>row(item.label,item.project||item.id,{html:stats([["Requests",num(item.requests)],["Input",num(item.inputTokens)],["Saved",`${num(item.savedTokens)} (${num(item.savedPercent)}%)`]])})).join("")}</div>`;
 }
 function renderBudget(data){
   const budgets=data.budgets||{}, warnings=budgets.warnings||[];
-  const rows=[
-    row("Budget pressure","Current summary",{badge:budgets.pressure||"low",badgeWarn:budgets.pressure==="high"}),
-    row("Total tokens","Observed token total",{html:`<div class="mono">${esc(metricText(budgets.totalTokens," tokens"))}</div>`}),
-    row("Budget limit","Configured limit or fallback",{html:`<div class="mono">${esc(metricText(budgets.budgetLimit," tokens"))}</div><div class="muted">${esc(metricHint(budgets.budgetLimit))}</div>`}),
-    row("Provider cache tokens","Reported cache counters, not confirmed savings",{html:`<div class="mono">${esc(metricText(data.providerCacheTokens," tokens"))}</div><div class="muted">${esc(metricHint(data.providerCacheTokens))}</div>`}),
-    row("Estimated cost","Availability",{html:`<div class="mono">${esc(metricText(data.estimatedCostEur," EUR"))}</div><div class="muted">${esc(metricHint(data.estimatedCostEur))}</div>`})
-  ];
+  const rows=[row("Budget pressure","Current summary",{badge:budgets.pressure||"low",badgeWarn:budgets.pressure==="high"}),row("Total tokens","Observed token total",{html:`<div class="mono">${esc(metricText(budgets.totalTokens," tokens"))}</div>`}),row("Budget limit","Configured limit or fallback",{html:`<div class="mono">${esc(metricText(budgets.budgetLimit," tokens"))}</div><div class="muted">${esc(metricHint(budgets.budgetLimit))}</div>`}),row("Provider cache tokens","Reported cache counters, not confirmed savings",{html:`<div class="mono">${esc(metricText(data.providerCacheTokens," tokens"))}</div><div class="muted">${esc(metricHint(data.providerCacheTokens))}</div>`}),row("Estimated cost","Availability",{html:`<div class="mono">${esc(metricText(data.estimatedCostEur," EUR"))}</div><div class="muted">${esc(metricHint(data.estimatedCostEur))}</div>`})];
   if(warnings.length) rows.push(row("Warnings","Current warnings",{html:`<div class="list">${warnings.map((item)=>`<div class="pill warn">${esc(reasonText(item))}</div>`).join("")}</div>`}));
   $("budget").innerHTML=`<div class="list">${rows.join("")}</div>`;
 }
 function renderRepeated(items){
-  if(!items?.length){
-    $("repeated").innerHTML='<div class="empty">No repeated token pressure candidates yet.</div>';
-    return;
-  }
+  if(!items?.length){$("repeated").innerHTML='<div class="empty">No repeated token pressure candidates yet.</div>';return}
   $("repeated").innerHTML=`<div class="list">${items.slice(0,10).map((item)=>row(item.project,item.endpoint,{html:stats([["Requests",num(item.requests)],["Input pressure",num(item.repeatedInputTokens)],["Confidence",item.confidence||"low"],["Evidence",reasonText(item.reason)]])})).join("")}</div>`;
 }
 function renderRecommendations(items){
-  if(!items?.length){
-    $("recommendations").innerHTML='<div class="empty">No recommendations yet.</div>';
-    return;
-  }
+  if(!items?.length){$("recommendations").innerHTML='<div class="empty">No recommendations yet.</div>';return}
   $("recommendations").innerHTML=`<div class="list">${items.map((item)=>row(kindLabels[item.kind]||item.kind,item.id,{badge:severityText(item.severity),badgeWarn:item.severity==="yellow",html:`<div class="muted">${esc(item.summary)}</div><div class="action">${esc(item.action||"Review this finding before changing routing.")}</div>`})).join("")}</div>`;
 }
 function renderPlans(items){
-  if(!items?.length){
-    $("plans").innerHTML='<div class="empty">No optimization plans yet.</div>';
-    return;
-  }
+  if(!items?.length){$("plans").innerHTML='<div class="empty">No optimization plans yet.</div>';return}
   $("plans").innerHTML=`<div class="list">${items.map((item)=>row(item.kind,item.id,{badge:item.confidence||"low",badgeWarn:item.confidence==="medium",html:`<div class="muted">${esc(item.summary)}</div><div class="action">${esc(item.action)}</div><div class="muted">Requires admin confirmation: ${esc(item.requiresConfirmation?"yes":"no")}</div>`})).join("")}</div>`;
 }
 async function load(){
@@ -168,13 +155,14 @@ async function load(){
     const data=await loadData();
     if(data.loadError){
       $("state").innerHTML=`Data unavailable <span class="badge">error</span><div class="muted">${esc(data.loadError)}</div>`;
-      ["metrics","buckets","budget","repeated","recommendations"].forEach((id)=>$(id).innerHTML='<div class="empty warn">Plugin data unavailable. Refresh after the proxy returns a valid data response.</div>');
+      ["metrics","buckets","budget","compression","repeated","recommendations"].forEach((id)=>$(id).innerHTML='<div class="empty warn">Plugin data unavailable. Refresh after the proxy returns a valid data response.</div>');
       $("plans").innerHTML='<div class="empty warn">Plugin data unavailable.</div>';
       return;
     }
     const windowText=data.snapshot?.from&&data.snapshot?.to?` Window: ${esc(data.snapshot.from)} to ${esc(data.snapshot.to)}.`:" Window unavailable.";
     $("state").innerHTML=`Observe and recommend <span class="badge">read only</span><div class="muted">Recent snapshot: ${num(data.snapshot?.observedRequests)} of ${num(data.snapshot?.limit)} max requests.${windowText} This workspace reports budgets, token pressure, and unavailable metrics without changing routing or request bodies.</div>`;
     renderMetrics(data);
+    renderCompressionDiagnostics(data.observations||{});
     renderBuckets(data.buckets);
     renderBudget(data);
     renderRepeated(data.repeatedContext);

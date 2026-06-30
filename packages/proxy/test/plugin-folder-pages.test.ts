@@ -48,6 +48,9 @@ test("serves a plugin's own page from its plugin folder", async () => {
     assert.match(optimizerHtml, /Pricing is not configured/);
     assert.match(optimizerHtml, /No plugin budget limit configured/);
     assert.match(optimizerHtml, /No confirmed compression savings recorded/);
+    assert.match(optimizerHtml, /Compression status/);
+    assert.match(optimizerHtml, /Zero-savings diagnostics/);
+    assert.match(optimizerHtml, /Protected coding context/);
     assert.match(optimizerHtml, /Review this finding before changing routing/);
     const projectGraph = await pluginFetch(base, "project-graph-plugin", cookie);
     assert.equal(projectGraph.status, 200);

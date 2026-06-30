@@ -32,6 +32,8 @@ export async function rewriteOpenAiJsonBody(body: string, store: RetrievalStore,
   audit.potentialCompressedItems = compressed.potentialCompressedItems;
   audit.potentialSavedTokens = compressed.potentialSavedTokens;
   audit.potentialSavedBytes = compressed.potentialSavedBytes;
+  audit.protectedSourceTokens = compressed.protectedSourceTokens;
+  audit.protectedDiffTokens = compressed.protectedDiffTokens;
   audit.contentFingerprints = compressed.contentFingerprints;
   audit.effectivePluginIds = compressed.effectivePluginIds;
   audit.compressorMode = compressed.compressorMode;
@@ -43,7 +45,7 @@ export async function rewriteOpenAiJsonBody(body: string, store: RetrievalStore,
 // and compression as separate, individually-toggleable steps.
 export async function compressJsonBody(text: string, store: RetrievalStore, requestId?: string, input: CompressJsonOptions | boolean = {}): Promise<CompressResult> {
   const options = normalizeOptions(input);
-  const acc: CompressResult = { body: text, compressedItems: 0, compressionCandidates: 0, compressionSkipped: 0, savedTokens: 0, redactedSecrets: 0, retrievalIds: [], compressorsUsed: [], skipReasons: {}, contentKindCounts: {}, originalBytes: byteLength(text), forwardedBytes: byteLength(text), compressionRatio: 1, potentialCompressedItems: 0, potentialSavedTokens: 0, potentialSavedBytes: 0, contentFingerprints: [], compressorMode: compressorMode(options) };
+  const acc: CompressResult = { body: text, compressedItems: 0, compressionCandidates: 0, compressionSkipped: 0, savedTokens: 0, redactedSecrets: 0, retrievalIds: [], compressorsUsed: [], skipReasons: {}, contentKindCounts: {}, originalBytes: byteLength(text), forwardedBytes: byteLength(text), compressionRatio: 1, potentialCompressedItems: 0, potentialSavedTokens: 0, potentialSavedBytes: 0, protectedSourceTokens: 0, protectedDiffTokens: 0, contentFingerprints: [], compressorMode: compressorMode(options) };
   if (!options.compress && !options.observe) return skip(acc, "compressor_disabled");
   if (options.maxBodyBytes !== undefined && acc.originalBytes > options.maxBodyBytes) return skip(acc, "body_too_large");
   const minChars = options.minJsonStringChars ?? MIN_JSON_STRING_CHARS;
@@ -79,6 +81,7 @@ export async function compressJsonBody(text: string, store: RetrievalStore, requ
     if (!result.compressed) {
       acc.compressionSkipped++;
       addCount(acc.skipReasons, result.reason);
+      addProtectedPressure(acc, span.value, result.reason);
       continue;
     }
     cached.uses++;
@@ -121,6 +124,8 @@ function emptyAudit(body: string, redactedSecrets: number): RewriteAudit {
     potentialCompressedItems: 0,
     potentialSavedTokens: 0,
     potentialSavedBytes: 0,
+    protectedSourceTokens: 0,
+    protectedDiffTokens: 0,
     contentFingerprints: []
   };
 }
@@ -136,6 +141,12 @@ function finish(acc: CompressResult): CompressResult {
   acc.compressionRatio = acc.originalBytes > 0 ? Math.round((acc.forwardedBytes / acc.originalBytes) * 10000) / 10000 : 1;
   if (acc.savedTokens === 0) acc.zeroSavingsReasons = Object.keys(acc.skipReasons).sort();
   return acc;
+}
+
+function addProtectedPressure(acc: CompressResult, text: string, reason: CompressionReason): void {
+  const tokens = estimateTokens(text);
+  if (reason === "source_code_not_compressed") acc.protectedSourceTokens += tokens;
+  else if (reason === "diff_not_compressed") acc.protectedDiffTokens += tokens;
 }
 
 function normalizeOptions(input: CompressJsonOptions | boolean): CompressJsonOptions {

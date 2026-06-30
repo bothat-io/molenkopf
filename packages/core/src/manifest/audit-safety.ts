@@ -27,6 +27,8 @@ export function normalizedManifest(manifest: AuditManifest): AuditManifest {
 	  assignNumber(safe, "potentialCompressedItems", manifest.potentialCompressedItems);
 	  assignNumber(safe, "potentialSavedTokens", manifest.potentialSavedTokens);
 	  assignNumber(safe, "potentialSavedBytes", manifest.potentialSavedBytes);
+	  assignNumber(safe, "protectedSourceTokens", manifest.protectedSourceTokens);
+	  assignNumber(safe, "protectedDiffTokens", manifest.protectedDiffTokens);
 	  assignNumber(safe, "cachedTokens", manifest.cachedTokens);
 	  assignNumber(safe, "cacheReadTokens", manifest.cacheReadTokens);
 	  assignNumber(safe, "cacheCreationTokens", manifest.cacheCreationTokens);
@@ -72,6 +74,7 @@ export function isAuditManifest(value: unknown): value is AuditManifest {
 	    && finiteOptionalNumber(item.compressionCandidates) && finiteOptionalNumber(item.compressionSkipped)
 	    && finiteOptionalNumber(item.originalBytes) && finiteOptionalNumber(item.forwardedBytes) && finiteOptionalNumber(item.compressionRatio)
 	    && finiteOptionalNumber(item.potentialCompressedItems) && finiteOptionalNumber(item.potentialSavedTokens) && finiteOptionalNumber(item.potentialSavedBytes)
+	    && finiteOptionalNumber(item.protectedSourceTokens) && finiteOptionalNumber(item.protectedDiffTokens)
 	    && finiteOptionalNumber(item.cachedTokens) && finiteOptionalNumber(item.cacheReadTokens) && finiteOptionalNumber(item.cacheCreationTokens) && finiteOptionalNumber(item.reasoningTokens)
 	    && finiteOptionalNumber(item.cacheablePrefixBytes) && finiteOptionalNumber(item.toolCount) && finiteOptionalNumber(item.toolSchemaBytes) && finiteOptionalNumber(item.toolSchemaTokens)
 	    && optionalHash(item.staticPrefixHash) && optionalHash(item.toolSchemaHash) && optionalBoolean(item.hasTimestampNoise) && optionalBoolean(item.hasRandomIdNoise)

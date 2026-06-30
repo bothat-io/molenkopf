@@ -23,3 +23,10 @@ test("classifies TypeScript build output as operational output", () => {
   ).join("\n");
   assert.equal(classifyContent(output), "shell_output");
 });
+
+test("classifies common coding-agent test runners as operational output", () => {
+  const commands = ["pytest tests", "cargo test", "go test ./...", "mvn test", "gradle test", "dotnet test"];
+  for (const command of commands) {
+    assert.equal(classifyContent(`$ ${command}\nFAILED suite\nexit code 1`), "shell_output");
+  }
+});

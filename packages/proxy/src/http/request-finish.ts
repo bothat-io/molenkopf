@@ -60,6 +60,7 @@ export function buildManifest(requestId: string, method: string, path: string, t
 	    compressionCandidates: audit?.compressionCandidates, compressionSkipped: audit?.compressionSkipped, skipReasons: audit?.skipReasons, contentKindCounts: audit?.contentKindCounts,
 	    originalBytes: audit?.originalBytes, forwardedBytes: audit?.forwardedBytes, compressionRatio: audit?.compressionRatio,
 	    potentialCompressedItems: audit?.potentialCompressedItems, potentialSavedTokens: audit?.potentialSavedTokens, potentialSavedBytes: audit?.potentialSavedBytes,
+	    protectedSourceTokens: audit?.protectedSourceTokens, protectedDiffTokens: audit?.protectedDiffTokens,
 	    contentFingerprints: audit?.contentFingerprints,
 	    effectivePluginIds: audit?.effectivePluginIds, compressorMode: audit?.compressorMode, zeroSavingsReasons: audit?.zeroSavingsReasons,
 	    staticPrefixHash: audit?.staticPrefixHash, toolSchemaHash: audit?.toolSchemaHash, cacheablePrefixBytes: audit?.cacheablePrefixBytes, hasTimestampNoise: audit?.hasTimestampNoise, hasRandomIdNoise: audit?.hasRandomIdNoise,
