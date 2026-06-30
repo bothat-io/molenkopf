@@ -83,7 +83,10 @@ test("normalizedManifest preserves safe compression diagnostics only", () => {
       source_code_not_compressed: 1,
       [`raw ${fakeOpenAiKey}`]: 2
     },
-    contentKindCounts: { log: 2, source_code: 1 }
+    contentKindCounts: { log: 2, source_code: 1 },
+    effectivePluginIds: ["context-compressor-plugin", fakeOpenAiKey],
+    compressorMode: `transform ${fakeOpenAiKey}`,
+    zeroSavingsReasons: ["source_code_not_compressed", fakeOpenAiKey]
   });
   const encoded = JSON.stringify(safe);
 
@@ -104,6 +107,9 @@ test("normalizedManifest preserves safe compression diagnostics only", () => {
   assert.equal(safe.hasTimestampNoise, true);
   assert.equal(safe.skipReasons?.source_code_not_compressed, 1);
   assert.equal(safe.contentKindCounts?.log, 2);
+  assert.deepEqual(safe.effectivePluginIds?.slice(0, 1), ["context-compressor-plugin"]);
+  assert.match(safe.compressorMode ?? "", /^transform__REDACTED_SECRET:openai_api_key:sha256:[a-f0-9]{12}_$/);
+  assert.equal(safe.zeroSavingsReasons?.[0], "source_code_not_compressed");
   assert.doesNotMatch(encoded, /sk-proj-/);
 });
 

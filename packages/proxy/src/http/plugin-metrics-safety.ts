@@ -18,6 +18,9 @@ export function sanitizeMetricState(id: string, ctx: PluginContext): void {
   ctx.compressorsUsed = safeStringList(ctx.compressorsUsed, "compressorsUsed", id, ctx, 20);
   ctx.skipReasons = safeCounts(ctx.skipReasons, "skipReasons", id, ctx);
   ctx.contentKindCounts = safeCounts(ctx.contentKindCounts, "contentKindCounts", id, ctx);
+  ctx.effectivePluginIds = safeTokenList(ctx.effectivePluginIds ?? [], "effectivePluginIds", id, ctx, 20);
+  ctx.compressorMode = safeOptionalToken(ctx.compressorMode, "compressorMode", id, ctx);
+  ctx.zeroSavingsReasons = safeTokenList(ctx.zeroSavingsReasons ?? [], "zeroSavingsReasons", id, ctx, 20);
   if (ctx.contentFingerprints && optionalContentFingerprints(ctx.contentFingerprints)) ctx.contentFingerprints = safeContentFingerprints(ctx.contentFingerprints);
   else if (ctx.contentFingerprints) { ctx.contentFingerprints = undefined; ctx.note(`plugin_metric_rejected:${id}:contentFingerprints`); }
 }
@@ -51,4 +54,18 @@ function safeCounts(value: unknown, field: string, id: string, ctx: PluginContex
     if (safeKey) out[safeKey] = (out[safeKey] ?? 0) + Math.max(0, Math.trunc(count));
   }
   return out;
+}
+
+function safeOptionalToken(value: unknown, field: string, id: string, ctx: PluginContext): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string") { ctx.note(`plugin_metric_rejected:${id}:${field}`); return undefined; }
+  return redactSecrets(value).text.replace(/[^a-z0-9._:@/-]/gi, "_").slice(0, 80) || undefined;
+}
+
+function safeTokenList(value: unknown, field: string, id: string, ctx: PluginContext, max: number): string[] {
+  if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) {
+    ctx.note(`plugin_metric_rejected:${id}:${field}`);
+    return [];
+  }
+  return value.slice(0, max).map((item) => safeOptionalToken(item, field, id, ctx)).filter((item): item is string => Boolean(item));
 }

@@ -1,9 +1,10 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { hashPasswordAsync, passwordTooLong } from "../../../core/src/auth/password.ts";
 import { normalizeBudget } from "../../../core/src/identity/budget.ts";
-import { viewUser, type Budget, type KeyPermissions, type Role, type Team, type User } from "../../../core/src/identity/types.ts";
+import { viewUser, type Budget, type Role, type Team, type User } from "../../../core/src/identity/types.ts";
 import type { RuntimeState } from "./runtime-types.ts";
 import { readJson, writeJson } from "./local-api-io.ts";
+import { parseKeyPermissionsPayload, parseRolePayload } from "./local-api-identity-validation.ts";
 import { isValidSlugId, isValidUserId } from "./identity-id.ts";
 import { isWeakPassword } from "./password-policy.ts";
 
@@ -31,6 +32,10 @@ export async function putIdentityUser(req: IncomingMessage, res: ServerResponse,
   const disabled = typeof body.disabled === "boolean" ? body.disabled : existing?.disabled;
   const loginDisabled = typeof body.loginDisabled === "boolean" ? body.loginDisabled : (rawPassword ? false : (password ? (existing?.loginDisabled ?? false) : true));
   if (!password && loginDisabled === false) return writeJson(res, 400, { error: "password_required" });
+  const role = parseRolePayload(body.role, existing?.role);
+  if (role.ok === false) return writeJson(res, 400, { error: role.error });
+  const keyPermissions = parseKeyPermissionsPayload(body.keyPermissions, existing?.keyPermissions);
+  if (keyPermissions.ok === false) return writeJson(res, 400, { error: keyPermissions.error });
   const teamIds = userTeamIds(body, existing?.teamIds ?? [], id);
   if (teamIds === false) return writeJson(res, 400, { error: "invalid_team_id" });
   const budget = nextBudget(body, existing?.budget);
@@ -38,14 +43,14 @@ export async function putIdentityUser(req: IncomingMessage, res: ServerResponse,
   const user: User = {
     id: userId,
     displayName: typeof body.displayName === "string" && body.displayName.trim() ? body.displayName.trim() : userId,
-    role: body.role === undefined ? (existing?.role ?? "member") : parseRole(body.role),
+    role: role.role,
     password,
     loginDisabled,
     teamIds,
-    keyPermissions: parseKeyPermissions(body.keyPermissions, existing?.keyPermissions),
+    keyPermissions: keyPermissions.keyPermissions,
     budget,
     disabled,
-    sessionVersion: nextSessionVersion(existing, { passwordChanged: Boolean(rawPassword), role: parseRole(body.role ?? existing?.role), disabled, loginDisabled }),
+    sessionVersion: nextSessionVersion(existing, { passwordChanged: Boolean(rawPassword), role: role.role, disabled, loginDisabled }),
     createdAt: existing?.createdAt ?? new Date().toISOString()
   };
   if (existing && isLastEnabledAdminWithPassword(id, existing) && !enabledAdminWithPassword(user)) {
@@ -117,7 +122,6 @@ export async function removeIdentityTeam(req: IncomingMessage, res: ServerRespon
   const ok = await id.removeTeam(teamId);
   writeJson(res, ok ? 200 : 404, ok ? { ok: true } : { error: "unknown_team" });
 }
-function parseRole(value: unknown): Role { return value === "admin" ? "admin" : value === "manager" ? "manager" : "member"; }
 function nextSessionVersion(existing: User | undefined, next: { passwordChanged: boolean; role: Role; disabled?: boolean; loginDisabled?: boolean }): number {
   if (!existing) return 0;
   const changed = next.passwordChanged || existing.role !== next.role || existing.disabled !== next.disabled || existing.loginDisabled !== next.loginDisabled;
@@ -171,11 +175,6 @@ function providerList(value: unknown, existing: Team["allowedProviders"], state:
     if (!out.includes(id)) out.push(id);
   }
   return out;
-}
-function parseKeyPermissions(value: unknown, existing: KeyPermissions | undefined): KeyPermissions | undefined {
-  if (!value || typeof value !== "object") return existing;
-  const permissions = value as Record<string, unknown>;
-  return { create: permissions.create !== false, revoke: permissions.revoke !== false };
 }
 function generatedTeamId(store: { getTeam(id: string): Team | undefined }, name: string): string {
   const base = slugFromName(name || "team");

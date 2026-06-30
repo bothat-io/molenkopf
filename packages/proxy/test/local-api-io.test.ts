@@ -18,6 +18,7 @@ test("readJson accepts valid boundary-sized JSON", async () => {
   const result = readJson(req, 7);
   req.end('{"a":1}');
   assert.deepEqual(await result, { a: 1 });
+  assertNoReadListeners(req);
 });
 
 test("readJson rejects invalid or non-object JSON", async () => {
@@ -37,7 +38,29 @@ test("readJson rejects immediately after the first byte over limit", async () =>
   const result = readJson(req, 5);
   req.write('{"a":');
   req.write('"');
-  await assert.rejects(result, /json_too_large/);
+  await assertRejectsCode(result, "json_too_large");
+  assertNoReadListeners(req);
+});
+
+test("readJson rejects aborted and prematurely closed request bodies", async () => {
+  const aborted = streamRequest();
+  const abortedResult = readJson(aborted);
+  aborted.emit("aborted");
+  await assertRejectsCode(abortedResult, "json_aborted");
+  assertNoReadListeners(aborted);
+
+  const closed = streamRequest();
+  const closedResult = readJson(closed);
+  closed.emit("close");
+  await assertRejectsCode(closedResult, "json_aborted");
+  assertNoReadListeners(closed);
+});
+
+test("readJson times out stalled request bodies and cleans listeners", async () => {
+  const req = streamRequest();
+  const result = readJson(req, 100, 5);
+  await assertRejectsCode(result, "json_timeout");
+  assertNoReadListeners(req);
 });
 
 test("writeJson sets hardened response headers", async () => {
@@ -62,4 +85,16 @@ test("writeJson sets hardened response headers", async () => {
 
 function streamRequest(): IncomingMessage & PassThrough {
   return new PassThrough() as unknown as IncomingMessage & PassThrough;
+}
+
+async function assertRejectsCode(promise: Promise<unknown>, code: string) {
+  await assert.rejects(promise, (error) => error instanceof LocalApiError && error.code === code);
+}
+
+function assertNoReadListeners(req: IncomingMessage) {
+  assert.equal(req.listenerCount("data"), 0);
+  assert.equal(req.listenerCount("error"), 0);
+  assert.equal(req.listenerCount("end"), 0);
+  assert.equal(req.listenerCount("aborted"), 0);
+  assert.equal(req.listenerCount("close"), 0);
 }

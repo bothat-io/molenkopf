@@ -10,6 +10,7 @@ import { listAgentDrafts } from "./agent-drafts.ts";
 import { orderIndex, redactionBeforeCompression } from "./local-api-pipeline.ts";
 import { consumerAllowed } from "./local-api-scope.ts";
 import { builtinPluginDescriptorV2 } from "./plugin-platform.ts";
+import { isPluginEnabled } from "./runtime-plugin-policy.ts";
 
 function hostOf(target: string): string {
   if (target.startsWith("cli://")) return target;
@@ -147,7 +148,7 @@ export function buildStats(state: RuntimeState) {
     host: state.host,
     port: state.port,
     latest: boundLatest(state.latest),
-    pluginEnabled: state.pluginEnabled,
+    pluginEnabled: Object.fromEntries(pluginCatalog.map((plugin) => [plugin.id, isPluginEnabled(state, plugin.id)])),
     activeProviderId: state.activeProviderId,
     settingsLoadWarning: state.settingsLoadWarning,
     providers: buildProviderStatus(state),
@@ -158,16 +159,18 @@ export function buildStats(state: RuntimeState) {
 }
 
 export function pluginView(plugin: MolenkopfPlugin, state: RuntimeState) {
-  const enabled = state.pluginEnabled[plugin.id] ?? plugin.enabledByDefault;
+  const enabled = isPluginEnabled(state, plugin.id);
   const lifecycle = state.pluginLifecycle[plugin.id];
   const descriptor = builtinPluginDescriptorV2().find((item) => item.id === plugin.id);
   return {
     ...plugin,
     enabled,
     status: enabled ? "enabled" : "disabled",
-    lifecycleStatus: lifecycle?.status ?? (enabled ? "enabled" : "disabled"),
-    lifecycleError: lifecycle?.error,
+    lifecycleStatus: enabled ? (lifecycle?.status ?? "enabled") : "disabled",
+    lifecycleError: enabled ? lifecycle?.error : undefined,
     defaultMaxRisk: descriptor?.defaultPolicy.maxRisk,
+    capabilities: descriptor ? [...descriptor.capabilities] : [...plugin.permissions],
+    settingsSchema: descriptor?.settingsSchema,
     actions: descriptor?.actions.map((action) => ({
       id: action.id,
       label: action.label,

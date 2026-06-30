@@ -103,7 +103,7 @@ Expected:
 ### Local CLI And Local Models
 
 Use `kind: "cli-claude"` or `kind: "cli-codex"` for local CLI accounts, and
-`kind: "ollama"` or `kind: "lmstudio"` for local OpenAI-compatible model
+`kind: "ollama"` or `kind: "local"` for local OpenAI-compatible model
 servers. Runtime-auth imports run CLI providers with isolated local auth/profile
 directories. Provider switching is visible in Admin; explicit agent bindings can
 route `x-molenkopf-agent` values to configured providers without bypassing

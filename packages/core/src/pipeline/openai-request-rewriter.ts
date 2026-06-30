@@ -5,62 +5,12 @@ import { RetrievalStore } from "../store/retrieval-store.ts";
 import { estimateTokens } from "../utils/tokens.ts";
 import { byteLength } from "../utils/text.ts";
 import { hasLongJsonStringCandidate, replaceJsonStrings, scanJsonStringValues, type JsonStringReplacement } from "./json-string-spans.ts";
-import type { AuditContentFingerprint } from "../manifest/audit-fingerprints.ts";
 import { addCompressionFingerprint } from "./compression-fingerprints.ts";
 import { blockMarker, repeatedBlock, repeatedSpanValues } from "./request-dedupe.ts";
+export type { CompressJsonOptions, CompressResult, RewriteAudit } from "./openai-rewrite-types.ts";
+import type { CompressJsonOptions, CompressResult, RewriteAudit } from "./openai-rewrite-types.ts";
 
-export type RewriteAudit = {
-  compressedItems: number;
-  estimatedOriginalTokens: number;
-  estimatedCompressedTokens: number;
-  estimatedSavedTokens: number;
-  redactedSecrets: number;
-  retrievalIds: string[];
-  compressorsUsed: string[];
-  warnings: string[];
-  compressionCandidates?: number;
-  compressionSkipped?: number;
-  skipReasons?: Record<string, number>;
-  contentKindCounts?: Record<string, number>;
-  originalBytes?: number;
-  forwardedBytes?: number;
-  compressionRatio?: number;
-  potentialCompressedItems?: number;
-  potentialSavedTokens?: number;
-  potentialSavedBytes?: number;
-  contentFingerprints?: AuditContentFingerprint[];
-  staticPrefixHash?: string;
-  toolSchemaHash?: string;
-  cacheablePrefixBytes?: number;
-  hasTimestampNoise?: boolean;
-  hasRandomIdNoise?: boolean;
-  toolCount?: number;
-  toolSchemaBytes?: number;
-  toolSchemaTokens?: number;
-};
-
-export type CompressResult = {
-  body: string;
-  compressedItems: number;
-  compressionCandidates: number;
-  compressionSkipped: number;
-  savedTokens: number;
-  redactedSecrets: number;
-  retrievalIds: string[];
-  compressorsUsed: string[];
-  skipReasons: Record<string, number>;
-  contentKindCounts: Record<string, number>;
-  originalBytes: number;
-  forwardedBytes: number;
-  compressionRatio: number;
-  potentialCompressedItems: number;
-  potentialSavedTokens: number;
-  potentialSavedBytes: number;
-  contentFingerprints: AuditContentFingerprint[];
-};
 const MIN_JSON_STRING_CHARS = 2000;
-
-export type CompressJsonOptions = CompressionOptions & { compress?: boolean; observe?: boolean; minJsonStringChars?: number; maxBodyBytes?: number; maxCandidatesPerRequest?: number; fingerprintSecret?: string };
 type CachedCompression = { result: ContextCompression; blockId?: string; replacementText: string; uses: number; auditRecorded: boolean };
 
 export async function rewriteOpenAiJsonBody(body: string, store: RetrievalStore, requestId?: string, options: { compress?: boolean } = {}): Promise<{ body: string; audit: RewriteAudit }> {
@@ -82,7 +32,12 @@ export async function rewriteOpenAiJsonBody(body: string, store: RetrievalStore,
   audit.potentialCompressedItems = compressed.potentialCompressedItems;
   audit.potentialSavedTokens = compressed.potentialSavedTokens;
   audit.potentialSavedBytes = compressed.potentialSavedBytes;
+  audit.protectedSourceTokens = compressed.protectedSourceTokens;
+  audit.protectedDiffTokens = compressed.protectedDiffTokens;
   audit.contentFingerprints = compressed.contentFingerprints;
+  audit.effectivePluginIds = compressed.effectivePluginIds;
+  audit.compressorMode = compressed.compressorMode;
+  audit.zeroSavingsReasons = compressed.zeroSavingsReasons;
   return { body: compressed.body, audit };
 }
 
@@ -90,7 +45,7 @@ export async function rewriteOpenAiJsonBody(body: string, store: RetrievalStore,
 // and compression as separate, individually-toggleable steps.
 export async function compressJsonBody(text: string, store: RetrievalStore, requestId?: string, input: CompressJsonOptions | boolean = {}): Promise<CompressResult> {
   const options = normalizeOptions(input);
-  const acc: CompressResult = { body: text, compressedItems: 0, compressionCandidates: 0, compressionSkipped: 0, savedTokens: 0, redactedSecrets: 0, retrievalIds: [], compressorsUsed: [], skipReasons: {}, contentKindCounts: {}, originalBytes: byteLength(text), forwardedBytes: byteLength(text), compressionRatio: 1, potentialCompressedItems: 0, potentialSavedTokens: 0, potentialSavedBytes: 0, contentFingerprints: [] };
+  const acc: CompressResult = { body: text, compressedItems: 0, compressionCandidates: 0, compressionSkipped: 0, savedTokens: 0, redactedSecrets: 0, retrievalIds: [], compressorsUsed: [], skipReasons: {}, contentKindCounts: {}, originalBytes: byteLength(text), forwardedBytes: byteLength(text), compressionRatio: 1, potentialCompressedItems: 0, potentialSavedTokens: 0, potentialSavedBytes: 0, protectedSourceTokens: 0, protectedDiffTokens: 0, contentFingerprints: [], compressorMode: compressorMode(options) };
   if (!options.compress && !options.observe) return skip(acc, "compressor_disabled");
   if (options.maxBodyBytes !== undefined && acc.originalBytes > options.maxBodyBytes) return skip(acc, "body_too_large");
   const minChars = options.minJsonStringChars ?? MIN_JSON_STRING_CHARS;
@@ -126,6 +81,7 @@ export async function compressJsonBody(text: string, store: RetrievalStore, requ
     if (!result.compressed) {
       acc.compressionSkipped++;
       addCount(acc.skipReasons, result.reason);
+      addProtectedPressure(acc, span.value, result.reason);
       continue;
     }
     cached.uses++;
@@ -168,6 +124,8 @@ function emptyAudit(body: string, redactedSecrets: number): RewriteAudit {
     potentialCompressedItems: 0,
     potentialSavedTokens: 0,
     potentialSavedBytes: 0,
+    protectedSourceTokens: 0,
+    protectedDiffTokens: 0,
     contentFingerprints: []
   };
 }
@@ -181,9 +139,21 @@ function skip(acc: CompressResult, reason: CompressionReason): CompressResult {
 function finish(acc: CompressResult): CompressResult {
   acc.forwardedBytes = byteLength(acc.body);
   acc.compressionRatio = acc.originalBytes > 0 ? Math.round((acc.forwardedBytes / acc.originalBytes) * 10000) / 10000 : 1;
+  if (acc.savedTokens === 0) acc.zeroSavingsReasons = Object.keys(acc.skipReasons).sort();
   return acc;
+}
+
+function addProtectedPressure(acc: CompressResult, text: string, reason: CompressionReason): void {
+  const tokens = estimateTokens(text);
+  if (reason === "source_code_not_compressed") acc.protectedSourceTokens += tokens;
+  else if (reason === "diff_not_compressed") acc.protectedDiffTokens += tokens;
 }
 
 function normalizeOptions(input: CompressJsonOptions | boolean): CompressJsonOptions {
   return typeof input === "boolean" ? { compress: input } : { compress: input.compress !== false, ...input };
+}
+
+function compressorMode(options: CompressJsonOptions): string {
+  if (options.observe) return "observe";
+  return options.compress === false ? "off" : "transform";
 }

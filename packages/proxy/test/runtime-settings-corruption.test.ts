@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { listAgentDrafts } from "../src/http/agent-drafts.ts";
 import { startProxy } from "../src/http/server.ts";
+import { createRuntimeState } from "../src/http/runtime-state.ts";
 import { loadRuntimeSettings } from "../src/http/runtime-settings.ts";
 
 const post = (base: string, path: string, body: unknown, cookie = "") =>
@@ -51,3 +53,45 @@ test("runtime settings clean providers semantically and keep CLI fields", async 
     await rm(dataDir, { recursive: true, force: true });
   }
 });
+
+test("runtime settings drop malformed agent drafts and keep valid drafts", async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), "molenkopf-settings-drafts-"));
+  try {
+    const hash = "a".repeat(64);
+    await writeFile(join(dataDir, "runtime-settings.json"), `${JSON.stringify({
+      agentDrafts: [
+        draft({ id: "bad-number-hash", tokenHash: 1 }),
+        draft({ id: "bad-object-hash", tokenHash: { value: hash } }),
+        draft({ id: "bad-plugin", enabledPluginIds: ["context-compressor-plugin", 7] }),
+        draft({ id: "valid", tokenHash: hash, enabledPluginIds: ["context-compressor-plugin"] })
+      ]
+    })}\n`);
+    const loaded = loadRuntimeSettings(dataDir);
+    assert.deepEqual(loaded.settings.agentDrafts?.map((item) => item.id), ["valid"]);
+    assert.equal(loaded.settings.agentDrafts?.[0].tokenHash, `sha256:${hash}`);
+  } finally {
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("agent draft views ignore malformed in-memory token hashes", () => {
+  const state = createRuntimeState({ target: "http://127.0.0.1:9/v1" }, "127.0.0.1");
+  state.agentDrafts = [draft({ tokenHash: { value: "not-a-string" } }) as any];
+  const [view] = listAgentDrafts(state);
+  assert.equal(view.tokenHashPresent, false);
+  assert.equal(view.tokenFingerprint, undefined);
+});
+
+function draft(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "ci",
+    label: "CI",
+    kind: "CI agent",
+    providerId: "default",
+    enabledPluginIds: [],
+    status: "draft",
+    createdAt: "2026-06-30T00:00:00.000Z",
+    updatedAt: "2026-06-30T00:00:00.000Z",
+    ...overrides
+  };
+}

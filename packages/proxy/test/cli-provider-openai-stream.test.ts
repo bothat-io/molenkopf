@@ -140,7 +140,7 @@ test("Codex CLI item events stream assistant text without raw JSONL", async () =
       "  console.log(JSON.stringify({ type: 'item.completed', item: { id: 'item_1', type: 'agent_message', text: 'second assistant text' } }));",
       "  console.log(JSON.stringify({ type: 'item.started', item: { id: 'item_1', type: 'command_execution', command: 'Get-Secret sk-test-secret', status: 'in_progress' } }));",
       "  console.log(JSON.stringify({ type: 'item.completed', item: { id: 'item_1', type: 'command_execution', command: 'Get-Secret sk-test-secret', aggregated_output: 'secret output', exit_code: 0, status: 'completed' } }));",
-      "  console.log(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 10, output_tokens: 2 } }));",
+      "  console.log(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 10, output_tokens: 2, cached_input_tokens: 8, reasoning_output_tokens: 1 } }));",
       "});"
     ].join("\n"));
     proxy = await startProxy({
@@ -175,6 +175,10 @@ test("Codex CLI item events stream assistant text without raw JSONL", async () =
     assert.match(text, /first assistant text/);
     assert.match(text, /first assistant text\\n\\nsecond assistant text/);
     assert.match(text, /event: response\.completed/);
+    assert.match(text, /"input_tokens":10/);
+    assert.match(text, /"output_tokens":2/);
+    assert.match(text, /"input_tokens_details":\{"cached_tokens":8\}/);
+    assert.match(text, /"output_tokens_details":\{"reasoning_tokens":1\}/);
     assert.doesNotMatch(text, /thread\.started/);
     assert.doesNotMatch(text, /item\.completed/);
     assert.doesNotMatch(text, /Get-Secret/);

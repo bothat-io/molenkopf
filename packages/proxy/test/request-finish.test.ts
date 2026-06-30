@@ -21,6 +21,9 @@ test("buildManifest copies safe provider cache and reasoning usage metrics", () 
       potentialSavedTokens: 250,
       potentialSavedBytes: 1000,
       contentFingerprints: [{ hash: "a".repeat(64), contentKind: "log", originalBytes: 1000, estimatedOriginalTokens: 250, compressed: false, skipReason: "observe_only" }],
+      effectivePluginIds: ["context-compressor-plugin"],
+      compressorMode: "observe",
+      zeroSavingsReasons: ["observe_only"],
       redactedSecrets: 0,
       retrievalIds: [],
       compressorsUsed: [],
@@ -39,4 +42,7 @@ test("buildManifest copies safe provider cache and reasoning usage metrics", () 
   assert.equal(manifest.potentialSavedTokens, 250);
   assert.equal(manifest.potentialSavedBytes, 1000);
   assert.equal(manifest.contentFingerprints?.[0]?.hash, "a".repeat(64));
+  assert.deepEqual(manifest.effectivePluginIds, ["context-compressor-plugin"]);
+  assert.equal(manifest.compressorMode, "observe");
+  assert.deepEqual(manifest.zeroSavingsReasons, ["observe_only"]);
 });

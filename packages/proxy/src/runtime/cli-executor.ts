@@ -3,13 +3,15 @@ import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_CLI_PROVIDER_TIMEOUT_MS } from "../../../core/src/providers/provider-catalog.ts";
 import type { ProviderConfig } from "../../../core/src/providers/provider-catalog.ts";
+import type { UsageTotals } from "../../../core/src/manifest/usage-meter.ts";
 import { createCliOutputCollector, type CliOutputEvent } from "./cli-output-events.ts";
 import { cliArgs, runtimeProviderCwd, runtimeProviderWorkspace } from "./cli-request.ts";
 import { cliEnv } from "./cli-env.ts";
 
 export type CliExecutionOptions = { signal?: AbortSignal; onEvent?: (event: CliOutputEvent) => void };
+export type CliExecutionResult = { output: string; usage?: UsageTotals };
 
-export function executeCliProvider(provider: ProviderConfig, prompt: string, runModel?: string, options: CliExecutionOptions = {}): Promise<string> {
+export function executeCliProvider(provider: ProviderConfig, prompt: string, runModel?: string, options: CliExecutionOptions = {}): Promise<CliExecutionResult> {
   return new Promise((resolve, reject) => {
     const baseArgs = cliArgs(provider, runModel);
     const args = provider.cliInputMode === "argument" ? [...baseArgs, prompt] : baseArgs;
@@ -56,7 +58,7 @@ export function executeCliProvider(provider: ProviderConfig, prompt: string, run
       finish(true);
       const output = outputEvents.finish(Buffer.concat(stdout).toString("utf8")).trim();
       if (!output) return reject(new Error(`local cli provider returned empty output${detail(lifecycle.items, stdout, stderr)}`));
-      resolve(output);
+      resolve({ output, usage: outputEvents.usage });
     });
 
     lifecycle.add("stdin sent");

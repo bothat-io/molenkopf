@@ -1,0 +1,71 @@
+import type { CompressionOptions } from "../compression/context-compressor.ts";
+import type { AuditContentFingerprint } from "../manifest/audit-fingerprints.ts";
+
+export type RewriteAudit = {
+  compressedItems: number;
+  estimatedOriginalTokens: number;
+  estimatedCompressedTokens: number;
+  estimatedSavedTokens: number;
+  redactedSecrets: number;
+  retrievalIds: string[];
+  compressorsUsed: string[];
+  warnings: string[];
+  compressionCandidates?: number;
+  compressionSkipped?: number;
+  skipReasons?: Record<string, number>;
+  contentKindCounts?: Record<string, number>;
+  originalBytes?: number;
+  forwardedBytes?: number;
+  compressionRatio?: number;
+  potentialCompressedItems?: number;
+  potentialSavedTokens?: number;
+  potentialSavedBytes?: number;
+  protectedSourceTokens?: number;
+  protectedDiffTokens?: number;
+  contentFingerprints?: AuditContentFingerprint[];
+  effectivePluginIds?: string[];
+  compressorMode?: string;
+  zeroSavingsReasons?: string[];
+  staticPrefixHash?: string;
+  toolSchemaHash?: string;
+  cacheablePrefixBytes?: number;
+  hasTimestampNoise?: boolean;
+  hasRandomIdNoise?: boolean;
+  toolCount?: number;
+  toolSchemaBytes?: number;
+  toolSchemaTokens?: number;
+};
+
+export type CompressResult = {
+  body: string;
+  compressedItems: number;
+  compressionCandidates: number;
+  compressionSkipped: number;
+  savedTokens: number;
+  redactedSecrets: number;
+  retrievalIds: string[];
+  compressorsUsed: string[];
+  skipReasons: Record<string, number>;
+  contentKindCounts: Record<string, number>;
+  originalBytes: number;
+  forwardedBytes: number;
+  compressionRatio: number;
+  potentialCompressedItems: number;
+  potentialSavedTokens: number;
+  potentialSavedBytes: number;
+  protectedSourceTokens: number;
+  protectedDiffTokens: number;
+  contentFingerprints: AuditContentFingerprint[];
+  effectivePluginIds?: string[];
+  compressorMode?: string;
+  zeroSavingsReasons?: string[];
+};
+
+export type CompressJsonOptions = CompressionOptions & {
+  compress?: boolean;
+  observe?: boolean;
+  minJsonStringChars?: number;
+  maxBodyBytes?: number;
+  maxCandidatesPerRequest?: number;
+  fingerprintSecret?: string;
+};

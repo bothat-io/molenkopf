@@ -30,6 +30,14 @@ test("identity APIs reject invalid references and passwordless enabled users", a
     assert.equal((await post(base, "/__molenkopf/identity/users", { id: "disabled", role: "member", disabled: true }, admin)).status, 200);
     assert.equal((await post(base, "/__molenkopf/identity/users", { id: "bob", password: "bob-secret", teamIds: ["missing"] }, admin)).status, 400);
     assert.equal((await post(base, "/__molenkopf/identity/users", { id: "bob", password: "bob-secret" }, admin)).status, 200);
+    assert.equal((await post(base, "/__molenkopf/identity/users", { id: "bob", role: "owner" }, admin)).status, 400);
+    assert.equal((await post(base, "/__molenkopf/identity/users", { id: "bob", keyPermissions: "all" }, admin)).status, 400);
+    assert.equal((await post(base, "/__molenkopf/identity/users", { id: "bob", keyPermissions: { create: "yes" } }, admin)).status, 400);
+    assert.equal((await post(base, "/__molenkopf/identity/users", { id: "bob", keyPermissions: { create: false } }, admin)).status, 200);
+    const identity = await fetch(`${base}/__molenkopf/identity`, { headers: { cookie: admin } }).then((r) => r.json());
+    const bob = identity.users.find((user: any) => user.id === "bob");
+    assert.equal(bob.role, "member");
+    assert.deepEqual(bob.keyPermissions, { create: false });
     assert.equal((await post(base, "/__molenkopf/identity/teams", { id: "bad-manager", managerIds: ["ghost"] }, admin)).status, 400);
     assert.equal((await post(base, "/__molenkopf/identity/teams", { id: "bad-member", memberIds: ["ghost"] }, admin)).status, 400);
     assert.equal((await post(base, "/__molenkopf/identity/teams", { id: "bad-provider", allowedProviders: ["ghost"] }, admin)).status, 400);

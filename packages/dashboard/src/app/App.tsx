@@ -10,7 +10,7 @@ import { Shell } from "./Shell";
 import { noticeTone, providerTestFailure } from "./messages";
 import { beginRefresh, connectionStatus, shouldPollDashboard, type RefreshState } from "./refresh";
 import { confirmDestructive } from "./destructiveActions";
-import { buildGlobalPluginPolicyRequest, buildResetTeamPluginPolicyRequest, buildTeamPluginPolicyRequest, type TeamPluginDraft } from "./pluginPolicyMutations";
+import { buildGlobalPluginPolicyRequest, buildResetTeamPluginPolicyRequest, buildTeamPluginPolicyRequest, type GlobalPluginDraft, type TeamPluginDraft } from "./pluginPolicyMutations";
 import { buildAssignUserToTeamBody, buildRemoveUserFromTeamBody } from "./teamMembershipMutations";
 import type { DashboardData, TeamView, UserView } from "./types";
 const emptyData: DashboardData = { usage: {}, keys: { items: [] }, config: {}, providers: {}, summary: {}, plugins: {} };
@@ -68,7 +68,7 @@ export function DashboardApp() {
   useDashboardEventRefresh(eventRefresh, Boolean(user || needsSetup));
   useEffect(() => {
     const tick = () => { if ((user || needsSetup) && shouldPollDashboard(document.visibilityState)) reload({ quiet: true }); };
-    const timer = window.setInterval(tick, 5000);
+    const timer = window.setInterval(tick, 15000);
     const visible = () => { if (document.visibilityState === "visible") tick(); };
     document.addEventListener("visibilitychange", visible);
     return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", visible); };
@@ -117,7 +117,7 @@ export function DashboardApp() {
       if (options?.rethrow) throw err;
     }
   }
-  async function saveGlobalPluginPolicy(pluginId: string, value: { enabled: boolean; maxRisk: "green" | "yellow" | "orange" | "red" }) { await persistPluginPolicy(buildGlobalPluginPolicyRequest(data, pluginId, value)); }
+  async function saveGlobalPluginPolicy(pluginId: string, value: GlobalPluginDraft) { await persistPluginPolicy(buildGlobalPluginPolicyRequest(data, pluginId, value)); }
   async function saveTeamPluginPolicy(teamId: string, pluginId: string, value: TeamPluginDraft) { await persistPluginPolicy(buildTeamPluginPolicyRequest(data, teamId, pluginId, value)); }
   async function resetTeamPluginPolicy(teamId: string, pluginId: string) { await persistPluginPolicy(buildResetTeamPluginPolicyRequest(data, teamId, pluginId)); }
   async function persistPluginPolicy(request: { path: string; body: unknown }) {

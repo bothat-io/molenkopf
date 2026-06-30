@@ -1,4 +1,5 @@
 import { DEFAULT_CLI_PROVIDER_TIMEOUT_MS, type ProviderConfig } from "../providers/provider-catalog.ts";
+import { inferredCredentialAuthScheme, isAnthropicStyleProvider } from "../providers/provider-auth.ts";
 import { validateProviderTarget } from "../security/target-policy.ts";
 
 type JsonRecord = Record<string, unknown>;
@@ -28,6 +29,7 @@ function apiProvider(item: JsonRecord, index: number, id: string): ProviderConfi
   const credentialValue = undefined;
   const credentialRef = stringOrUndefined(auth.credentialRef) ?? "none";
   const credentialEnv = credentialEnvFromRef(credentialRef, id);
+  const protocol = protocolValue(item.protocol, item.kind, kind, target, `$.providers[${index}].protocol`);
   return {
     id,
     name: stringOrUndefined(item.name) ?? id,
@@ -36,14 +38,15 @@ function apiProvider(item: JsonRecord, index: number, id: string): ProviderConfi
     credentialEnv,
     credentialRef,
     credentialValue,
-    authScheme: authSchemeValue(auth.scheme, target, credentialEnv || credentialValue, `$.providers[${index}].auth.scheme`),
-    protocol: protocolValue(item.protocol, item.kind, kind, target, `$.providers[${index}].protocol`),
+    authScheme: authSchemeValue(auth.scheme, { protocol, kind: item.kind, target }, credentialEnv || credentialValue, `$.providers[${index}].auth.scheme`),
+    protocol,
     enabled: item.enabled === undefined ? true : boolean(item.enabled, `$.providers[${index}].enabled`)
   };
 }
 
 function cliProvider(item: JsonRecord, id: string, runtime: "claude" | "codex"): ProviderConfig {
-  if (item.inputMode === "argument" && item.allowUnsafeArgumentInput !== true) throw new Error(`unsafe CLI inputMode for provider: ${id}`);
+  const inputMode = cliInputMode(item.inputMode, id);
+  if (inputMode === "argument" && item.allowUnsafeArgumentInput !== true) throw new Error(`unsafe CLI inputMode for provider: ${id}`);
   return {
     id,
     name: stringOrUndefined(item.name) ?? id,
@@ -52,7 +55,7 @@ function cliProvider(item: JsonRecord, id: string, runtime: "claude" | "codex"):
     runtime,
     cliCommand: stringOrUndefined(item.command) ?? runtime,
     cliArgs: stringArray(item.args ?? (runtime === "codex" ? ["exec"] : ["--print"]), `$.providers.${id}.args`),
-    cliInputMode: item.inputMode === "argument" ? "argument" : "stdin",
+    cliInputMode: inputMode,
     cliTimeoutMs: positiveNumber(item.timeoutMs, DEFAULT_CLI_PROVIDER_TIMEOUT_MS),
     authScheme: "none",
     credentialRef: "none",
@@ -75,11 +78,10 @@ function credentialEnvFromRef(ref: string, id: string): string | undefined {
   return match[1];
 }
 
-function authSchemeValue(value: unknown, target: string, credential: string | undefined, path: string): ProviderConfig["authScheme"] {
+function authSchemeValue(value: unknown, provider: { protocol?: ProviderConfig["protocol"]; kind?: unknown; target?: string }, credential: string | undefined, path: string): ProviderConfig["authScheme"] {
   if (value === "bearer" || value === "x-api-key" || value === "none") return value;
   if (value !== undefined) throw new Error(`invalid provider auth.scheme: ${path}`);
-  if (!credential) return "none";
-  return target.includes("anthropic") ? "x-api-key" : "bearer";
+  return inferredCredentialAuthScheme(credential, provider);
 }
 
 function providerKind(value: unknown): ProviderConfig["kind"] {
@@ -97,7 +99,13 @@ function protocolValue(value: unknown, rawKind: unknown, kind: ProviderConfig["k
   if (value !== undefined) throw new Error(`invalid provider protocol: ${path}`);
   if (rawKind === "ollama" || target.includes("11434")) return "ollama-tags";
   if (kind === "local") return "openai-chat";
-  return target.includes("anthropic") || rawKind === "anthropic" ? "anthropic-messages" : "openai-responses";
+  return isAnthropicStyleProvider({ kind: rawKind, target }) ? "anthropic-messages" : "openai-responses";
+}
+
+function cliInputMode(value: unknown, id: string): ProviderConfig["cliInputMode"] {
+  if (value === undefined || value === "stdin") return "stdin";
+  if (value === "argument") return "argument";
+  throw new Error(`invalid CLI inputMode for provider: ${id}`);
 }
 
 function record(value: unknown, path: string): JsonRecord {

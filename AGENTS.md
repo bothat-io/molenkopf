@@ -16,3 +16,14 @@
 - Core and Proxy use Node built-ins only.
 - Dashboard dependencies stay in the isolated dashboard package.
 - Multi-account routing must use explicit profiles.
+
+## Integration and release flow
+
+- Before preview, main, Docker, release, or version work, read
+  `.claude/skills/molenkopf-release-ghcr/SKILL.md`.
+- Track the active workflow step from that skill while working.
+- Work branches target `preview` by GitHub PR.
+- Do not merge locally into `preview` or `main`.
+- Keep `preview` as the persistent integration branch.
+- Promote `preview` to `main` by GitHub PR after preview checks pass.
+- Keep version bumps such as `0.2.0` in a clearly scoped release commit or PR.

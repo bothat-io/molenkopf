@@ -1,15 +1,82 @@
 ---
 name: molenkopf-release-ghcr
-description: Molenkopf release workflow memory for GHCR Docker publishing, protected npm publishing, preview testing, SemVer tag handling, and README update timing. Use when changing release.yml, tagging releases, publishing containers, testing GHCR images, publishing npm packages, or documenting install instructions.
+description: Molenkopf release workflow memory for preview-to-main PR promotion, GHCR Docker publishing, protected npm publishing, preview testing, SemVer tag handling, and README update timing. Use when changing release.yml, targeting preview, merging to main, tagging releases, publishing containers, testing GHCR images, bumping versions, publishing npm packages, or documenting install instructions.
 ---
 
 # Molenkopf GHCR Release Workflow
 
 Use this workflow when working on Molenkopf releases or Docker publishing.
 
+## Agent Rule
+
+- Read this skill before integration, preview, main, Docker, or version work.
+- Before changing GitHub state, state the target release version, active branch,
+  active PR, base branch, head SHA, and active step.
+- State the active step by number and name while working.
+- Do not merge locally into `preview` or `main`.
+- Do not push directly to `preview` or `main` unless the user explicitly asks
+  for a repository-maintainer exception.
+- Use GitHub PRs for all branch promotion.
+- Keep guiding the user through the release. After each step, report what passed,
+  what is blocked, and the exact next step.
+
+## Branch And Version Discipline
+
+- `preview` is the persistent integration branch. Work happens on a release or
+  fix branch, then merges into `preview` by GitHub PR.
+- Versioned release branches must match the target release, for example
+  `preview-integration-0.2.0` for package version `0.2.0`.
+- Do not reuse a stale versioned branch name for a later version.
+- If a stale branch name is discovered before a PR is green, create a correctly
+  named branch/PR and close the stale PR.
+- If a stale branch name is discovered after the PR head is green and already
+  carries the correct package version, do not create a second branch during the
+  release. Explain the mismatch, keep the existing PR, and continue the current
+  release flow unless the user explicitly asks for branch cleanup.
+- The release version is determined by `package.json`/`package-lock.json`, the
+  merged `main` commit, and the final `vX.Y.Z` tag, not by an old branch name.
+
+## Preview To Main Flow
+
+1. Identify the target version and create or use a correctly named fix/release
+   branch.
+2. Commit only intentional files; keep ignored artifacts such as `fixme.md`,
+   `.env`, and local ZIPs out of commits.
+3. Push the branch and open a GitHub PR into `preview`.
+4. Wait for preview PR checks, including Docker/release gates when configured.
+5. Mark the PR ready for review only after the PR description and checks match
+   the intended release state.
+6. Merge into `preview` only through GitHub after the PR is green.
+7. Keep `preview` as the persistent integration branch; do not delete or locally
+   fast-forward it as a substitute for PR promotion.
+8. Wait for the `preview` push workflows, including preview Docker publishing,
+   to finish.
+9. When preview is accepted, open a second GitHub PR from `preview` into `main`.
+10. Merge into `main` only through GitHub after the main PR is green.
+11. Wait for the `main` push test workflow on the merged `main` commit.
+12. Create and push the official `vX.Y.Z` tag only from the verified `main`
+    commit.
+13. Wait for the tag-triggered release workflow and GHCR publishing.
+14. Make version bumps such as `0.2.0` in a release PR or a clearly scoped
+    release commit, not hidden inside unrelated fixes.
+
+## Squash-Only Main Fallback
+
+- First try the normal `preview` to `main` PR.
+- If that PR conflicts only because `preview` and `main` diverged through
+  squash merges, and the repository disallows merge commits, do not local-merge
+  into `preview` or `main`.
+- Create `release-X.Y.Z-main` from `origin/main`, restore the exact
+  `origin/preview` file tree onto it, commit, and open that branch to `main`.
+- In the PR body, link the validated preview PR, preview head SHA, and green
+  preview push workflows. State that this is the repo-compatible substitute for
+  the blocked `preview` to `main` PR.
+- Close the blocked direct PR as superseded only after the substitute PR exists.
+
 ## Current Policy
 
 - Treat `main` as the source for official releases.
+- Treat `preview` as the persistent integration branch before `main`.
 - Keep npm publishing manual and protected.
 - Ship Docker automatically from official SemVer tags; ship npm manually after
   the same release commit has passed validation.

@@ -9,6 +9,7 @@ import { PluginWorkspace } from "../plugins/PluginWorkspace";
 import { TeamMemberTree } from "./TeamMemberTree";
 import { tokensOf } from "../../app/format";
 import type { DashboardData, TeamView, UserView } from "../../app/types";
+import type { GlobalPluginDraft, TeamPluginDraft } from "../../app/pluginPolicyMutations";
 
 export function AdminTab(props: {
   data: DashboardData;
@@ -29,8 +30,8 @@ export function AdminTab(props: {
   onProviderTest: (id: string) => void;
   onProviderWeight: (id: string, share: number) => void;
   onPluginToggle: (id: string, enabled: boolean) => void;
-  onSaveGlobalPluginPolicy: (pluginId: string, value: { enabled: boolean; maxRisk: "green" | "yellow" | "orange" | "red" }) => Promise<void> | void;
-  onSaveTeamPluginPolicy: (teamId: string, pluginId: string, value: { enabledMode: "inherit" | "override"; enabled: boolean; maxRiskMode: "inherit" | "override"; maxRisk: "green" | "yellow" | "orange" | "red" }) => Promise<void> | void;
+  onSaveGlobalPluginPolicy: (pluginId: string, value: GlobalPluginDraft) => Promise<void> | void;
+  onSaveTeamPluginPolicy: (teamId: string, pluginId: string, value: TeamPluginDraft) => Promise<void> | void;
   onResetTeamPluginPolicy: (teamId: string, pluginId: string) => Promise<void> | void;
 }) {
   const users = mergeUsers(props.data.identity?.users || [], props.data.usage.users || []);

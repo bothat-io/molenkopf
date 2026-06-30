@@ -65,16 +65,22 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 }
 
 export function packageFailures(manifest, tarballPaths, baseDir = root) {
+  const tarballEntries = tarballPaths.map((item) => typeof item === "string" ? { path: item } : item);
+  const tarballPathSet = new Set(tarballEntries.map((item) => item.path));
   const listed = new Set(manifest.files ?? []);
   const failures = [];
   for (const file of requiredFiles) if (!existsSync(join(baseDir, file))) failures.push(`missing required package file: ${file}`);
   for (const file of requiredFiles) if (!isWhitelisted(file, listed)) failures.push(`package files does not include: ${file}`);
   for (const item of listed) if (isForbidden(item)) failures.push(`unsafe package files entry: ${item}`);
-  for (const path of tarballPaths) {
+  for (const { path } of tarballEntries) {
     if (isForbidden(path)) failures.push(`unsafe tarball path: ${path}`);
     if (!isApprovedTarballPath(path)) failures.push(`unexpected tarball path: ${path}`);
   }
-  for (const file of requiredFiles) if (!tarballPaths.includes(file)) failures.push(`tarball omits required file: ${file}`);
+  for (const file of requiredFiles) if (!tarballPathSet.has(file)) failures.push(`tarball omits required file: ${file}`);
+  for (const file of ["bin/molenkopf.js", "bin/launcher.js"]) {
+    const entry = tarballEntries.find((item) => item.path === file);
+    if (entry && typeof entry.mode === "number" && !executableMode(entry.mode) && !sourceExecutable(baseDir, file)) failures.push(`package bin is not executable: ${file}`);
+  }
   return failures;
 }
 
@@ -127,7 +133,20 @@ function packInventory(cwd) {
   const output = runNpm(["pack", "--dry-run", "--json", "--ignore-scripts"], cwd).toString("utf8");
   const result = JSON.parse(output);
   if (!Array.isArray(result) || result.length !== 1 || !Array.isArray(result[0].files)) throw new Error("invalid npm pack inventory");
-  return result[0].files.map((file) => file.path);
+  return result[0].files.map((file) => ({ path: file.path, mode: file.mode }));
+}
+
+function executableMode(mode) {
+  return (mode & 0o111) !== 0;
+}
+
+function sourceExecutable(baseDir, file) {
+  try {
+    const line = execFileSync("git", ["-C", baseDir, "ls-files", "--stage", file], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return line.startsWith("100755 ");
+  } catch {
+    return false;
+  }
 }
 
 function runNpm(args, cwd) {

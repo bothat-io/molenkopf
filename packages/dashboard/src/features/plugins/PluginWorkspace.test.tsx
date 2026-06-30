@@ -1,7 +1,8 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { PluginWorkspace, pluginDefaultMaxRisk } from "./PluginWorkspace";
+import { PluginWorkspace } from "./PluginWorkspace";
 import { pluginActionLabels } from "./PluginWorkspaceMeta";
+import { pluginDefaultMaxRisk } from "./PluginWorkspacePolicy";
 
 describe("PluginWorkspace", () => {
   it("renders one generic plugin surface with scope selection and plugin accordions", () => {

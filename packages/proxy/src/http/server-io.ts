@@ -31,26 +31,41 @@ export function readBody(req: IncomingMessage, timeoutMs = bodyTimeoutMs(), maxB
     let size = 0;
     let settled = false;
     const timer = setTimeout(() => fail(new Error(`request body timed out after ${timeoutMs}ms`)), timeoutMs);
-    req.on("data", (chunk) => {
+    const onData = (chunk: Buffer | string) => {
+      if (settled) return;
       size += Buffer.byteLength(chunk);
       if (size > maxBytes) return fail(new HttpInputError(413, "request_body_too_large"));
       chunks.push(Buffer.from(chunk));
-    });
-    req.on("aborted", () => fail(new Error("request body aborted")));
-    req.on("close", () => { if (!req.complete) fail(new Error("request body aborted")); });
-    req.on("error", fail);
-    req.on("end", () => done(Buffer.concat(chunks).toString("utf8")));
+    };
+    const onAborted = () => fail(new Error("request body aborted"));
+    const onClose = () => { if (!req.complete) fail(new Error("request body aborted")); };
+    const onError = (error: Error) => fail(error);
+    const onEnd = () => done(Buffer.concat(chunks).toString("utf8"));
+    req.on("data", onData);
+    req.on("aborted", onAborted);
+    req.on("close", onClose);
+    req.on("error", onError);
+    req.on("end", onEnd);
     function done(value: string): void {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      cleanup();
       resolve(value);
     }
     function fail(error: Error): void {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      chunks.length = 0;
+      cleanup();
       reject(error);
+    }
+    function cleanup(): void {
+      clearTimeout(timer);
+      req.off("data", onData);
+      req.off("aborted", onAborted);
+      req.off("close", onClose);
+      req.off("error", onError);
+      req.off("end", onEnd);
     }
   });
 }
